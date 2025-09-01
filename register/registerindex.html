@@ -275,8 +275,8 @@
                     <input type="tel" id="phone" class="form-input"  required>
                 </div>
                <div class="form-group">
-                    <label for="type">ประเภทการแข่งขัน</label>
-                    <select id="type" class="form-input" required>
+                    <label for="types">ประเภทการแข่งขัน</label>
+                    <select id="types" class="form-input" required>
                               <option value="">-- กรุณาเลือกประเภทการแข่งขัน --</option>
                               <option value="TOP100MEN">TOP100MEN</option>
                               <option value="TOP100WOMEN">TOP100WOMEN</option>
@@ -311,7 +311,7 @@
         const LIFF_ID = "2001781240-6kgL2p3b";
         const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-        const BUCKET_NAME = "user-uploads";
+        const BUCKET_NAME = "user-images";
         const TELEGRAM_BOT_TOKEN = "7617089207:AAFeY11dAem4mnmFvyXg5n2ZQCG8G1NflvM"; 
         const TELEGRAM_CHAT_ID = "7652385294"; 
        
@@ -493,7 +493,7 @@ async function sendTelegramNotification_ClientSide(formData, imageUrls) {
 <b>ชื่อ-สกุล:</b> ${formData.title} ${formData.first_name} ${formData.last_name}
 <b>อีเมล:</b> ${formData.email || "ไม่ได้กรอก"}
 <b>เบอร์โทร:</b> ${formData.phone || "ไม่ได้กรอก"}
-<b>ประเภทการแข่งขัน:</b> ${formData.type || "ไม่ได้กรอก"}
+<b>ประเภทการแข่งขัน:</b> ${formData.types || "ไม่ได้กรอก"}
 <b>จำนวนรูป:</b> ${imageUrls.length} รูป
 
 <a href="${imageUrls[0] || ' '}">ดูรูปภาพแรกที่อัปโหลด</a>
@@ -547,7 +547,7 @@ async function sendTelegramNotification_ClientSide(formData, imageUrls) {
                     last_name: document.getElementById('last_name').value,
                     email: document.getElementById('email').value,
                     phone: document.getElementById('phone').value,
-                    type: document.getElementById('type').value,
+                    type: document.getElementById('types').value,
                     uploaded_image_urls: imageUrls
                 };
 
