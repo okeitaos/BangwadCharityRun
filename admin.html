@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Admin LINE Chatbot</title>
-    <meta name="description" content="Admin LINE Chatbote for LIFF" />
+    <title>LINE Chatbot Admin</title>
+    <meta name="description" content="LINE Chatbot Admin for LIFF" />
     <meta name="author" content="iton5" />
-    <meta property="og:title" content="Admin LINE Chatbote-iton5-thailand" />
-    <meta property="og:description" content="Admin LINE Chatbot for LIFF" />
+    <meta property="og:title" content="LINE Chatbot Admin-iton5-thailand" />
+    <meta property="og:description" content="LINE Chatbot Admin for LIFF" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://lh3.googleusercontent.com/d/1Ck_OCfEW4dEp3A1k9yfQplYmW7qmwzFF" />
-   
+    <!-- Library Scripts -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -33,10 +33,11 @@
 
         .modal-content { background-color: var(--brand-dark); animation: modal-open 0.3s ease-out forwards; }
         
+        /* ✨ [แก้ไข] ปรับปรุงดีไซน์ Toggle Switch ให้สวยงามและสมดุล */
         .toggle-label {
             width: 50px;
             height: 28px;
-            background-color: #4B5563; 
+            background-color: #4B5563; /* Gray-600 */
             border-radius: 9999px;
             position: relative;
             cursor: pointer;
@@ -51,14 +52,14 @@
             background-color: white;
             top: 50%;
             left: 4px;
-            transform: translateY(-50%); 
+            transform: translateY(-50%); /* จัดให้อยู่กึ่งกลางแนวตั้ง */
             transition: transform 0.2s ease-in-out;
         }
         .toggle-checkbox:checked + .toggle-label {
-            background-color: #22C55E;
+            background-color: #22C55E; /* Green-500 */
         }
         .toggle-checkbox:checked + .toggle-label::before {
-           
+            /* เมื่อถูกเลือก ให้ขยับทั้งแกน X และ Y เพื่อให้ยังอยู่ตรงกลาง */
             transform: translateX(22px) translateY(-50%);
         }
           .loading-spinner {
@@ -66,10 +67,11 @@
             height: 40px;
             animation: spin 1s linear-infinite;
         }
-        
+
         .modal-body::-webkit-scrollbar { width: 8px; }
         .modal-body::-webkit-scrollbar-track { background: var(--brand-dark); }
         .modal-body::-webkit-scrollbar-thumb { background-color: #4B5563; border-radius: 10px; border: 2px solid var(--brand-dark); }
+
 
         .chat-bubble { max-width: 80%; padding: 10px 15px; border-radius: 20px; margin-bottom: 10px; }
         .user-bubble { background-color: #3B82F6; color: white; align-self: flex-end; border-bottom-right-radius: 5px; }
@@ -78,6 +80,7 @@
 </head>
 <body class="text-gray-200">
 
+    <!-- Main Container -->
     <div id="app-container" class="container mx-auto p-4 max-w-4xl hidden">
         <header class="text-center my-6">
             <h1 class="text-4xl font-bold gradient-text">Admin LINE Chatbot-AI</h1>
@@ -93,6 +96,7 @@
             </nav>
         </div>
 
+        <!-- Content Panels -->
         <main>
             <div id="panel-users">
                 <div class="sticky top-4 z-10 mb-6"><input id="userSearchInput" type="text" placeholder="ค้นหาด้วยชื่อ..." class="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"></div>
@@ -118,20 +122,24 @@
         </main>
     </div>
 
-
-    <div id="keyword-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-70 backdrop-blur-sm hidden">
+    <!-- Keyword Editor Modal -->
+   <div id="keyword-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-70 backdrop-blur-sm hidden">
         <div class="modal-content w-full max-w-2xl rounded-2xl shadow-lg max-h-[90vh] flex flex-col">
-            <form id="keywordForm" class="p-8 space-y-4 overflow-y-auto">
-                <h2 id="modalTitle" class="text-2xl font-bold text-white mb-4"></h2>
+            <div class="p-6 border-b border-gray-700">
+                <h2 id="modalTitle" class="text-2xl font-bold text-white"></h2>
+            </div>
+            <form id="keywordForm" class="p-6 space-y-4 overflow-y-auto modal-body">
                 <input type="hidden" id="keywordId">
                 <div><label for="keywordInput" class="block text-sm font-medium text-gray-300">คีย์เวิร์ด (คำสั่งหลัก)</label><input type="text" id="keywordInput" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white focus:ring-yellow-500 focus:border-yellow-500"></div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div><label for="replyImageInput" class="block text-sm font-medium text-gray-300">ตอบกลับด้วยรูปภาพ (URL)</label><input type="url" id="replyImageInput" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white focus:ring-yellow-500 focus:border-yellow-500"></div>
-                    <div><label for="replyRichmenuInput" class="block text-sm font-medium text-gray-300">เปลี่ยน Rich Menu (ID)</label><input type="text" id="replyRichmenuInput" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white focus:ring-yellow-500 focus:border-yellow-500"></div>
+                    <div><label for="replyImageInput" class="block text-sm font-medium text-gray-300">ตอบกลับด้วยรูปภาพ (URL)</label><input type="url" id="replyImageInput" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white"></div>
+                    <div><label for="replyRichmenuInput" class="block text-sm font-medium text-gray-300">เปลี่ยน Rich Menu (ID)</label><input type="text" id="replyRichmenuInput" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white"></div>
+                    <div><label for="replyPostbackInput" class="block text-sm font-medium text-gray-300">ข้อมูล Postback</label><input type="text" id="replyPostbackInput" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white"></div>
                 </div>
-                <div><label for="replyTextInput" class="block text-sm font-medium text-gray-300">ตอบกลับด้วยข้อความ (Text)</label><textarea id="replyTextInput" rows="3" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white focus:ring-yellow-500 focus:border-yellow-500"></textarea></div>
-                <div><label for="replyFlexInput" class="block text-sm font-medium text-gray-300">ตอบกลับด้วย Flex Message (JSON)</label><textarea id="replyFlexInput" rows="5" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white focus:ring-yellow-500 focus:border-yellow-500"></textarea></div>
-                <div><label for="replyPromptInput" class="block text-sm font-medium text-gray-300">คำสั่งสำหรับ AI (Prompt)</label><textarea id="replyPromptInput" rows="3" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white focus:ring-yellow-500 focus:border-yellow-500"></textarea></div>
+                <div><label for="replyTextInput" class="block text-sm font-medium text-gray-300">ตอบกลับด้วยข้อความ (Text)</label><textarea id="replyTextInput" rows="3" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white"></textarea></div>
+                <div><label for="replyFlexInput" class="block text-sm font-medium text-gray-300">ตอบกลับด้วย Flex Message (JSON)</label><textarea id="replyFlexInput" rows="5" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white"></textarea></div>
+                <div><label for="replyTemplateInput" class="block text-sm font-medium text-gray-300">ตอบกลับด้วย Template Message (JSON)</label><textarea id="replyTemplateInput" rows="5" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white"></textarea></div>
+                <div><label for="replyPromptInput" class="block text-sm font-medium text-gray-300">คำสั่งสำหรับ AI (Prompt)</label><textarea id="replyPromptInput" rows="3" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white"></textarea></div>
                 <div class="flex items-center justify-between pt-2">
                      <label for="requireVipInput" class="block text-sm font-medium text-gray-300">จำกัดสิทธิ์เฉพาะ VIP</label>
                      <div class="relative inline-block w-10 align-middle select-none">
@@ -139,15 +147,17 @@
                         <label for="requireVipInput" class="toggle-label block"></label>
                     </div>
                 </div>
-                <div class="flex justify-end space-x-4 pt-4">
-                    <button type="button" id="cancelKeywordBtn" class="px-4 py-2 bg-gray-600 rounded-lg hover:bg-gray-500">ยกเลิก</button>
-                    <button type="submit" id="saveKeywordBtn" class="px-4 py-2 bg-yellow-500 text-gray-900 font-bold rounded-lg hover:bg-yellow-400">บันทึก</button>
-                </div>
             </form>
+            <div class="p-6 border-t border-gray-700 mt-auto bg-gray-800 rounded-b-2xl">
+                <div class="flex justify-end space-x-4">
+                    <button type="button" id="cancelKeywordBtn" class="px-4 py-2 bg-gray-600 rounded-lg hover:bg-gray-500">ยกเลิก</button>
+                    <button type="submit" form="keywordForm" class="px-4 py-2 bg-yellow-500 text-gray-900 font-bold rounded-lg hover:bg-yellow-400">บันทึก</button>
+                </div>
+            </div>
         </div>
     </div>
     
-
+    <!-- Permission Editor Modal -->
     <div id="permission-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-70 backdrop-blur-sm hidden">
         <div class="modal-content w-full max-w-lg rounded-2xl shadow-lg">
             <form id="permissionForm" class="p-8 space-y-4">
@@ -177,7 +187,7 @@
                 <button id="closeChatHistoryBtn" class="p-2 text-2xl text-gray-400 hover:text-white">&times;</button>
             </div>
             <div id="chatHistoryModalBody" class="p-6 overflow-y-auto modal-body flex flex-col space-y-2">
-                <!-- ประวัติแชทกับ AI -->
+                <!-- Chat bubbles will be injected here -->
             </div>
         </div>
     </div>
@@ -187,7 +197,7 @@
         <p id="action-loading-text" class="text-lg font-semibold text-white"></p>
     </div>
 
-    
+    <!-- Initial Screen -->
     <div id="initial-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900">
         <div id="loadingIndicator" class="text-center">
             <div class="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
@@ -200,12 +210,12 @@
     </div>
 
     <script>
-       
-        const LIFF_ID = "2001781240-8eDz6XwW"; 
-        const ADMIN_API_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/admin-api"; 
+        // --- 🚨 Configuration 🚨 ---
+        const LIFF_ID = "2001781240-8eDz6XwW"; // <-- 🚨 ใส่ LIFF ID ของคุณ
+        const ADMIN_API_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/admin-api"; // <-- 🚨 ใส่ URL ของ Function 'admin-api'
         const botbasicId = "@368jwqsw"
       
-     
+      // --- DOM Elements ---
         const tabUsers = document.getElementById('tab-users');
         const tabKeywords = document.getElementById('tab-keywords');
         const tabPermissions = document.getElementById('tab-permissions');
@@ -240,7 +250,7 @@
             actionLoadingOverlay.classList.remove('flex');
         }
 
-        
+        // --- Helper function for authenticated API calls ---
         async function apiFetch(endpoint, options = {}) {
             const accessToken = liff.getAccessToken();
             if (!accessToken) throw new Error("Not logged in");
@@ -256,6 +266,7 @@
             return response.json();
         }
 
+        // --- Main App Initialization ---
         document.addEventListener("DOMContentLoaded", async () => {
             try {
                 await liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true  });
@@ -283,7 +294,7 @@
             }
         });
         
-   
+        // --- Tab Navigation ---
         tabUsers.addEventListener('click', () => switchTab('users'));
         tabKeywords.addEventListener('click', () => switchTab('keywords'));
         tabPermissions.addEventListener('click', () => switchTab('permissions'));
@@ -311,7 +322,7 @@
             }
         }
         
-      
+        // --- User Management ---
         let userSearchTimeout;
         userSearchInput.addEventListener('keyup', () => {
             clearTimeout(userSearchTimeout);
@@ -344,7 +355,7 @@
                     });
                 }
             } catch (error) {
-              
+                // userList.innerHTML = `<p class="text-center text-red-500">เกิดข้อผิดพลาด: ${error.message}</p>`;
                 console.error("เกิดข้อผิดพลาด:", error.message);
                 userList.innerHTML = `<div  class="text-center "><h2 class="text-3xl font-bold text-red-500">ขอโทษด้วย</h2><p class="mt-2 text-gray-400">คุณไม่มีสิทธิ์เข้าใช้งานหน้านี้</p>
         </div>`;
@@ -372,10 +383,11 @@
             }
         });
 
+        // --- Keyword Management ---
         document.getElementById('addKeywordBtn').addEventListener('click', () => openKeywordModal());
         document.getElementById('cancelKeywordBtn').addEventListener('click', () => closeKeywordModal());
 
-         async function loadKeywords() {
+        async function loadKeywords() {
              keywordList.innerHTML = `<p class="text-center text-gray-400">กำลังโหลดคีย์เวิร์ด...</p>`;
              try {
                 const keywords = await apiFetch('/keywords');
@@ -489,7 +501,7 @@
             });
         }
 
-      
+        // --- VIP Permission Management ---
         document.getElementById('addPermissionBtn').addEventListener('click', () => openPermissionModal());
         document.getElementById('cancelPermissionBtn').addEventListener('click', () => closePermissionModal());
         
@@ -525,7 +537,8 @@
                     });
                 }
             } catch (error) {
-                console.error("เกิดข้อผิดพลาด:", error.message);
+                // permissionList.innerHTML = `<p class="text-center text-red-500">เกิดข้อผิดพลาด: ${error.message}</p>`;
+                 console.error("เกิดข้อผิดพลาด:", error.message);
                 permissionList.innerHTML = `<div  class="text-center "><h2 class="text-3xl font-bold text-red-500">ขอโทษด้วย</h2><p class="mt-2 text-gray-400">คุณไม่มีสิทธิ์เข้าใช้งานหน้านี้</p>
         </div>`;
        
@@ -663,7 +676,7 @@
                         bubble.textContent = msg.message;
                         modalBody.appendChild(bubble);
                     });
-                    
+                    // Scroll to the bottom
                     modalBody.scrollTop = modalBody.scrollHeight;
                 }
             } catch (error) {
