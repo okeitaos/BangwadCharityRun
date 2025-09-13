@@ -131,28 +131,79 @@
 
         
         
+        // async function handleRegistration() {
+        //     const phone = phoneInput.value.trim();
+        //     if (phone.length < 10) { Swal.fire('ข้อมูลไม่ถูกต้อง', 'กรุณากรอกเบอร์โทรให้ครบ 10 หลัก', 'warning'); return; }
+        //     registerBtn.disabled = true;
+        //     registerBtn.innerHTML = 'กำลังบันทึก...';
+        //     try {
+        //         const { data, error } = await db.from('user_profiles').upsert({
+        //             userId: lineProfile.userId, displayName: lineProfile.displayName,
+        //             pictureUrl: lineProfile.pictureUrl, phone: phone, updated_at: new Date()
+        //         }).select().single();
+        //         if (error) throw error;
+        //         userProfile = data;
+        //         phoneModal.classList.add('hidden');
+        //         loadingOverlay.classList.remove('hidden');
+        //         await loadApp();
+        //     } catch(error) {
+        //         console.error("Registration error:", error);
+        //         Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้', 'error');
+        //         registerBtn.disabled = false;
+        //         registerBtn.innerHTML = 'ยืนยันเบอร์โทร';
+        //     }
+        // }
+
         async function handleRegistration() {
-            const phone = phoneInput.value.trim();
-            if (phone.length < 10) { Swal.fire('ข้อมูลไม่ถูกต้อง', 'กรุณากรอกเบอร์โทรให้ครบ 10 หลัก', 'warning'); return; }
-            registerBtn.disabled = true;
-            registerBtn.innerHTML = 'กำลังบันทึก...';
-            try {
-                const { data, error } = await db.from('user_profiles').upsert({
-                    userId: lineProfile.userId, displayName: lineProfile.displayName,
-                    pictureUrl: lineProfile.pictureUrl, phone: phone, updated_at: new Date()
-                }).select().single();
-                if (error) throw error;
-                userProfile = data;
-                phoneModal.classList.add('hidden');
-                loadingOverlay.classList.remove('hidden');
-                await loadApp();
-            } catch(error) {
-                console.error("Registration error:", error);
-                Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้', 'error');
-                registerBtn.disabled = false;
-                registerBtn.innerHTML = 'ยืนยันเบอร์โทร';
-            }
+    const phone = phoneInput.value.trim();
+    if (phone.length < 10) {
+        Swal.fire('ข้อมูลไม่ถูกต้อง', 'กรุณากรอกเบอร์โทรให้ครบ 10 หลัก', 'warning');
+        return;
+    }
+
+    registerBtn.disabled = true;
+    registerBtn.innerHTML = 'กำลังบันทึก...';
+
+    try {
+        // 🔍 เช็กก่อนว่าเบอร์นี้มีอยู่แล้วหรือไม่ (และไม่ใช่ของ user ปัจจุบัน)
+        const { data: existing, error: checkError } = await db
+            .from('user_profiles')
+            .select('userId')
+            .eq('phone', phone)
+            .neq('userId', lineProfile.userId);
+
+        if (checkError) throw checkError;
+
+        if (existing && existing.length > 0) {
+            Swal.fire('เบอร์นี้ถูกใช้แล้ว', 'กรุณาใช้เบอร์อื่น', 'error');
+            registerBtn.disabled = false;
+            registerBtn.innerHTML = 'ยืนยันเบอร์โทร';
+            return;
         }
+
+        // ✅ ถ้าไม่ซ้ำ จึงบันทึกหรืออัปเดตข้อมูลของ user ปัจจุบัน
+        const { data, error } = await db.from('user_profiles').upsert({
+            userId: lineProfile.userId,
+            displayName: lineProfile.displayName,
+            pictureUrl: lineProfile.pictureUrl,
+            phone: phone,
+            updated_at: new Date()
+        }).select().single();
+
+        if (error) throw error;
+
+        userProfile = data;
+        phoneModal.classList.add('hidden');
+        loadingOverlay.classList.remove('hidden');
+        await loadApp();
+
+    } catch (error) {
+        console.error("Registration error:", error);
+        Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้', 'error');
+        registerBtn.disabled = false;
+        registerBtn.innerHTML = 'ยืนยันเบอร์โทร';
+    }
+}
 
         async function loadApp() {
             userPicture.src = userProfile.pictureUrl || 'https://img.icons8.com/?size=80&id=492ILERveW8G&format=png';
