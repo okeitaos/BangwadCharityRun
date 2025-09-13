@@ -117,17 +117,78 @@
             }
         }
 
+        // async function checkUserRegistration() {
+        //     const { data, error } = await db.from('user_profiles').select('*').eq('userId', lineProfile.userId).single();
+        //     if (error && error.code !== 'PGRST116') throw error;
+        //     if (!data || !data.phone) {
+        //         loadingOverlay.classList.add('hidden');
+        //         phoneModal.classList.remove('hidden');
+        //     } else {
+        //         userProfile = data;
+        //         await loadApp();
+        //     }
+        // }
+
+
         async function checkUserRegistration() {
-            const { data, error } = await db.from('user_profiles').select('*').eq('userId', lineProfile.userId).single();
-            if (error && error.code !== 'PGRST116') throw error;
-            if (!data || !data.phone) {
-                loadingOverlay.classList.add('hidden');
-                phoneModal.classList.remove('hidden');
-            } else {
-                userProfile = data;
-                await loadApp();
+    const { data, error } = await db.from('user_profiles')
+        .select('*')
+        .eq('userId', lineProfile.userId)
+        .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+
+    if (!data || !data.phone) {
+        loadingOverlay.classList.add('hidden');
+        phoneModal.classList.remove('hidden');
+
+        // 🆕 เพิ่ม event ตอนกดบันทึกเบอร์โทร
+        const savePhoneBtn = document.getElementById('savePhoneBtn');
+        const phoneInput = document.getElementById('phoneInput');
+
+        savePhoneBtn.onclick = async () => {
+            const phone = phoneInput.value.trim();
+
+            if (!phone) {
+                alert('กรุณากรอกเบอร์โทร');
+                return;
             }
-        }
+
+            // 🔍 ตรวจสอบเบอร์ซ้ำ
+            const { data: existing, error: phoneError } = await db.from('user_profiles')
+                .select('userId')
+                .eq('phone', phone)
+                .single();
+
+            if (existing) {
+                alert('เบอร์นี้มีผู้ใช้งานแล้ว');
+                return;
+            }
+
+            // ✅ บันทึกเบอร์เข้า user_profiles
+            const { error: insertError } = await db.from('user_profiles')
+                .upsert({
+                    userId: lineProfile.userId,
+                    phone: phone
+                });
+
+            if (insertError) {
+                alert('เกิดข้อผิดพลาดในการบันทึก');
+                console.error(insertError);
+                return;
+            }
+
+            phoneModal.classList.add('hidden');
+            userProfile = { userId: lineProfile.userId, phone: phone };
+            await loadApp();
+        };
+    } else {
+        userProfile = data;
+        await loadApp();
+    }
+}
+
+        
         
         async function handleRegistration() {
             const phone = phoneInput.value.trim();
