@@ -463,7 +463,7 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
 
   try {
     // duplicate check using national_id field (assumes that DB column exists)
-    const { data: existing, error: exErr } = await supabaseClient.from("kaimukandaman")
+    const { data: existing, error: exErr } = await supabaseClient.from("bandwad")
       .select("national_id")
       .eq("national_id", rawId);
 
@@ -493,7 +493,7 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
     const slipUrl = `${SUPABASE_URL}/storage/v1/object/public/slips/${encodeURIComponent(fileName)}`;
 
     // insert record
-    const { error: insertError } = await supabaseClient.from("kaimukandaman").insert([{
+    const { error: insertError } = await supabaseClient.from("bangwad").insert([{
       first_name: firstName,
       last_name: lastName,
       national_id: rawId,
