@@ -197,6 +197,33 @@ footer p {
 a { color: #FFD700; text-decoration: none; }
 a:hover { color: #cf142b; }
 
+    .race-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 25px;
+  margin-top: 30px;
+  justify-items: center;
+}
+
+.race-card {
+  background: linear-gradient(145deg, #00247d, #000);
+  padding: 25px 15px;
+  border-radius: 20px;
+  box-shadow: 0 6px 15px rgba(207,20,43,0.6);
+  color: #fff;
+  transition: transform 0.3s, box-shadow 0.3s;
+  text-align: center;
+  
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  height: 150px; /* กำหนดความสูงเท่ากัน */
+  width: 100%;   /* ให้เต็มคอลัมน์ */
+  box-sizing: border-box;
+}
+
   </style>
 </head>
 <body>
