@@ -1,739 +1,559 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modern Registration</title>
-    <meta name="description" content="Modern Registration for LIFF App" />
-    <meta name="author" content="iton5" />
-    <meta property="og:title" content="Modern Registration-iton5-thailand" />
-    <meta property="og:description" content="Modern Registration for LIFF App" />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lh3.googleusercontent.com/d/1Ck_OCfEW4dEp3A1k9yfQplYmW7qmwzFF" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <link rel="stylesheet" href="https://bit.ly/fontiton5" type="text/css" charset="utf-8" />
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap');
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ลงทะเบียนวิ่ง | Running Registration</title>
+<style>
+  body { 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    background: linear-gradient(135deg, #0f172a, #1e293b, #0f172a); 
+    color:#fff; margin:0; padding:20px; min-height:100vh;
+    display:flex; justify-content:center; align-items:center;
+  }
+  form.container {
+    position: relative; width:100%; max-width:540px;
+    background: rgba(255,255,255,0.05); border-radius:20px; padding:28px;
+    backdrop-filter: blur(12px); box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+    border:1px solid rgba(255,255,255,0.08); text-align:left;
+  }
+  .logo { display:block; margin:0 auto 12px auto; width:66px; height:66px; }
+  h1 { text-align:center; font-size:1.6rem; color:#facc15; margin-bottom:4px;}
+  h2 { text-align:center; font-size:0.95rem; color:#cbd5e1; margin-bottom:14px; }
+  label { display:block; font-weight:600; margin-bottom:6px; margin-top:12px; font-size:0.95rem; }
+  .row { display:flex; gap:10px; align-items:center; }
+  input, select {
+    width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.06); color:#fff; font-size:0.96rem; outline:none;
+    transition: all 0.18s ease; box-sizing:border-box;
+  }
+  input:focus, select:focus { border-color:#facc15; box-shadow:0 3px 12px rgba(250,204,21,0.12); }
+  .small { width:130px; }
+  .inline { display:flex; gap:8px; }
+  .hint { font-size:0.85rem; color:#ffd; margin-top:6px; }
+  .error { font-size:0.85rem; color:#ff7b7b; margin-top:6px; white-space:pre-line; }
+  button#submitBtn {
+    display:block; width:100%; padding:12px; margin-top:18px;
+    background: linear-gradient(90deg,#facc15,#f59e0b); border:none; border-radius:12px;
+    cursor:pointer; font-size:1rem; font-weight:700; color:#111;
+  }
+  button#submitBtn:disabled { opacity:0.6; cursor:not-allowed; transform:none; }
+  #loading { display:none; text-align:center; margin-top:8px; font-style:italic; color:#cbd5e1; }
 
-        body {
-            font-family: 'line_seed_sans_th';
-            background: linear-gradient(135deg, #f0f4f8, #d9e2ec);
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            padding: 20px;
-            box-sizing: border-box;
-        }
+  .lang-switch {
+    position:absolute; top:12px; right:12px; background:#facc15; color:#000;
+    border:none; padding:6px 12px; border-radius:20px; cursor:pointer; font-weight:700;
+    font-size:0.85rem; display:flex; align-items:center; gap:6px;
+  }
+  .lang-switch:hover { transform:scale(1.02); }
 
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-        }
+  #resultModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+                background: rgba(0,0,0,0.7); justify-content:center; align-items:center; z-index:999; }
+  .modal-content { background:#fff; color:#000; padding:20px; border-radius:14px; width:92%; max-width:420px; text-align:center; }
+  .close-btn { position:absolute; top:8px; right:8px; background:#ef4444; color:#fff; border:none; border-radius:50%; width:34px; height:34px; cursor:pointer; font-weight:bold; }
+  .close-btn:hover { background:#dc2626; }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+  @media (max-width:520px){
+    form.container { padding:18px; }
+    .small { width:110px; }
+  }
 
-        .card {
-            background: #ffffff;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 500px;
-            padding: 30px 40px;
-            box-sizing: border-box;
-            animation: fadeIn 0.6s ease-out forwards;
-        }
+  
+  input, select {
+    width:100%;
+    padding:12px 14px;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.08);
+    color:#fff;
+    font-size:0.95rem;
+    outline:none;
+    transition: all 0.2s ease;
+    box-sizing:border-box;
+  }
+  input:focus, select:focus {
+    border-color:#facc15;
+    background: rgba(255,255,255,0.12);
+    box-shadow:0 0 0 3px rgba(250,204,21,0.25);
+  }
+  label {
+    font-weight:600;
+    margin-bottom:6px;
+    display:block;
+    font-size:0.92rem;
+    color:#fefefe;
+  }
 
-       
-        .screen {
-            display: none;
-        }
-        .screen.active {
-            display: block;
-        }
+  /* จัด layout document type + id ให้ align กัน */
+  .doc-row {
+    display:flex;
+    gap:12px;
+    margin-top:14px;
+  }
+  .doc-row > div {
+    flex:1;
+    display:flex;
+    flex-direction:column;
+  }
+  #idHint {
+    font-size:0.8rem;
+    color:#e0e0a0;
+    margin-top:4px;
+  }
+  #idError {
+    font-size:0.8rem;
+    color:#ff6b6b;
+    margin-top:4px;
+  }
 
-        h1 {
-            text-align: center;
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 2rem;
-            background: linear-gradient(45deg, #00b09b, #96c93d);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
 
-        .form-group {
-            margin-bottom: 1.25rem;
-        }
+</style>
 
-        label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #4a5568;
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-
-        .form-input, .form-select {
-            width: 100%;
-            padding: 12px 15px;
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            box-sizing: border-box;
-            font-size: 1rem;
-            color: #2d3748;
-            background-color: #f7fafc;
-            transition: all 0.3s ease;
-        }
-
-        .form-input:focus, .form-select:focus {
-            outline: none;
-            border-color: #00b09b;
-            box-shadow: 0 0 0 3px rgba(0, 176, 155, 0.2);
-            background-color: #ffffff;
-        }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: 1fr 2fr;
-            gap: 1rem;
-        }
-
-        .btn {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .btn-primary {
-            background: linear-gradient(45deg, #00b09b, #96c93d);
-            color: white;
-            box-shadow: 0 4px 15px rgba(0, 176, 155, 0.3);
-        }
-
-        .btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 20px rgba(0, 176, 155, 0.4);
-        }
-
-        .btn:active {
-            transform: translateY(0);
-            box-shadow: 0 4px 15px rgba(0, 176, 155, 0.3);
-        }
-
-        .btn-secondary {
-            background-color: #e2e8f0;
-            color: #4a5568;
-        }
-        .btn-secondary:hover {
-            background-color: #cbd5e0;
-            box-shadow: none;
-        }
-
-        .pdpa-box {
-            background-color: #f7fafc;
-            border: 1px solid #e2e8f0;
-            padding: 15px;
-            border-radius: 10px;
-            height: 500px;
-            overflow-y: auto;
-            color: #718096;
-            font-size: 0.9rem;
-            margin-bottom: 1.5rem;
-        }
-        .pdpa-actions {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .file-input-wrapper {
-            border: 2px dashed #e2e8f0;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            cursor: pointer;
-            transition: background-color 0.3s, border-color 0.3s;
-        }
-        .file-input-wrapper:hover {
-            background-color: #f7fafc;
-            border-color: #00b09b;
-        }
-        #imageUpload { display: none; }
-        .image-preview-container { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
-        .image-preview-item { width: 70px; height: 70px; border-radius: 10px; overflow: hidden; }
-        .image-preview-item img { width: 100%; height: 100%; object-fit: cover; }
-
-        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.8); backdrop-filter: blur(5px); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
-        .spinner { border: 5px solid #e2e8f0; border-top: 5px solid #00b09b; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
-        #loading-text { color: #4a5568; font-weight: 600; margin-top: 20px; }
-        .hidden { display: none !important; }
-        #status { text-align: center; margin-top: 1.5rem; font-weight: 600; min-height: 24px; }
-        .profile-header {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-bottom: 1.5rem;
-        }
-
-        .profile-image {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            border: 4px solid #ffffff;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-            object-fit: cover;
-        }
-
-        .profile-name {
-            margin-top: 0.75rem;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #2d3748;
-        }
-    </style>
-    </head>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
 <body>
 
-    <div class="card">
-        <div id="screen-loading" class="screen active">
-             <h1>กำลังโหลด...</h1>
-        </div>
+<form class="container" id="registerForm" novalidate>
+  <button type="button" class="lang-switch" id="langToggleBtn" onclick="toggleLang()">
+    <span id="langFlag">🇹🇭</span> <span id="langText">TH</span>
+  </button>
 
-        <div id="screen-pdpa" class="screen">
-            <h1>ข้อตกลงการใช้งาน</h1>
-            <div class="pdpa-box">
-                <p><strong>นโยบายคุ้มครองข้อมูลส่วนบุคคล (Privacy Policy)</strong></p>
-                <p class="mt-2">บริษัทฯ ให้ความสำคัญกับการคุ้มครองข้อมูลส่วนบุคคลของท่าน เพื่อให้ท่านมั่นใจได้ว่าข้อมูลที่ท่านมอบให้จะถูกนำไปใช้ตรงตามวัตถุประสงค์และเป็นไปตามที่กฎหมายกำหนด</p>
+  <img src="https://cdn-icons-png.flaticon.com/512/1041/1041883.png" class="logo" alt="Logo">
+  <h1 id="formTitle">ลงทะเบียนวิ่ง</h1>
+  <h2 id="formSubtitle">Running Registration Form</h2>
 
-                <p class="mt-3"><strong>1. ข้อมูลที่เก็บรวบรวม:</strong></p>
-                <p>เราจะเก็บข้อมูลของท่านซึ่งรวมถึงแต่ไม่จำกัดเพียง: ข้อมูลโปรไฟล์จาก LINE (User ID, ชื่อที่แสดง, รูปโปรไฟล์), ชื่อ-นามสกุล, คำนำหน้าชื่อ, อีเมล, เบอร์โทรศัพท์ และรูปภาพที่ท่านอัปโหลดผ่านแบบฟอร์มนี้</p>
+  <label id="labelFirstName">ชื่อ</label>
+  <input type="text" id="firstName" required>
 
-                <p class="mt-3"><strong>2. วัตถุประสงค์ในการเก็บข้อมูล:</strong></p>
-                <p>เพื่อใช้ในการยืนยันตัวตน, ดำเนินการลงทะเบียนเข้าร่วมกิจกรรม, และเพื่อการติดต่อสื่อสารที่เกี่ยวข้องกับกิจกรรมนี้เท่านั้น บริษัทฯ จะไม่นำข้อมูลของท่านไปใช้เพื่อวัตถุประสงค์อื่นนอกเหนือจากที่แจ้งไว้โดยไม่ได้รับความยินยอมจากท่านก่อน</p>
+  <label id="labelLastName">นามสกุล</label>
+  <input type="text" id="lastName" required>
 
-                <p class="mt-3"><strong>3. การจัดเก็บและรักษาความปลอดภัย:</strong></p>
-                <p>ข้อมูลของท่านจะถูกจัดเก็บอย่างปลอดภัยบนระบบฐานข้อมูลที่มีมาตรการรักษาความปลอดภัยที่เหมาะสม และจะถูกเก็บรักษาไว้เท่าที่จำเป็นสำหรับวัตถุประสงค์ที่กล่าวมาข้างต้น</p>
-
-                <p class="mt-3"><strong>4. สิทธิของเจ้าของข้อมูล:</strong></p>
-                <p>ท่านมีสิทธิในการเข้าถึง, แก้ไข, หรือร้องขอให้ลบข้อมูลส่วนบุคคลของท่านได้ตลอดเวลา โดยสามารถติดต่อเราได้ตามช่องทางที่ระบุไว้</p>
-
-                <p class="mt-4">การกดปุ่ม "ยินยอม" ถือว่าท่านได้อ่านและเข้าใจข้อตกลงและนโยบายคุ้มครองข้อมูลส่วนบุคคลฉบับนี้โดยละเอียดแล้ว</p>
-            </div>
-            <div class="pdpa-actions">
-                <button id="btn-pdpa-disagree" class="btn btn-secondary">ไม่ยินยอม</button>
-                <button id="btn-pdpa-agree" class="btn btn-primary">ยินยอม</button>
-            </div>
-        </div>
-
-        <div id="screen-form" class="screen">
-                <h1
-                    class="text-2xl font-extrabold tracking-tight text-gray-900 dark:text-slate-200 sm:text-3xl md:text-4xl">ลงทะเบียน</h1>
-            <div class="profile-header mt-4">
-                <img id="profileImage" src="" alt="Profile Picture" class="profile-image">
-                <p class="profile-name">สวัสดี, <span id="displayName"></span>!</p>
-            </div>
-            <form id="registrationForm">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="title">คำนำหน้า</label>
-                        <select id="title" class="form-select" required>
-                            <option value="นาย">นาย</option>
-                            <option value="นาง">นาง</option>
-                            <option value="นางสาว">นางสาว</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="first_name">ชื่อ</label>
-                        <input type="text" id="first_name" class="form-input" required>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="last_name">นามสกุล</label>
-                    <input type="text" id="last_name" class="form-input" required>
-                </div>
-                <div class="form-group">
-                    <label for="email">อีเมล</label>
-                    <input type="email" id="email" class="form-input" placeholder="example@email.com" required>
-                </div>
-                <div class="form-group">
-                    <label for="phone">เบอร์โทรศัพท์</label>
-                    <input type="tel" id="phone" class="form-input"  required>
-                </div>
-               <div class="form-group">
-                    <label for="types">ประเภทการแข่งขัน</label>
-                    <select id="types" class="form-input" required>
-                              <option value="">-- กรุณาเลือกประเภทการแข่งขัน --</option>
-                              <option value="TOP100MEN">TOP100MEN</option>
-                              <option value="TOP100WOMEN">TOP100WOMEN</option>
-                             
-  </select>
+  <!-- ID type + input -->
+  <div class="doc-row">
+  <div>
+    <label id="labelIdType">ประเภทเอกสาร</label>
+    <select id="idType">
+      <option value="auto">Auto-detect</option>
+      <option value="thaiid">บัตรประชาชน</option>
+      <option value="passport">Passport</option>
+    </select>
+  </div>
+  <div>
+    <label id="labelNationalId">เลขบัตรประชาชน / Passport</label>
+    <input type="text" id="nationalId" autocomplete="off" inputmode="text"/>
+    <div id="idHint" class="hint"></div>
+    <div id="idError" class="error" style="display:none"></div>
+  </div>
 </div>
 
-                <div class="form-group">
-                    <label for="imageUpload">อัปโหลดรูปภาพ (สูงสุด 5 รูป)</label>
-                    <label for="imageUpload" class="file-input-wrapper">
-                        <span id="file-input-text">คลิกเพื่อเลือกไฟล์</span>
-                    </label>
-                    <input type="file" id="imageUpload" accept="image/*" multiple>
-                    <div id="image-preview" class="image-preview-container"></div>
-                </div>
-                <div class="form-group">
-                    <button type="submit" class="btn btn-primary">ยืนยันการลงทะเบียน</button>
-                </div>
-            </form>
-        </div>
+  <label id="labelPhone">เบอร์โทรศัพท์</label>
+  <input type="tel" id="phone" maxlength="10" required>
 
-        <p id="status"></p>
-    </div>
+  <label id="labelEmail">Email</label>
+  <input type="email" id="email" required>
 
-    <div id="loading-overlay" class="hidden">
-        <div class="spinner"></div>
-        <p id="loading-text">โปรดรอสักครู่...</p>
-    </div>
+  <label id="labelAge">อายุ</label>
+  <input type="number" id="age" min="1" max="99" required>
 
-    <script>
+  <label id="labelShirtSize">ไซส์เสื้อ / Shirt Size</label>
+  <select id="shirtSize" required>
+    <option value="">-- เลือกไซส์เสื้อ --</option>
+    <option value="XS">XS 34"</option>
+    <option value="S">S 36"</option>
+    <option value="M">M 38"</option>
+    <option value="L">L 40"</option>
+    <option value="XL">XL 42"</option>
+    <option value="2XL">2XL 44"</option>
+    <option value="3XL">3XL 46"</option>
+    <option value="4XL">4XL 48"</option>
+  </select>
 
-        const LIFF_ID = "2001781240-6kgL2p3b";
-        const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-        const BUCKET_NAME = "user-images";
-        const TELEGRAM_BOT_TOKEN = "7617089207:AAFeY11dAem4mnmFvyXg5n2ZQCG8G1NflvM"; 
-        const TELEGRAM_CHAT_ID = "7652385294"; 
-       
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        let liffProfile = null;
+  <label id="labelCategory">รุ่นอายุ/เพศ</label>
+  <select id="category" required>
+    <option value="">-- เลือกรุ่นการแข่งขัน --</option>
+  </select>
 
-        const screens = {
-            loading: document.getElementById('screen-loading'),
-            pdpa: document.getElementById('screen-pdpa'),
-            form: document.getElementById('screen-form')
-        };
-        const loadingOverlay = document.getElementById('loading-overlay');
-        const loadingText = document.getElementById('loading-text');
-        const statusElement = document.getElementById('status');
+  <label id="labelSlip">แนบสลิปโอนเงิน</label>
+  <input type="file" id="slip" accept="image/*" required>
 
-        function showScreen(screenName) {
-            Object.values(screens).forEach(screen => screen.classList.remove('active'));
-            screens[screenName]?.classList.add('active');
-        }
+  <button type="submit" id="submitBtn">ลงทะเบียน</button>
+  <div id="loading">⏳ กำลังบันทึก...</div>
+</form>
 
-       
-        function initializeForm() {
-            if (!liffProfile) return;
-            document.getElementById('profileImage').src = liffProfile.pictureUrl || '';
-            document.getElementById('displayName').innerText = liffProfile.displayName;
-        }
+<!-- Result Modal -->
+<div id="resultModal">
+  <div class="modal-content">
+    <button class="close-btn" onclick="closeModal()">×</button>
+    <h2 id="modalTitle">การลงทะเบียนสำเร็จ! ✅</h2>
+    <p id="resultText" style="white-space:pre-line; text-align:left;"></p>
+    <img id="slipPreview" src="" alt="slip" style="max-width:220px; border-radius:8px; margin-top:8px;">
+    <div style="margin-top:12px;"><button onclick="closeModal()" style="background:#3b82f6;color:#fff;padding:8px 14px;border-radius:8px;border:none;">ปิด</button></div>
+  </div>
+</div>
 
-        async function main() {
-            try {
-                await liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true  });
-                if (!liff.isLoggedIn()) { liff.login({ redirectUri: window.location.href }); return; }
-                liffProfile = await liff.getProfile();
-                document.getElementById('email').value = liff.getDecodedIDToken().email || '';
-                const { data } = await supabaseClient
-                    .from('registrations')
-                    .select('pdpa_consent')
-                    .eq('user_id', liffProfile.userId)
-                    .single();
+<script>
+/* ====== Supabase config - ใช้คีย์จากโค้ดเดิมของคุณ (ถ้าต้องการให้ทำงานจริง ให้ตรวจสอบคีย์) ====== */
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-                if (data && data.pdpa_consent) {
-                    initializeForm(); 
-                    showScreen('form');
-                } else {
-                    showScreen('pdpa');
-                }
-            } catch (error) {
-                if (error.code === 'PGRST116') {
-                    showScreen('pdpa');
-                } else {
-                    console.error("Init Error:", error);
-                    statusElement.textContent = "เกิดข้อผิดพลาดในการโหลดข้อมูล";
-                }
-            } finally {
-                screens.loading.classList.remove('active');
-            }
-        }
+/* ====== State ====== */
+let categoriesData = [];
+let currentLang = "TH"; // TH or EN
 
-        document.addEventListener('DOMContentLoaded', main);
-
-        document.getElementById('btn-pdpa-agree').addEventListener('click', async () => {
-            loadingOverlay.classList.remove('hidden');
-            loadingText.textContent = 'กำลังบันทึกความยินยอม...';
-            try {
-                const { error } = await supabaseClient
-                    .from('registrations')
-                    .upsert({ user_id: liffProfile.userId, pdpa_consent: true, display_name: liffProfile.displayName, picture_url: liffProfile.pictureUrl }, { onConflict: 'user_id' });
-                if (error) throw error;
-
-                initializeForm(); 
-                showScreen('form');
-            } catch (error) {
-                console.error("PDPA Consent Error:", error);
-                statusElement.textContent = "เกิดข้อผิดพลาดในการให้ความยินยอม";
-            } finally {
-                loadingOverlay.classList.add('hidden');
-            }
-        });
-
-               document.getElementById('btn-pdpa-disagree').addEventListener('click', () => {
-                   if (liff.isInClient()) liff.closeWindow();
-               });
-
-               document.getElementById('imageUpload').addEventListener('change', (event) => {
-                   const previewContainer = document.getElementById('image-preview');
-                   const textLabel = document.getElementById('file-input-text');
-                   previewContainer.innerHTML = '';
-                   const files = event.target.files;
-
-                   if (files.length > 5) {
-                       alert("สามารถอัปโหลดได้สูงสุด 5 รูปภาพ");
-                       event.target.value = '';
-                       textLabel.textContent = 'คลิกเพื่อเลือกไฟล์';
-                       return;
-                   }
-
-                   if(files.length > 0) {
-                       textLabel.textContent = `${files.length} ไฟล์ถูกเลือก`;
-                   } else {
-                       textLabel.textContent = 'คลิกเพื่อเลือกไฟล์';
-                   }
-
-                   Array.from(files).forEach(file => {
-                       const reader = new FileReader();
-                       reader.onload = (e) => {
-                           const div = document.createElement('div');
-                           div.className = 'image-preview-item';
-                           div.innerHTML = `<img src="${e.target.result}" alt="${file.name}">`;
-                           previewContainer.appendChild(div);
-                       };
-                       reader.readAsDataURL(file);
-                   });
-               });
-
-
-        function processAndCompressImage(file, maxDimension = 1280, quality = 0.8) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onerror = (error) => reject(error);
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.src = event.target.result;
-                    img.onerror = (error) => reject(error);
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-
-                        let newWidth = img.width;
-                        let newHeight = img.height;
-
-                        if (newWidth > maxDimension || newHeight > maxDimension) {
-                            if (newWidth > newHeight) {
-                                newHeight *= maxDimension / newWidth;
-                                newWidth = maxDimension;
-                            } else {
-                                newWidth *= maxDimension / newHeight;
-                                newHeight = maxDimension;
-                            }
-                        }
-
-                        canvas.width = newWidth;
-                        canvas.height = newHeight;
-
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, newWidth, newHeight);
-
-                        const webpDataUrl = canvas.toDataURL('image/webp', quality);
-
-                        const blob = (() => {
-                            const parts = webpDataUrl.split(',');
-                            const mimeType = parts[0].match(/:(.*?);/)[1];
-                            const decodedData = atob(parts[1]);
-                            let n = decodedData.length;
-                            const u8arr = new Uint8Array(n);
-                            while (n--) {
-                                u8arr[n] = decodedData.charCodeAt(n);
-                            }
-                            return new Blob([u8arr], { type: mimeType });
-                        })();
-
-                        const newFileName = file.name.substring(0, file.name.lastIndexOf('.')) + '.webp';
-                        const webpFile = new File([blob], newFileName, { type: 'image/webp' });
-
-                        console.log(`Processed ${file.name}: Original size ${(file.size / 1024).toFixed(1)} KB -> New size ${(webpFile.size / 1024).toFixed(1)} KB`);
-                        resolve(webpFile);
-                    };
-                };
-            });
-        }
-
-async function sendTelegramNotification_ClientSide(formData, imageUrls) {
-    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-        console.warn("Telegram credentials are not set.");
-        return;
-    }
-
-    const message = `
-🔔 <b>มีการลงทะเบียนใหม่!</b>
-
-<b>ชื่อ-สกุล:</b> ${formData.title} ${formData.first_name} ${formData.last_name}
-<b>อีเมล:</b> ${formData.email || "ไม่ได้กรอก"}
-<b>เบอร์โทร:</b> ${formData.phone || "ไม่ได้กรอก"}
-<b>ประเภทการแข่งขัน:</b> ${formData.types || "ไม่ได้กรอก"}
-<b>จำนวนรูป:</b> ${imageUrls.length} รูป
-
-<a href="${imageUrls[0] || ' '}">ดูรูปภาพแรกที่อัปโหลด</a>
-`;
-
-    const encodedMessage = encodeURIComponent(message);
-    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${encodedMessage}&parse_mode=HTML`;
-
-    try {
-       
-        fetch(url);
-        console.log("Telegram notification request sent.");
-    } catch (error) {
-        console.error("Failed to send Telegram notification:", error);
-    }
+/* ====== Utility: Thai ID checksum ====== */
+function isValidThaiId(id){
+  if(!/^\d{13}$/.test(id)) return false;
+  let sum = 0;
+  for(let i=0;i<12;i++){
+    sum += parseInt(id.charAt(i),10) * (13 - i);
+  }
+  const check = (11 - (sum % 11)) % 10;
+  return check === parseInt(id.charAt(12),10);
 }
-            document.getElementById('registrationForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            loadingOverlay.classList.remove('hidden');
-            const submitButton = e.target.querySelector('button[type="submit"]');
-            submitButton.disabled = true;
+function isPassportFormat(val){
+  // passport: allow alphanumeric 6-15, must include at least one letter
+  return /^(?=.*[A-Za-z])[A-Za-z0-9]{6,15}$/.test(val);
+}
 
-            try {
-                const imageFiles = document.getElementById('imageUpload').files;
-                if (imageFiles.length === 0) {
-                    throw new Error("กรุณาอัปโหลดรูปภาพอย่างน้อย 1 รูป");
-                }
+/* detect type by value */
+function detectIdTypeByValue(val){
+  if(isValidThaiId(val)) return "thaiid";
+  if(isPassportFormat(val)) return "passport";
+  return null;
+}
 
-                loadingText.textContent = `กำลังประมวลผล ${imageFiles.length} รูป...`;
-                const processingPromises = Array.from(imageFiles).map(file => processAndCompressImage(file, 1280, 0.8));
-                const processedFiles = await Promise.all(processingPromises);
+/* ====== Language / Texts ====== */
+const TEXT = {
+  TH: {
+    formTitle: "ลงทะเบียนวิ่ง",
+    formSubtitle: "Running Registration Form",
+    labelFirstName: "ชื่อ",
+    labelLastName: "นามสกุล",
+    labelIdType: "ประเภทเอกสาร",
+    labelNationalId: "เลขบัตรประชาชน / Passport",
+    idHintThai: "บัตรประชาชน: ตัวเลข 13 หลัก",
+    idHintPassport: "Passport: ตัวอักษร/ตัวเลข 6–15 ตัว (ต้องมีตัวอักษรอย่างน้อย 1 ตัว)",
+    idErrorThai: "❌ กรุณากรอกเลขบัตรประชาชน 13 หลักให้ถูกต้อง",
+    idErrorPassport: "❌ กรุณากรอกหมายเลข Passport ให้ถูกต้อง (6–15 ตัว อักษร/ตัวเลข)",
+    idErrorGeneric: "❌ รูปแบบไม่ถูกต้อง",
+    labelPhone: "เบอร์โทรศัพท์",
+    labelEmail: "Email",
+    labelAge: "อายุ",
+    labelShirtSize: "ไซส์เสื้อ",
+    labelCategory: "รุ่นอายุ/เพศ",
+    labelSlip: "แนบสลิปโอนเงิน",
+    submitBtn: "ลงทะเบียน",
+    modalTitle: "การลงทะเบียนสำเร็จ! ✅",
+    duplicateMsg: "เลขบัตร/Passport นี้ลงทะเบียนแล้ว ❌",
+    uploadError: "อัพโหลดสลิปไม่สำเร็จ ❌",
+    saveError: "บันทึกไม่สำเร็จ ❌",
+    fillFields: "กรุณากรอกข้อมูลให้ครบถ้วน"
+  },
+  EN: {
+    formTitle: "Running Registration",
+    formSubtitle: "Fill in the form to join the event",
+    labelFirstName: "First Name",
+    labelLastName: "Last Name",
+    labelIdType: "Document Type",
+    labelNationalId: "National ID / Passport",
+    idHintThai: "Thai ID: 13 digits",
+    idHintPassport: "Passport: 6–15 alphanumeric (must include a letter)",
+    idErrorThai: "❌ Please enter a valid 13-digit Thai national ID",
+    idErrorPassport: "❌ Please enter a valid passport number (6–15 alphanumeric)",
+    idErrorGeneric: "❌ Invalid format",
+    labelPhone: "Phone Number",
+    labelEmail: "Email",
+    labelAge: "Age",
+    labelShirtSize: "Shirt Size",
+    labelCategory: "Category (Age / Gender)",
+    labelSlip: "Upload Payment Slip",
+    submitBtn: "Register",
+    modalTitle: "Registration Completed Successfully! ✅",
+    duplicateMsg: "This National ID / Passport is already registered ❌",
+    uploadError: "Upload slip failed ❌",
+    saveError: "Save failed ❌",
+    fillFields: "Please fill all required fields"
+  }
+};
 
-                loadingText.textContent = `กำลังอัปโหลด ${processedFiles.length} รูป...`;
-                const uploadPromises = processedFiles.map(file => {
-                    const filePath = `${liffProfile.userId}/${Date.now()}-${file.name.replace(/\s/g, '_')}`;
-                    return supabaseClient.storage.from(BUCKET_NAME).upload(filePath, file);
-                });
+function applyLanguageUI(){
+  const t = TEXT[currentLang];
+  document.getElementById("formTitle").innerText = t.formTitle;
+  document.getElementById("formSubtitle").innerText = t.formSubtitle;
+  document.getElementById("labelFirstName").innerText = t.labelFirstName;
+  document.getElementById("labelLastName").innerText = t.labelLastName;
+  document.getElementById("labelIdType").innerText = t.labelIdType;
+  document.getElementById("labelNationalId").innerText = t.labelNationalId;
+  document.getElementById("labelPhone").innerText = t.labelPhone;
+  document.getElementById("labelEmail").innerText = t.labelEmail;
+  document.getElementById("labelAge").innerText = t.labelAge;
+  document.getElementById("labelShirtSize").innerText = t.labelShirtSize;
+  document.getElementById("labelCategory").innerText = t.labelCategory;
+  document.getElementById("labelSlip").innerText = t.labelSlip;
+  document.getElementById("submitBtn").innerText = t.submitBtn;
+  document.getElementById("modalTitle").innerText = t.modalTitle;
+  document.getElementById("langText").innerText = currentLang;
+  document.getElementById("langFlag").innerText = currentLang === "TH" ? "🇹🇭" : "🇬🇧";
+  // update category options (renderCategories uses currentLang)
+  renderCategories();
+  updateIdHint(); // update hint text
+}
 
-                const uploadResults = await Promise.all(uploadPromises);
-                const imageUrls = [];
-                for (const result of uploadResults) {
-                    if (result.error) throw new Error(`Upload failed: ${result.error.message}`);
-                    const { data: urlData } = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(result.data.path);
-                    imageUrls.push(urlData.publicUrl);
-                }
+/* toggle language */
+function toggleLang(){
+  currentLang = currentLang === "TH" ? "EN" : "TH";
+  applyLanguageUI();
+}
 
-                loadingText.textContent = 'กำลังบันทึกข้อมูล...';
-                const formData = {
-                    title: document.getElementById('title').value,
-                    first_name: document.getElementById('first_name').value,
-                    last_name: document.getElementById('last_name').value,
-                    email: document.getElementById('email').value,
-                    phone: document.getElementById('phone').value,
-                    types: document.getElementById('types').value,
-                    uploaded_image_urls: imageUrls
-                };
+/* ====== Categories load and rendering ====== */
+async function loadCategories(){
+  try{
+    const { data, error } = await supabaseClient.from("categories")
+      .select("*")
+      .eq("is_open",true)
+      .order("id",{ascending:true});
+    if(!error && data){
+      categoriesData = data;
+      renderCategories();
+    }
+  }catch(err){
+    console.error("loadCategories:", err);
+  }
+}
 
-                const { error: updateError } = await supabaseClient
-                    .from('registrations')
-                    .update(formData)
-                    .eq('user_id', liffProfile.userId);
+function renderCategories(){
+  const select = document.getElementById("category");
+  const t = TEXT[currentLang];
+  select.innerHTML = `<option value="">-- ${t.labelCategory} --</option>`;
+  categoriesData.forEach(cat => {
+    const opt = document.createElement("option");
+    opt.value = cat.value || cat.id;
+    opt.textContent = currentLang === "TH" ? (cat.name_th || cat.name_en) : (cat.name_en || cat.name_th);
+    select.appendChild(opt);
+  });
+}
 
-                if (updateError) throw updateError;
-                 await sendTelegramNotification_ClientSide(formData, imageUrls);
-                
-                loadingText.textContent = 'กำลังส่งข้อความยืนยัน...';
+/* ====== ID validation & UI helpers ====== */
+const idTypeSelect = document.getElementById("idType");
+const nationalIdInput = document.getElementById("nationalId");
+const idHintElem = document.getElementById("idHint");
+const idErrorElem = document.getElementById("idError");
+const submitBtn = document.getElementById("submitBtn");
+const loadingElem = document.getElementById("loading");
 
-                const messagesToSend = [
-                 {
-                        "type": "flex",
-                        "altText": "การลงทะเบียนของคุณเสร็จสมบูรณ์",
-                        "contents": {
-                      "type": "bubble",
-                      "header": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "contents": [
-                          {
-                            "type": "text",
-                            "text": "ลงทะเบียนเรียบร้อย",
-                            "wrap": true,
-                            "weight": "bold",
-                            "size": "xl",
-                            "color": "#06C755",
-                            "margin": "none",
-                            "align": "center"
-                          }
-                        ]
-                      },
-                      "hero": {
-                        "type": "image",
-                        "url": imageUrls[0],
-                        "aspectMode": "fit",
-                        "aspectRatio": "1:1",
-                        "size": "full"
-                      },
-                      "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "contents": [
-                          {
-                            "type": "text",
-                            "text": "ขอบคุณที่ลงทะเบียนเข้าร่วมกิจกรรมกับเรา",
-                            "color": "#aaaaaa",
-                            "adjustMode": "shrink-to-fit"
-                          },
-                          {
-                            "type": "box",
-                            "layout": "horizontal",
-                            "contents": [
-                              {
-                                "type": "text",
-                                "text": "ชื่อ-สกุล:",
-                                "wrap": true,
-                                "flex": 3,
-                                "size": "xs",
-                                "color": "#989898"
-                              },
-                              {
-                                "type": "text",
-                                "text": `${formData.title} ${formData.first_name} ${formData.last_name}`,
-                                "wrap": true,
-                                "size": "xs",
-                                "margin": "md",
-                                "flex": 7,
-                                "color": "#222222",
-                                "align": "start"
-                              }
-                            ],
-                            "margin": "xxl"
-                          },
-                          {
-                            "type": "box",
-                            "layout": "baseline",
-                            "contents": [
-                              {
-                                "type": "text",
-                                "text": "อีเมล:",
-                                "wrap": true,
-                                "flex": 3,
-                                "size": "xs",
-                                "color": "#989898"
-                              },
-                              {
-                                "type": "text",
-                                "text": `${formData.email}`,
-                                "wrap": true,
-                                "size": "xs",
-                                "margin": "md",
-                                "flex": 7,
-                                "color": "#222222"
-                              }
-                            ],
-                            "margin": "md"
-                          },
-                          {
-                            "type": "box",
-                            "layout": "baseline",
-                            "contents": [
-                              {
-                                "type": "text",
-                                "text": "เบอร์โทร:",
-                                "wrap": true,
-                                "flex": 3,
-                                "size": "xs",
-                                "color": "#989898"
-                              },
-                              {
-                                "type": "text",
-                                "wrap": true,
-                                "size": "xs",
-                                "margin": "md",
-                                "flex": 7,
-                                "text": `${formData.phone}`,
-                                "color": "#222222"
-                              }
-                            ],
-                            "margin": "md"
-                          }
-                        ],
-                        "spacing": "sm"
-                      },
-                      "footer": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "contents": [
-                          {
-                            "type": "button",
-                            "style": "primary",
-                            "action": {
-                              "type": "uri",
-                              "label": "แก้ไขใหม่",
-                              "uri": "https://liff.line.me/"+ LIFF_ID
-                            },
-                            "color": "#06C755",
-                            "height": "sm"
-                          }
-                        ]
-                      }
-                    }
-                    }
-                ];
+function updateIdHint(){
+  const t = TEXT[currentLang];
+  const selected = idTypeSelect.value;
+  if(selected === "thaiid"){
+    idHintElem.innerText = t.idHintThai;
+  } else if(selected === "passport"){
+    idHintElem.innerText = t.idHintPassport;
+  } else {
+    idHintElem.innerText = t.idHintThai + " / " + t.idHintPassport;
+  }
+}
 
-              
-                if (liff.isInClient()) {
-                    await liff.sendMessages(messagesToSend);
-                    statusElement.textContent = "ลงทะเบียนสำเร็จและส่งข้อความแล้ว!";
-                    Swal.fire('สำเร็จ', "ลงทะเบียนสำเร็จและส่งข้อความแล้ว!", 'success');
-                    setTimeout(() => liff.closeWindow(), 2000);
-                } else {
-             
-                    statusElement.textContent = "ลงทะเบียนสำเร็จ! (Flex Message จะแสดงเฉพาะมือถือเท่านั้น)";
-                  
-                }
-              
+function showIdError(msg){
+  idErrorElem.style.display = "block";
+  idErrorElem.innerText = msg;
+  nationalIdInput.style.border = "2px solid #ff7b7b";
+  submitBtn.disabled = true;
+}
+function clearIdError(){
+  idErrorElem.style.display = "none";
+  idErrorElem.innerText = "";
+  nationalIdInput.style.border = "";
+  submitBtn.disabled = false;
+}
 
-            } catch (error) {
-                console.error('Submission Error:', error);
-                statusElement.textContent = `เกิดข้อผิดพลาด: ${error.message}`;
-            } finally {
-                loadingOverlay.classList.add('hidden');
-                submitButton.disabled = false;
-            }
-        });
-      const message = "ไม่อนุญาตให้คลิกขวาครับ";
+/* real-time validation */
+nationalIdInput.addEventListener("input", () => {
+  const raw = nationalIdInput.value.trim();
+  const sel = idTypeSelect.value;
+  const t = TEXT[currentLang];
 
-        document.addEventListener("contextmenu", function (e) {
-            Swal.fire('Oh!', message, 'error');
+  if(raw === ""){
+    clearIdError();
+    updateIdHint();
+    return;
+  }
 
-            e.preventDefault();
-        });
+  if(sel === "auto"){
+    const detected = detectIdTypeByValue(raw);
+    if(detected === "thaiid"){
+      clearIdError();
+      idHintElem.innerText = t.idHintThai;
+    } else if(detected === "passport"){
+      clearIdError();
+      idHintElem.innerText = t.idHintPassport;
+    } else {
+      showIdError(t.idErrorGeneric);
+    }
+  } else if(sel === "thaiid"){
+    if(!isValidThaiId(raw)){
+      showIdError(t.idErrorThai);
+    } else clearIdError();
+  } else if(sel === "passport"){
+    if(!isPassportFormat(raw)){
+      showIdError(t.idErrorPassport);
+    } else clearIdError();
+  }
+});
 
-        document.addEventListener("mousedown", function (e) {
-            if (e.button === 2 || e.button === 1) {
-                Swal.fire('Oh!', message, 'error');
+/* when user changes idType select, update hint & validate again */
+idTypeSelect.addEventListener("change", () => {
+  updateIdHint();
+  // trigger validation
+  const ev = new Event('input');
+  nationalIdInput.dispatchEvent(ev);
+});
 
-                e.preventDefault();
-            }
-        });
-           </script>
-       </body>
-       </html>
+/* auto-detect: if idType is auto and typed value clearly matches one type, optionally show that */
+nationalIdInput.addEventListener("blur", () => {
+  if(idTypeSelect.value === "auto"){
+    const detected = detectIdTypeByValue(nationalIdInput.value.trim());
+    if(detected){
+      // do nothing or optionally set placeholder; we keep selection as auto but show hint
+      // (we don't force-select, to avoid surprising user)
+    }
+  }
+});
 
+/* ====== Submit handler ====== */
+document.getElementById("registerForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  // basic required checks
+  const firstName = document.getElementById("firstName").value.trim();
+  const lastName = document.getElementById("lastName").value.trim();
+  const rawId = nationalIdInput.value.trim();
+  const phone = document.getElementById("phone").value.trim();
+  const email = document.getElementById("email").value.trim();
+  const age = document.getElementById("age").value.trim();
+  const shirtSize = document.getElementById("shirtSize").value;
+  const category = document.getElementById("category").value;
+  const slipFile = document.getElementById("slip").files[0];
+
+  const t = TEXT[currentLang];
+
+  if(!firstName || !lastName || !rawId || !phone || !email || !age || !shirtSize || !category || !slipFile){
+    alert(t.fillFields);
+    return;
+  }
+
+  // validate according to selection / auto-detect
+  const sel = idTypeSelect.value;
+  let isValid = false;
+  if(sel === "auto"){
+    if(isValidThaiId(rawId) || isPassportFormat(rawId)) isValid = true;
+  } else if(sel === "thaiid"){
+    if(isValidThaiId(rawId)) isValid = true;
+  } else if(sel === "passport"){
+    if(isPassportFormat(rawId)) isValid = true;
+  }
+
+  if(!isValid){
+    alert(t.idErrorGeneric);
+    return;
+  }
+
+  // disable submit + show loading
+  submitBtn.disabled = true;
+  loadingElem.style.display = "block";
+
+  try {
+    // duplicate check using national_id field (assumes that DB column exists)
+    const { data: existing, error: exErr } = await supabaseClient.from("kaimukandaman")
+      .select("national_id")
+      .eq("national_id", rawId);
+
+    if(exErr){
+      console.error("duplicate check error:", exErr);
+    }
+    if(existing && existing.length > 0){
+      alert(t.duplicateMsg);
+      submitBtn.disabled = false;
+      loadingElem.style.display = "none";
+      return;
+    }
+
+    // upload slip to storage
+    const fileName = `slip_${Date.now()}_${(slipFile.name || "").replace(/\s+/g,'_')}`;
+    const { error: uploadError } = await supabaseClient.storage.from("slips").upload(fileName, slipFile);
+
+    if(uploadError){
+      console.error("uploadError:", uploadError);
+      alert(t.uploadError);
+      submitBtn.disabled = false;
+      loadingElem.style.display = "none";
+      return;
+    }
+
+    // build public url (alternative: use supabaseClient.storage.from('slips').getPublicUrl)
+    const slipUrl = `${SUPABASE_URL}/storage/v1/object/public/slips/${encodeURIComponent(fileName)}`;
+
+    // insert record
+    const { error: insertError } = await supabaseClient.from("kaimukandaman").insert([{
+      first_name: firstName,
+      last_name: lastName,
+      national_id: rawId,
+      phone,
+      email,
+      age,
+      shirt_size: shirtSize,
+      category,
+      slip_url: slipUrl,
+      status: "pending"
+    }]);
+
+    loadingElem.style.display = "none";
+    submitBtn.disabled = false;
+
+    if(insertError){
+      console.error("insertError:", insertError);
+      alert(t.saveError);
+      return;
+    }
+
+    // show modal with details
+    document.getElementById("resultText").innerText =
+      `${TEXT[currentLang].labelFirstName}: ${firstName} ${lastName}\n${TEXT[currentLang].labelAge}: ${age}\n${TEXT[currentLang].labelShirtSize}: ${shirtSize}\n${TEXT[currentLang].labelCategory}: ${category}\n${TEXT[currentLang].labelPhone}: ${phone}\nEmail: ${email}`;
+    document.getElementById("slipPreview").src = slipUrl;
+    document.getElementById("resultModal").style.display = "flex";
+
+    // reset form
+    document.getElementById("registerForm").reset();
+    updateIdHint();
+  } catch(err){
+    console.error("submit error:", err);
+    alert(TEXT[currentLang].saveError);
+    submitBtn.disabled = false;
+    loadingElem.style.display = "none";
+  }
+});
+
+/* ====== Modal close ====== */
+function closeModal(){
+  document.getElementById("resultModal").style.display = "none";
+}
+
+/* ====== Init ====== */
+document.addEventListener("DOMContentLoaded", async () => {
+  // set initial language UI
+  applyLanguageUI();
+  // load categories
+  await loadCategories();
+  // update hint
+  updateIdHint();
+});
+
+/* ====== small protections like before (optional) ====== */
+document.addEventListener("contextmenu", e => { /* e.preventDefault(); */ }); // keep but not blocking UX
+document.addEventListener("keydown", e=>{ 
+  if(e.key==="F12" || (e.ctrlKey && e.shiftKey && e.key==="I") || (e.ctrlKey && e.key==="u")){
+    e.preventDefault();
+  }
+});
+</script>
+</body>
+</html>
