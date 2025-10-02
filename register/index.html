@@ -6,10 +6,14 @@
   <title>BCR RUN 2025</title>
   <style>
 body {
+  font-family: "Prompt", sans-serif;
+  margin: 0;
+  padding: 0;
   background: linear-gradient(-45deg, #cf142b, #000, #00247d, #fff);
   background-size: 400% 400%;
   animation: gradientBG 15s ease infinite;
   color: #fff;
+  text-align: center;
 }
 
 @keyframes gradientBG {
@@ -17,8 +21,6 @@ body {
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
-
-
 
 header {
   background: linear-gradient(135deg, #cf142b, #fff, #00247d);
@@ -51,8 +53,8 @@ section h2 {
   color: #cf142b;
   font-size: 2rem;
   margin-bottom: 30px;
-  position: relative;
   display: inline-block;
+  position: relative;
   padding-bottom: 5px;
 }
 
@@ -72,6 +74,7 @@ section h2::after {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 25px;
   margin-top: 30px;
+  justify-items: center; /* จัด card กลาง */
 }
 
 .race-card {
@@ -81,6 +84,7 @@ section h2::after {
   box-shadow: 0 6px 15px rgba(207,20,43,0.6);
   color: #fff;
   transition: transform 0.3s, box-shadow 0.3s;
+  text-align: center; /* เนื้อหาอยู่กลาง */
 }
 
 .race-card:hover {
@@ -103,6 +107,7 @@ section h2::after {
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 25px;
   margin-top: 30px;
+  justify-items: center; /* จัดรูปกลาง */
 }
 
 .gallery-grid img {
@@ -168,9 +173,10 @@ section h2::after {
 }
 
 iframe {
+  display: block;
+  margin: 25px auto 0 auto;
   border: 3px solid #cf142b;
   border-radius: 15px;
-  margin-top: 25px;
 }
 
 footer {
@@ -188,6 +194,9 @@ footer p {
   margin:0;
 }
 
+a { color: #FFD700; text-decoration: none; }
+a:hover { color: #cf142b; }
+
   </style>
 </head>
 <body>
@@ -201,7 +210,7 @@ footer p {
     <p>วันที่ 15 ธันวาคม 2025</p>
   </section>
 
- <section>
+  <section>
   <h2>📍 สถานที่จัดงาน</h2>
   <p>เขื่อนบางวาด จังหวัดภูเก็ต</p>
   <iframe 
@@ -212,7 +221,6 @@ footer p {
     src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d15714.902399775786!2d98.333558!3d7.891251!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNy44OTEyNTEsIDk4LjMzMzU1OA!5e0!3m2!1sth!2sth!4v1735855000000!5m2!1sth!2sth">
   </iframe>
 </section>
-
 
   <section>
     <h2>👇 ประเภทการแข่งขัน & ค่าสมัคร</h2>
@@ -237,7 +245,7 @@ footer p {
 
   <section>
     <h2>📝 การสมัครเข้าร่วม</h2>
-    <p>สมัครออนไลน์ได้ที่ <a href="#" style="color:#cf142b;">ลิงก์ลงทะเบียน</a></p>
+    <p>สมัครออนไลน์ได้ที่ <a href="#">ลิงก์ลงทะเบียน</a></p>
   </section>
 
   <footer>
