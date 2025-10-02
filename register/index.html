@@ -9,26 +9,28 @@
       font-family: "Prompt", sans-serif;
       margin: 0;
       padding: 0;
-      background: #000;
-      color: #fff;
+      background: #fff;
+      color: #000;
       text-align: center;
     }
 
     header {
-      background: linear-gradient(90deg, #111, #222);
+      background: linear-gradient(90deg, #00247d, #fff, #cf142b);
       padding: 40px 20px;
-      border-bottom: 2px solid #FFD700;
+      border-bottom: 4px solid #cf142b;
     }
 
     header h1 {
       font-size: 2.5rem;
-      color: #FFD700;
+      color: #fff;
       margin: 0;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
     }
 
     header p {
       font-size: 1.2rem;
-      color: #ddd;
+      color: #fff;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
     }
 
     section {
@@ -38,15 +40,14 @@
     }
 
     section h2 {
-      color: #FFD700;
+      color: #cf142b;
       margin-bottom: 20px;
       font-size: 1.8rem;
-      border-bottom: 2px solid #FFD700;
+      border-bottom: 3px solid #00247d;
       display: inline-block;
       padding-bottom: 5px;
     }
 
-    /* ---------- Race Grid ---------- */
     .race-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -55,31 +56,23 @@
     }
 
     .race-card {
-      background: #111;
+      background: #00247d;
       padding: 20px;
       border-radius: 15px;
       text-align: center;
-      box-shadow: 0 4px 10px rgba(255,215,0,0.4);
+      box-shadow: 0 4px 10px rgba(207,20,43,0.4);
       transition: transform 0.3s, box-shadow 0.3s;
     }
 
-    .race-card h3 {
-      color: #FFD700;
-      margin-bottom: 10px;
-      font-size: 1.3rem;
-    }
-
-    .race-card p {
-      color: #ddd;
-      font-size: 1rem;
+    .race-card h3, .race-card p {
+      color: #fff;
     }
 
     .race-card:hover {
       transform: translateY(-5px);
-      box-shadow: 0 6px 20px rgba(255,215,0,0.8);
+      box-shadow: 0 6px 20px rgba(207,20,43,0.8);
     }
 
-    /* ---------- Gallery ---------- */
     .gallery-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -92,17 +85,16 @@
       height: 200px;
       object-fit: cover;
       border-radius: 15px;
-      box-shadow: 0 4px 10px rgba(255,215,0,0.3);
+      box-shadow: 0 4px 10px rgba(207,20,43,0.3);
       transition: transform 0.3s, box-shadow 0.3s;
       cursor: pointer;
     }
 
     .gallery-grid img:hover {
       transform: scale(1.05);
-      box-shadow: 0 6px 20px rgba(255,215,0,0.6);
+      box-shadow: 0 6px 20px rgba(207,20,43,0.6);
     }
 
-    /* ---------- Modal Lightbox ---------- */
     .modal {
       display: none;
       position: fixed;
@@ -122,23 +114,24 @@
       max-width: 90%;
       max-height: 80%;
       border-radius: 10px;
-      box-shadow: 0 4px 20px rgba(255,215,0,0.6);
+      box-shadow: 0 4px 20px rgba(207,20,43,0.6);
     }
 
-    .modal-close {
+    .modal-close, .modal-prev, .modal-next {
       position: absolute;
-      top: 20px;
-      right: 35px;
       color: #fff;
       font-size: 40px;
       font-weight: bold;
       cursor: pointer;
+      user-select: none;
       transition: 0.3s;
     }
 
-    .modal-close:hover {
-      color: #FFD700;
-    }
+    .modal-close { top: 20px; right: 35px; }
+    .modal-prev { top: 50%; left: 20px; transform: translateY(-50%); }
+    .modal-next { top: 50%; right: 20px; transform: translateY(-50%); }
+
+    .modal-close:hover, .modal-prev:hover, .modal-next:hover { color: #cf142b; }
 
     #modalCaption {
       text-align: center;
@@ -148,23 +141,19 @@
     }
 
     iframe {
-      border: 2px solid #FFD700;
+      border: 3px solid #cf142b;
       border-radius: 10px;
       margin-top: 20px;
     }
 
     footer {
-      background: #111;
+      background: #00247d;
       padding: 20px;
       margin-top: 40px;
-      border-top: 2px solid #FFD700;
+      border-top: 4px solid #cf142b;
     }
 
-    footer p {
-      margin: 0;
-      font-size: 0.9rem;
-      color: #aaa;
-    }
+    footer p { color: #fff; font-size: 0.9rem; margin:0; }
   </style>
 </head>
 <body>
@@ -181,44 +170,20 @@
   <section>
     <h2>📍 สถานที่จัดงาน</h2>
     <p>เขื่อนบางวาด จังหวัดภูเก็ต</p>
-    <!-- Google Maps Embed -->
-
     <iframe 
-  src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d15714.902399775786!2d98.333558!3d7.891251!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNy44OTEyNTEsIDk4LjMzMzU1OA!5e0!3m2!1sth!2sth!4v1735855000000!5m2!1sth!2sth" 
-  width="100%" 
-  height="400" 
-  style="border:0;" 
-  allowfullscreen="" 
-  loading="lazy" 
-  referrerpolicy="no-referrer-when-downgrade">
-</iframe>
-
-
+      src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3945.388946666675!2d98.331369!3d7.891194!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x30503b1b2f9c9b7d%3A0x7b8f7e56b1a2de42!2sBangwad%20Dam%2C%20Phuket%2C%20Thailand!5e0!3m2!1sth!2sth!4v1735860000000!5m2!1sth!2sth" 
+      width="100%" height="400" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade">
+    </iframe>
   </section>
 
   <section>
     <h2>👇 ประเภทการแข่งขัน & ค่าสมัคร</h2>
     <div class="race-grid">
-      <div class="race-card">
-        <h3>TOP100MEN</h3>
-        <p>ค่าสมัคร: 100 บาท</p>
-      </div>
-      <div class="race-card">
-        <h3>TOP100WOMEN</h3>
-        <p>ค่าสมัคร: 100 บาท</p>
-      </div>
-      <div class="race-card">
-        <h3>BCR50.4</h3>
-        <p>ค่าสมัคร: 500 บาท</p>
-      </div>
-      <div class="race-card">
-        <h3>BCR69.3</h3>
-        <p>ค่าสมัคร: 500 บาท</p>
-      </div>
-      <div class="race-card">
-        <h3>BCR100.8</h3>
-        <p>ค่าสมัคร: 500 บาท</p>
-      </div>
+      <div class="race-card"><h3>TOP100MEN</h3><p>100 บาท</p></div>
+      <div class="race-card"><h3>TOP100WOMEN</h3><p>100 บาท</p></div>
+      <div class="race-card"><h3>BCR50.4</h3><p>500 บาท</p></div>
+      <div class="race-card"><h3>BCR69.3</h3><p>500 บาท</p></div>
+      <div class="race-card"><h3>BCR100.8</h3><p>500 บาท</p></div>
     </div>
   </section>
 
@@ -234,7 +199,7 @@
 
   <section>
     <h2>📝 การสมัครเข้าร่วม</h2>
-    <p>สมัครออนไลน์ได้ที่ <a href="#" style="color:#FFD700;">ลิงก์ลงทะเบียน</a></p>
+    <p>สมัครออนไลน์ได้ที่ <a href="#" style="color:#cf142b;">ลิงก์ลงทะเบียน</a></p>
   </section>
 
   <footer>
@@ -244,28 +209,49 @@
   <!-- Modal Lightbox -->
   <div id="modal" class="modal">
     <span class="modal-close">&times;</span>
+    <span class="modal-prev">&#10094;</span>
+    <span class="modal-next">&#10095;</span>
     <img class="modal-content" id="modalImg">
     <div id="modalCaption"></div>
   </div>
 
   <script>
-    // Modal Script
     const modal = document.getElementById('modal');
     const modalImg = document.getElementById('modalImg');
     const modalCaption = document.getElementById('modalCaption');
     const galleryImgs = document.querySelectorAll('.gallery-grid img');
     const modalClose = document.querySelector('.modal-close');
+    const modalPrev = document.querySelector('.modal-prev');
+    const modalNext = document.querySelector('.modal-next');
 
-    galleryImgs.forEach(img => {
-      img.addEventListener('click', () => {
-        modal.style.display = 'block';
-        modalImg.src = img.src;
-        modalCaption.innerText = img.alt;
-      });
+    let currentIndex = 0;
+
+    function openModal(index){
+      currentIndex = index;
+      modal.style.display = 'block';
+      modalImg.src = galleryImgs[currentIndex].src;
+      modalCaption.innerText = galleryImgs[currentIndex].alt;
+    }
+
+    galleryImgs.forEach((img, idx) => {
+      img.addEventListener('click', ()=>openModal(idx));
     });
 
-    modalClose.addEventListener('click', () => { modal.style.display = 'none'; });
-    modal.addEventListener('click', (e) => { if(e.target === modal) modal.style.display = 'none'; });
+    modalClose.addEventListener('click', ()=> modal.style.display='none');
+    modalPrev.addEventListener('click', ()=>{
+      currentIndex = (currentIndex - 1 + galleryImgs.length) % galleryImgs.length;
+      modalImg.src = galleryImgs[currentIndex].src;
+      modalCaption.innerText = galleryImgs[currentIndex].alt;
+    });
+    modalNext.addEventListener('click', ()=>{
+      currentIndex = (currentIndex + 1) % galleryImgs.length;
+      modalImg.src = galleryImgs[currentIndex].src;
+      modalCaption.innerText = galleryImgs[currentIndex].alt;
+    });
+
+    modal.addEventListener('click', e=>{
+      if(e.target===modal) modal.style.display='none';
+    });
   </script>
 </body>
 </html>
