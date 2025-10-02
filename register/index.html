@@ -5,14 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BCR RUN 2025</title>
   <style>
- body {
-  font-family: "Prompt", sans-serif;
-  margin: 0;
-  padding: 0;
-  background: #000;
+body {
+  background: linear-gradient(-45deg, #cf142b, #000, #00247d, #fff);
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
   color: #fff;
-  text-align: center;
 }
+
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+
 
 header {
   background: linear-gradient(135deg, #cf142b, #fff, #00247d);
