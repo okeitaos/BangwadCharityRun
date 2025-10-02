@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BCR RUN 2025</title>
   <style>
+    /* ---------- Body & Fonts ---------- */
     body {
       font-family: "Prompt", sans-serif;
       margin: 0;
       padding: 0;
-      background: #fff;
-      color: #000;
+      background: #000; /* พื้นหลังดำ */
+      color: #fff;
       text-align: center;
     }
 
@@ -22,7 +23,7 @@
 
     header h1 {
       font-size: 2.5rem;
-      color: #fff;
+      color: #FFD700; /* สีทอง */
       margin: 0;
       text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
     }
@@ -40,14 +41,15 @@
     }
 
     section h2 {
-      color: #cf142b;
+      color: #cf142b; /* แดง */
       margin-bottom: 20px;
       font-size: 1.8rem;
-      border-bottom: 3px solid #00247d;
+      border-bottom: 3px solid #00247d; /* น้ำเงิน */
       display: inline-block;
       padding-bottom: 5px;
     }
 
+    /* ---------- Race Grid ---------- */
     .race-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -56,15 +58,12 @@
     }
 
     .race-card {
-      background: #00247d;
+      background: #00247d; /* น้ำเงิน */
       padding: 20px;
       border-radius: 15px;
       text-align: center;
       box-shadow: 0 4px 10px rgba(207,20,43,0.4);
       transition: transform 0.3s, box-shadow 0.3s;
-    }
-
-    .race-card h3, .race-card p {
       color: #fff;
     }
 
@@ -73,6 +72,7 @@
       box-shadow: 0 6px 20px rgba(207,20,43,0.8);
     }
 
+    /* ---------- Gallery ---------- */
     .gallery-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -95,6 +95,7 @@
       box-shadow: 0 6px 20px rgba(207,20,43,0.6);
     }
 
+    /* ---------- Modal Lightbox ---------- */
     .modal {
       display: none;
       position: fixed;
@@ -105,7 +106,7 @@
       width: 100%;
       height: 100%;
       overflow: auto;
-      background: rgba(0,0,0,0.9);
+      background: rgba(0,0,0,0.95);
     }
 
     .modal-content {
