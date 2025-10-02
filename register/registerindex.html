@@ -463,7 +463,7 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
 
   try {
     // duplicate check using national_id field (assumes that DB column exists)
-    const { data: existing, error: exErr } = await supabaseClient.from("bandwad")
+    const { data: existing, error: exErr } = await supabaseClient.from("bangwad")
       .select("national_id")
       .eq("national_id", rawId);
 
