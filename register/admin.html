@@ -201,7 +201,7 @@ let currentStatusFilter = "All";
 const searchInput = document.getElementById("searchInput");
 
 async function loadParticipants() {
-  const { data, error } = await client.from("kaimukandaman").select("*").order("id",{ascending:true});
+  const { data, error } = await client.from("bangwad").select("*").order("id",{ascending:true});
   if(error){ console.error(error); alert("Error loading data"); return;}
   participantsData = data || [];
   updateStats();
@@ -256,7 +256,7 @@ function renderCards(){
 
 async function approve(participant){
   if(!confirm(`Approve ${participant.first_name} ${participant.last_name}?`)) return;
-  const { error } = await client.from("kaimukandaman").update({status:"Approved"}).eq("id",participant.id);
+  const { error } = await client.from("bangwad").update({status:"Approved"}).eq("id",participant.id);
   if(error){ alert("Failed!"); console.error(error); return;}
 
   const templateParams = {
