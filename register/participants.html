@@ -174,7 +174,7 @@ function applyLanguage(){
 }
 
 async function loadParticipants(){
-  const { data, error } = await client.from("kaimukandaman")
+  const { data, error } = await client.from("bangwad")
     .select("first_name,last_name,category")
     .eq("status","Approved")
     .order("id",{ascending:true});
