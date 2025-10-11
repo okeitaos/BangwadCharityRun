@@ -36,7 +36,8 @@
     margin:12px 0;
     font-size:1rem;
   }
-  /* QR Code Effect */
+
+  /* QR Code */
   .qr-container {
     display:inline-block;
     position:relative;
@@ -48,21 +49,6 @@
     border:8px solid #fff;
     border-radius:12px;
     animation: bounce 2s infinite, glow 1.5s infinite alternate;
-  }
-  .qr-container:hover::after {
-    content: attr(data-tooltip);
-    position:absolute;
-    bottom:100%;
-    left:50%;
-    transform:translateX(-50%);
-    background: rgba(0,0,0,0.8);
-    color:#fff;
-    padding:6px 12px;
-    border-radius:6px;
-    font-size:0.9rem;
-    white-space: nowrap;
-    pointer-events:none;
-    opacity:1;
   }
 
   .btn {
@@ -81,6 +67,30 @@
     transform: translateY(-3px);
     box-shadow:0 6px 20px rgba(250,204,21,0.5);
   }
+
+  .plan-btn {
+    display:inline-block;
+    margin:10px;
+    padding:10px 18px;
+    border-radius:25px;
+    border:none;
+    cursor:pointer;
+    font-weight:bold;
+    transition: all 0.3s;
+  }
+  .plan-btn.run {
+    background:#22c55e;
+    color:#fff;
+  }
+  .plan-btn.top {
+    background:#3b82f6;
+    color:#fff;
+  }
+  .plan-btn:hover {
+    transform: scale(1.05);
+    opacity:0.9;
+  }
+
   .lang-switch {
     position:absolute;
     top:20px;
@@ -94,9 +104,7 @@
     font-weight:bold;
     font-size:0.9rem;
     box-shadow:0 3px 8px rgba(0,0,0,0.3);
-    transition: transform 0.2s;
   }
-  .lang-switch:hover { transform:scale(1.05); background:#eab308; }
 
   @keyframes bounce {
     0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
@@ -119,19 +127,50 @@
 <button class="lang-switch" onclick="toggleLang()"><span id="langFlag">🇬🇧</span> <span id="langText">EN</span></button>
 
 <div class="container">
-  <h1 id="title">📌 ชำระเงินค่าสมัคร 350 บาท</h1>
-  <p id="desc">กรุณาสแกน QR Code เพื่อชำระเงินก่อนเข้าสู่หน้าลงทะเบียน</p>
+  <h1 id="title">📌 เลือกรุ่นและชำระเงินค่าสมัคร</h1>
 
-  <div class="qr-container" data-tooltip="Scan QR Code to pay / สแกนจ่ายเงิน">
-    <img src="https://promptpay.io/0936494961/350" alt="QR Code" class="qr">
+  <div>
+    <button class="plan-btn run" onclick="selectPlan('run')">🏃‍♂️ BANGWAD CHARITY RUN (500 บาท)</button>
+    <button class="plan-btn top" onclick="selectPlan('top')">⭐ TOP100 (100 บาท)</button>
   </div>
 
-  <p id="afterPay">หลังจากชำระเงินเสร็จแล้ว กดปุ่มด้านล่างเพื่อลงทะเบียน</p>
-  <a href="registerbangwad.html" class="btn" id="registerBtn">ไปหน้าลงทะเบียน</a>
+  <p id="desc">กรุณาเลือกรุ่นก่อนเพื่อแสดง QR Code สำหรับชำระเงิน</p>
+
+  <div class="qr-container" id="qrSection" style="display:none;" data-tooltip="Scan QR Code to pay / สแกนจ่ายเงิน">
+    <img id="qrImg" src="" alt="QR Code" class="qr">
+  </div>
+
+  <p id="afterPay" style="display:none;">หลังจากชำระเงินเสร็จแล้ว กดปุ่มด้านล่างเพื่อลงทะเบียน</p>
+  <a href="registerbangwad.html" class="btn" id="registerBtn" style="display:none;">ไปหน้าลงทะเบียน</a>
 </div>
 
 <script>
-let currentLang="TH";
+let currentLang = "TH";
+let selectedPlan = "";
+
+function selectPlan(plan){
+  const title = document.getElementById("title");
+  const desc = document.getElementById("desc");
+  const qrSection = document.getElementById("qrSection");
+  const qrImg = document.getElementById("qrImg");
+  const afterPay = document.getElementById("afterPay");
+  const registerBtn = document.getElementById("registerBtn");
+
+  if(plan === "run"){
+    selectedPlan = "BANGWAD CHARITY RUN";
+    qrImg.src = "https://promptpay.io/0936494961/500";
+    title.innerText = "📌 ชำระเงินค่าสมัคร BANGWAD CHARITY RUN (500 บาท)";
+  } else {
+    selectedPlan = "TOP100";
+    qrImg.src = "https://promptpay.io/0936494961/100";
+    title.innerText = "📌 ชำระเงินค่าสมัคร TOP100 (100 บาท)";
+  }
+
+  desc.innerText = "กรุณาสแกน QR Code เพื่อชำระเงินสำหรับรุ่น " + selectedPlan;
+  qrSection.style.display = "block";
+  afterPay.style.display = "block";
+  registerBtn.style.display = "inline-block";
+}
 
 function toggleLang(){
   const title = document.getElementById("title");
@@ -142,16 +181,16 @@ function toggleLang(){
   const langText = document.getElementById("langText");
 
   if(currentLang==="TH"){
-    title.innerText="📌 Payment 350 THB";
-    desc.innerText="Please scan the QR Code to pay before proceeding to registration";
-    afterPay.innerText="After payment, click the button below to register";
+    title.innerText="📌 Select a category and make payment";
+    desc.innerText="Please choose a plan to show the QR Code for payment.";
+    afterPay.innerText="After payment, click the button below to register.";
     btn.innerText="Go to Registration";
     langFlag.innerText="🇹🇭";
     langText.innerText="TH";
     currentLang="EN";
   } else {
-    title.innerText="📌 ชำระเงินค่าสมัคร 350 บาท";
-    desc.innerText="กรุณาสแกน QR Code เพื่อชำระเงินก่อนเข้าสู่หน้าลงทะเบียน";
+    title.innerText="📌 เลือกรุ่นและชำระเงินค่าสมัคร";
+    desc.innerText="กรุณาเลือกรุ่นก่อนเพื่อแสดง QR Code สำหรับชำระเงิน";
     afterPay.innerText="หลังจากชำระเงินเสร็จแล้ว กดปุ่มด้านล่างเพื่อลงทะเบียน";
     btn.innerText="ไปหน้าลงทะเบียน";
     langFlag.innerText="🇬🇧";
@@ -160,13 +199,13 @@ function toggleLang(){
   }
 }
 
-  // ป้องกันการคลิกขวา
+// ป้องกันการคลิกขวา
 document.addEventListener("contextmenu", function(e) {
   e.preventDefault();
   alert("❌ ไม่อนุญาตให้คลิกขวา");
 });
 
-// ป้องกันการกดปุ่ม F12, Ctrl+Shift+I, Ctrl+U
+// ป้องกันการกด F12, Ctrl+Shift+I, Ctrl+U
 document.addEventListener("keydown", function(e) {
   if (e.key === "F12" || 
       (e.ctrlKey && e.shiftKey && e.key === "I") || 
