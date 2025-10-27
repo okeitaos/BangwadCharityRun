@@ -2,13 +2,14 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>🏃‍♂️ Race Live Dashboard (Pro)</title>
+<title>🏃‍♂️ Race Analytics Dashboard (Realtime + Chart)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-  .rank-finisher { background-color: #d1fae5; } /* เขียวอ่อน */
-  .rank-running { background-color: #fef9c3; }  /* เหลืองอ่อน */
-  .rank-dnf { background-color: #fee2e2; }      /* แดงอ่อน */
+  .rank-finisher { background-color: #d1fae5; }
+  .rank-running { background-color: #fef9c3; }
+  .rank-dnf { background-color: #fee2e2; }
   .active-tab { background-color: #2563eb !important; color: white !important; }
   .popup-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; justify-content: center; align-items: center; z-index: 50; }
   .popup { background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 500px; }
@@ -29,6 +30,12 @@
 <!-- 🔍 ช่องค้นหา -->
 <div class="flex justify-center mb-6">
   <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อหรือ Tag ID เพื่อค้นหา..." class="border p-2 rounded w-full max-w-md">
+</div>
+
+<!-- 📊 กราฟ TOP10 -->
+<div class="max-w-4xl mx-auto bg-white p-4 rounded-lg shadow mb-6">
+  <h2 class="text-xl font-semibold mb-2 text-center">🏆 TOP 10 เวลารวมดีที่สุด</h2>
+  <canvas id="lapChart" height="100"></canvas>
 </div>
 
 <!-- ตาราง -->
@@ -69,14 +76,14 @@ const popupContent = document.getElementById("popupContent");
 const closePopup = document.getElementById("closePopup");
 const typeTabs = document.querySelectorAll(".type-tab");
 const searchInput = document.getElementById("searchInput");
+const ctx = document.getElementById("lapChart").getContext("2d");
 
 let currentType = "ALL";
 let currentSearch = "";
+let chartInstance = null;
 
-// ปิด popup
 closePopup.onclick = () => popup.style.display = "none";
 
-// 🕒 แปลงเวลาเป็น HH:MM:SS
 function formatDuration(ms) {
   const totalSeconds = Math.floor(ms / 1000);
   const hours = Math.floor(totalSeconds / 3600);
@@ -85,7 +92,6 @@ function formatDuration(ms) {
   return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
 }
 
-// โหลดข้อมูล
 async function loadDashboard() {
   const { data: runners, error } = await supabase
     .from("runner")
@@ -97,7 +103,6 @@ async function loadDashboard() {
   if (currentType !== "ALL") {
     filtered = filtered.filter(r => (r.type || "").replace(/\s+/g,"").toUpperCase().includes(currentType.replace(" ","").toUpperCase()));
   }
-
   if (currentSearch.trim() !== "") {
     const q = currentSearch.toLowerCase();
     filtered = filtered.filter(r =>
@@ -123,8 +128,13 @@ async function loadDashboard() {
   const dnf = data.filter(r => r.status === "DNF").sort((a,b) => b.completedLaps - a.completedLaps);
   const all = [...finished, ...running, ...dnf];
 
+  updateTable(all);
+  updateChart(finished.slice(0, 10));
+}
+
+function updateTable(runners) {
   runnerTableBody.innerHTML = "";
-  all.forEach((r, i) => {
+  runners.forEach((r, i) => {
     const rowClass = r.status === "FINISHER" ? "rank-finisher"
                    : r.status === "DNF" ? "rank-dnf" : "rank-running";
     const totalTimeText = r.totalTime ? formatDuration(r.totalTime) : "-";
@@ -144,7 +154,34 @@ async function loadDashboard() {
   });
 }
 
-// แสดงรายละเอียด Lap
+// 🧮 อัปเดตกราฟ TOP10
+function updateChart(top10) {
+  const labels = top10.map(r => r.name);
+  const times = top10.map(r => Math.floor(r.totalTime / 1000 / 60)); // แปลงเป็นนาที
+
+  if (chartInstance) chartInstance.destroy();
+  chartInstance = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        label: "เวลารวม (นาที)",
+        data: times,
+        backgroundColor: "rgba(37,99,235,0.6)",
+        borderColor: "#2563eb",
+        borderWidth: 1
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: "นาที" } },
+        x: { title: { display: true, text: "นักวิ่ง Top 10" } }
+      }
+    }
+  });
+}
+
 function showDetails(runner) {
   popup.style.display = "flex";
   popupTitle.textContent = `${runner.name} (${runner.type})`;
@@ -173,7 +210,6 @@ function showDetails(runner) {
       </div>
     `;
   });
-
   popupContent.innerHTML = content;
 }
 
@@ -197,7 +233,7 @@ searchInput.addEventListener("input", () => {
   }, 400);
 });
 
-// โหลดครั้งแรก + realtime
+// 🚀 เริ่มระบบ
 loadDashboard();
 setInterval(loadDashboard, 15000);
 supabase.channel("record-changes")
