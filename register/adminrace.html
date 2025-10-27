@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>🏁 ระบบกรรมการสนาม (Realtime + Auto Search + Filter RUNNING)</title>
+<title>🏁 ระบบกรรมการสนาม (Realtime + Confirm DNF/FINISHER)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
@@ -18,7 +18,7 @@
 <body class="bg-gray-100 p-6">
 
 <div class="max-w-5xl mx-auto bg-white rounded-lg shadow p-6">
-  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Realtime)</h1>
+  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Realtime + Confirm DNF/FINISHER)</h1>
 
   <!-- 🔐 Login -->
   <div id="login-section">
@@ -43,7 +43,6 @@
     </div>
 
     <p id="lastUpdate" class="text-xs text-gray-500 mb-4">อัปเดตล่าสุด: -</p>
-
     <div id="runnerList" class="space-y-3"></div>
   </div>
 </div>
@@ -68,18 +67,6 @@ let currentUser = null;
 let searchTimeout = null;
 let showOnlyRunning = false;
 
-// Elements
-const loginSection = document.getElementById("login-section");
-const adminSection = document.getElementById("admin-section");
-const loginBtn = document.getElementById("loginBtn");
-const logoutBtn = document.getElementById("logoutBtn");
-const searchInput = document.getElementById("searchInput");
-const runnerList = document.getElementById("runnerList");
-const lastUpdate = document.getElementById("lastUpdate");
-const clearBtn = document.getElementById("clearBtn");
-const showAllBtn = document.getElementById("showAllBtn");
-const showRunningBtn = document.getElementById("showRunningBtn");
-
 // ============================ LOGIN ============================
 window.addEventListener("DOMContentLoaded", async () => {
   const { data: { session } } = await supabase.auth.getSession();
@@ -89,15 +76,6 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (event === "SIGNED_OUT") showLogin();
   });
 });
-
-loginBtn.onclick = async () => {
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return alert("❌ เข้าสู่ระบบไม่สำเร็จ");
-  autoLogin(data.user);
-};
-logoutBtn.onclick = async () => { await supabase.auth.signOut(); showLogin(); };
 
 async function autoLogin(user) {
   const { data: profile } = await supabase
@@ -112,40 +90,41 @@ async function autoLogin(user) {
   }
 
   currentUser = { id: user.id, name: profile.full_name };
-  loginSection.classList.add("hidden");
-  adminSection.classList.remove("hidden");
+  document.getElementById("login-section").classList.add("hidden");
+  document.getElementById("admin-section").classList.remove("hidden");
 
   loadRunners();
   startRealtimeListener();
   setInterval(loadRunners, 10000);
 }
 
+document.getElementById("loginBtn").onclick = async () => {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return alert("❌ เข้าสู่ระบบไม่สำเร็จ");
+  autoLogin(data.user);
+};
+document.getElementById("logoutBtn").onclick = async () => { await supabase.auth.signOut(); showLogin(); };
+
 function showLogin() {
   currentUser = null;
-  loginSection.classList.remove("hidden");
-  adminSection.classList.add("hidden");
+  document.getElementById("login-section").classList.remove("hidden");
+  document.getElementById("admin-section").classList.add("hidden");
 }
 
-// ============================ SEARCH & FILTER ============================
+// ============================ SEARCH / FILTER ============================
+const searchInput = document.getElementById("searchInput");
+const clearBtn = document.getElementById("clearBtn");
+const showAllBtn = document.getElementById("showAllBtn");
+const showRunningBtn = document.getElementById("showRunningBtn");
 searchInput.addEventListener("input", () => {
   if (searchTimeout) clearTimeout(searchTimeout);
   searchTimeout = setTimeout(() => loadRunners(searchInput.value), 800);
 });
-
-clearBtn.addEventListener("click", () => {
-  searchInput.value = "";
-  loadRunners();
-});
-
-showAllBtn.addEventListener("click", () => {
-  showOnlyRunning = false;
-  loadRunners();
-});
-
-showRunningBtn.addEventListener("click", () => {
-  showOnlyRunning = true;
-  loadRunners();
-});
+clearBtn.onclick = () => { searchInput.value = ""; loadRunners(); };
+showAllBtn.onclick = () => { showOnlyRunning = false; loadRunners(); };
+showRunningBtn.onclick = () => { showOnlyRunning = true; loadRunners(); };
 
 // ============================ LOAD RUNNERS ============================
 async function loadRunners(query = "") {
@@ -154,20 +133,15 @@ async function loadRunners(query = "") {
     .select("id, name, tag_id, type, status, record(lap, start_time, finish_time)")
     .order("name", { ascending: true });
 
-  if (query.trim() !== "") {
-    queryBuilder = queryBuilder.or(`name.ilike.%${query}%,tag_id.ilike.%${query}%`);
-  }
-  if (showOnlyRunning) {
-    queryBuilder = queryBuilder.eq("status", "RUNNING");
-  }
+  if (query.trim() !== "") queryBuilder = queryBuilder.or(`name.ilike.%${query}%,tag_id.ilike.%${query}%`);
+  if (showOnlyRunning) queryBuilder = queryBuilder.eq("status", "RUNNING");
 
   const { data: runners, error } = await queryBuilder;
-  if (error) {
-    console.error(error);
-    return;
-  }
+  if (error) return console.error(error);
 
+  const runnerList = document.getElementById("runnerList");
   runnerList.innerHTML = "";
+
   (runners || []).forEach(r => {
     const laps = (r.record || []).filter(x => x.start_time).map(x => x.lap);
     const showLap = laps.length ? Math.max(...laps) : 0;
@@ -180,30 +154,29 @@ async function loadRunners(query = "") {
     else if (normalizedType.includes("BCR100.8")) { finisherRequired = 16; dnfStart = 8; }
 
     const canFinish = showLap >= finisherRequired;
-    const reachedDNF = showLap >= dnfStart && showLap < finisherRequired;
 
-    let bgClass = "bg-green-50";
-    if (r.status === "DNF") bgClass = "bg-red-50";
-    else if (r.status === "FINISHER") bgClass = "blink-finisher";
-    else if (reachedDNF) bgClass = "blink-dnf";
+    let bgClass = r.status === "DNF" ? "bg-red-50" :
+                  r.status === "FINISHER" ? "blink-finisher" :
+                  "bg-green-50";
 
     let info = showLap === 0
       ? "✅ Check-in แล้ว (ยังไม่เริ่มวิ่ง)"
       : `🏁 รอบที่: ${showLap} / ${finisherRequired}<br>ระยะทาง: ${distance} กม.`;
 
-    let notice = "";
-    if (canFinish && r.status === "RUNNING") notice = "<div class='text-green-700 text-xs mt-1 font-medium'>🎖️ FINISHER - ครบระยะแล้ว</div>";
-    else if (reachedDNF && r.status === "RUNNING") notice = "<div class='text-yellow-700 text-xs mt-1 font-medium'>⚠️ ถึงระยะ DNF แล้ว</div>";
-
     let buttons = "";
     if (r.status === "FINISHER" || r.status === "DNF") {
       buttons = `<span class="text-gray-500 text-sm">🚫 ออกจากการแข่งขันแล้ว</span>`;
     } else if (canFinish) {
-      buttons = `<button class="bg-red-500 text-white px-2 py-1 rounded" onclick="updateStatus('${r.id}','FINISHER')">FINISHER</button>`;
-    } else if (reachedDNF) {
-      buttons = `<button class="bg-yellow-500 text-white px-2 py-1 rounded" onclick="updateStatus('${r.id}','DNF')">DNF</button>`;
-    } else {
-      buttons = `<span class="text-gray-400 text-sm">กำลังวิ่ง...</span>`;
+      buttons = `
+        <div class="flex flex-col items-end gap-1">
+          <button class="bg-red-500 text-white px-2 py-1 rounded" onclick="confirmChange('${r.id}','FINISHER','${r.name}')">FINISHER</button>
+          <button class="bg-yellow-500 text-white px-2 py-1 rounded" onclick="confirmChange('${r.id}','DNF','${r.name}')">DNF</button>
+        </div>`;
+    } else if (r.status === "RUNNING") {
+      buttons = `
+        <div class="flex flex-col items-end gap-1">
+          <button class="bg-yellow-500 text-white px-2 py-1 rounded" onclick="confirmChange('${r.id}','DNF','${r.name}')">DNF</button>
+        </div>`;
     }
 
     runnerList.innerHTML += `
@@ -211,29 +184,36 @@ async function loadRunners(query = "") {
         <div>
           <b>${r.name}</b> (${r.type})<br>
           🏷️ Tag ID: ${r.tag_id || "-"}<br>
-          สถานะ: ${r.status}<br>${info}${notice}
+          สถานะ: ${r.status}<br>${info}
         </div>
         <div>${buttons}</div>
       </div>`;
   });
 
-  lastUpdate.textContent = "อัปเดตล่าสุด: " + new Date().toLocaleTimeString("th-TH");
+  document.getElementById("lastUpdate").textContent = "อัปเดตล่าสุด: " + new Date().toLocaleTimeString("th-TH");
 }
 
-// ============================ STATUS ============================
-async function updateStatus(runnerId, status) {
-  const reason = prompt(status === "DNF" ? "เหตุผล DNF:" : "ยืนยัน FINISHER:", "ครบระยะ / เจ็บ / อื่นๆ");
+// ============================ CONFIRM + UPDATE ============================
+async function confirmChange(runnerId, status, name) {
+  const confirm1 = confirm(`⚠️ ยืนยันเปลี่ยนสถานะของ "${name}" เป็น ${status}?`);
+  if (!confirm1) return;
+  const confirm2 = confirm("❗ นี่เป็นการเปลี่ยนสถานะถาวร นักวิ่งจะออกจากการแข่งขันทันที!\n\nต้องการดำเนินการต่อหรือไม่?");
+  if (!confirm2) return;
+
+  const reason = prompt(status === "DNF" ? "เหตุผล DNF:" : "หมายเหตุ FINISHER:", "ครบระยะ / บาดเจ็บ / อื่นๆ");
   if (!reason) return;
+
   await supabase.from("runner").update({ status }).eq("id", runnerId);
   await supabase.from("dnf_log").insert({ runner_id: runnerId, status, reason, updated_by: currentUser.id });
-  showToast(`✅ เปลี่ยนสถานะเป็น ${status} สำเร็จ`);
+
+  showToast(`✅ เปลี่ยนสถานะของ ${name} เป็น ${status} สำเร็จ`);
   loadRunners(searchInput.value);
 }
 
 // ============================ REALTIME ============================
 function startRealtimeListener() {
   supabase.channel("record-changes")
-    .on("postgres_changes", { event: "*", schema: "public", table: "record" }, (payload) => {
+    .on("postgres_changes", { event: "*", schema: "public", table: "record" }, payload => {
       const lap = payload.new?.lap;
       if (!lap) return;
       loadRunners(searchInput.value);
@@ -245,14 +225,14 @@ function startRealtimeListener() {
 
 // ============================ TOAST ============================
 function showToast(message) {
-  const toast = document.createElement("div");
-  toast.className = "toast";
-  toast.innerHTML = message;
-  toastContainer.appendChild(toast);
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.innerHTML = message;
+  toastContainer.appendChild(t);
   setTimeout(() => {
-    toast.style.transition = "opacity 0.5s";
-    toast.style.opacity = "0";
-    setTimeout(() => toast.remove(), 500);
+    t.style.transition = "opacity 0.5s";
+    t.style.opacity = "0";
+    setTimeout(() => t.remove(), 500);
   }, 3500);
 }
 </script>
