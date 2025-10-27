@@ -7,109 +7,47 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
-  body {
-    background: linear-gradient(135deg, #e0f2fe 0%, #f0fdfa 100%);
-    font-family: "Prompt", sans-serif;
+  .rank-finisher { background-color: #d1fae5; } /* เขียวอ่อน */
+  .rank-running { background-color: #fef9c3; }  /* เหลืองอ่อน */
+  .rank-dnf { background-color: #fee2e2; }      /* แดงอ่อน */
+  .active-tab { background-color: #2563eb !important; color: white !important; }
+  .popup-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 50; }
+  .popup { background: white; padding: 20px; border-radius: 10px; width: 95%; max-width: 550px; max-height: 85vh; overflow-y: auto; }
+  @keyframes blinkSlow {
+    0%,100% { background-color: inherit; }
+    50% { background-color: rgba(253,230,138,0.5); }
   }
-
-  /* Card & Table */
-  .dashboard-card {
-    backdrop-filter: blur(10px);
-    background: rgba(255,255,255,0.8);
-    border-radius: 1rem;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-  }
-
-  /* Row styles */
-  .rank-finisher {
-    background: linear-gradient(90deg, #dcfce7, #bbf7d0);
-    transition: all 0.3s ease;
-  }
-
-  .rank-running {
-    background: linear-gradient(90deg, #dbeafe, #bfdbfe);
-    transition: all 0.3s ease;
-  }
-
-  .rank-dnf {
-    background: linear-gradient(90deg, #fee2e2, #fecaca);
-  }
-
-  tr:hover {
-    transform: scale(1.01);
-    transition: 0.25s ease;
-  }
-
-  /* Modal */
-  .popup-bg {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    display: none; justify-content: center; align-items: center;
-    z-index: 50;
-  }
-
-  .popup {
-    background: rgba(255,255,255,0.95);
-    backdrop-filter: blur(10px);
-    padding: 1.5rem;
-    border-radius: 1rem;
-    width: 95%; max-width: 550px; max-height: 85vh;
-    overflow-y: auto;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    transform: scale(0.95);
-    opacity: 0;
-    transition: all 0.3s ease;
-  }
-
-  .popup.show {
-    transform: scale(1);
-    opacity: 1;
-  }
-
-  .modal-header {
-    background: linear-gradient(to right, #2563eb, #3b82f6);
-    color: white;
-    padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
-  }
-
-  @keyframes blinkFinisher {
-    0%,100% { background-color: #bbf7d0; }
-    50% { background-color: #4ade80; }
-  }
-  .blink-finisher {
-    animation: blinkFinisher 3s infinite;
-  }
+  .blink-slow { animation: blinkSlow 2.5s infinite; }
 </style>
 </head>
+<body class="bg-gray-100 min-h-screen p-6">
 
-<body class="min-h-screen p-6">
-
-<h1 class="text-3xl font-bold text-center mb-6 text-gray-800 drop-shadow">📊 Race Dashboard</h1>
+<h1 class="text-3xl font-bold text-center mb-4">📊 DASHBOARD สรุปผลการแข่งขัน</h1>
 
 <!-- Tabs -->
-<div class="flex flex-wrap justify-center gap-2 mb-6">
-  <button data-type="ALL" class="type-tab bg-blue-600 text-white px-4 py-2 rounded-lg shadow active-tab">ทั้งหมด</button>
-  <button data-type="BCR 50.4" class="type-tab bg-gray-200 hover:bg-blue-100 px-4 py-2 rounded-lg">BCR 50.4</button>
-  <button data-type="BCR 69.3" class="type-tab bg-gray-200 hover:bg-blue-100 px-4 py-2 rounded-lg">BCR 69.3</button>
-  <button data-type="BCR 100.8" class="type-tab bg-gray-200 hover:bg-blue-100 px-4 py-2 rounded-lg">BCR 100.8</button>
+<div class="flex flex-wrap justify-center space-x-2 mb-4">
+  <button data-type="ALL" class="type-tab bg-gray-300 px-3 py-1 rounded active-tab">ทั้งหมด</button>
+  <button data-type="BCR 50.4" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 50.4</button>
+  <button data-type="BCR 69.3" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 69.3</button>
+  <button data-type="BCR 100.8" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 100.8</button>
 </div>
 
 <!-- Search -->
-<div class="flex justify-center mb-8">
-  <input id="searchInput" type="text" placeholder="🔍 ค้นหาชื่อหรือ Tag ID..." class="border rounded-lg p-3 w-full max-w-md shadow focus:outline-none focus:ring-2 focus:ring-blue-400">
+<div class="flex justify-center mb-6">
+  <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อหรือ Tag ID เพื่อค้นหา..." class="border p-2 rounded w-full max-w-md">
 </div>
 
-<!-- Dashboard Table -->
-<div id="runner-list" class="dashboard-card max-w-6xl mx-auto p-6 overflow-x-auto">
+<!-- Table -->
+<div id="runner-list" class="max-w-5xl mx-auto bg-white p-4 rounded-lg shadow">
   <table class="w-full text-sm text-left border-collapse">
-    <thead class="bg-blue-50 border-b border-gray-200 text-gray-700 uppercase text-xs">
-      <tr>
-        <th class="p-3 text-center">🏅 อันดับ</th>
-        <th class="p-3">ชื่อ</th>
-        <th class="p-3 text-center">ประเภท</th>
-        <th class="p-3 text-center">รอบ</th>
-        <th class="p-3 text-center">ระยะทาง (กม.)</th>
-        <th class="p-3 text-center">เวลารวม</th>
+    <thead>
+      <tr class="bg-gray-200">
+        <th class="p-2 text-center">🏅 อันดับ</th>
+        <th class="p-2">ชื่อ</th>
+        <th class="p-2 text-center">ประเภท</th>
+        <th class="p-2 text-center">รอบ</th>
+        <th class="p-2 text-center">ระยะทาง (กม.)</th>
+        <th class="p-2 text-center">เวลารวม</th>
       </tr>
     </thead>
     <tbody id="runnerTableBody"></tbody>
@@ -119,36 +57,34 @@
 <!-- Popup -->
 <div id="popup" class="popup-bg">
   <div class="popup">
-    <div class="modal-header">
-      <h2 id="popupTitle" class="text-lg font-semibold"></h2>
-    </div>
-    <div id="popupSummary" class="text-sm my-3 text-gray-800"></div>
+    <h2 id="popupTitle" class="text-lg font-semibold mb-2"></h2>
+    <div id="popupSummary" class="text-sm mb-3 text-gray-700"></div>
     <table class="w-full text-xs sm:text-sm mb-3 border">
       <thead>
         <tr class="bg-gray-100 text-gray-700">
           <th class="p-2 text-center">🏁 รอบ</th>
-          <th class="p-2 text-center">⏱ เริ่ม</th>
-          <th class="p-2 text-center">🏁 จบ</th>
+          <th class="p-2 text-center">⏱ เวลาเริ่ม</th>
+          <th class="p-2 text-center">🏁 เวลาจบ</th>
           <th class="p-2 text-center">⏳ เวลาต่อรอบ</th>
         </tr>
       </thead>
       <tbody id="popupContent"></tbody>
     </table>
     <p id="avgTime" class="text-center text-sm text-gray-600 mb-4"></p>
-    <button id="closePopup" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg w-full shadow">ปิด</button>
+    <button id="closePopup" class="bg-gray-700 text-white px-3 py-2 rounded w-full">ปิด</button>
   </div>
 </div>
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // ใส่ anon key ของคุณ
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const runnerTableBody = document.getElementById("runnerTableBody");
 const popup = document.getElementById("popup");
-const popupContent = document.getElementById("popupContent");
 const popupTitle = document.getElementById("popupTitle");
 const popupSummary = document.getElementById("popupSummary");
+const popupContent = document.getElementById("popupContent");
 const avgTime = document.getElementById("avgTime");
 const closePopup = document.getElementById("closePopup");
 const typeTabs = document.querySelectorAll(".type-tab");
@@ -157,10 +93,7 @@ const searchInput = document.getElementById("searchInput");
 let currentType = "ALL";
 let currentSearch = "";
 
-closePopup.onclick = () => {
-  popup.classList.remove("show");
-  setTimeout(()=>popup.style.display="none",200);
-};
+closePopup.onclick = () => popup.style.display = "none";
 
 function formatDuration(ms) {
   const s = Math.floor(ms / 1000);
@@ -199,27 +132,26 @@ async function loadDashboard() {
     return { ...r, totalTime, completedLaps, distance };
   });
 
-  const finished = data.filter(r => r.status === "FINISHER").sort((a,b)=>a.totalTime-b.totalTime);
-  const running = data.filter(r => r.status === "RUNNING").sort((a,b)=>b.completedLaps-a.completedLaps);
-  const dnf = data.filter(r => r.status === "DNF").sort((a,b)=>b.completedLaps-a.completedLaps);
+  const finished = data.filter(r => r.status === "FINISHER").sort((a,b) => a.totalTime - b.totalTime);
+  const running = data.filter(r => r.status === "RUNNING").sort((a,b) => b.completedLaps - a.completedLaps);
+  const dnf = data.filter(r => r.status === "DNF").sort((a,b) => b.completedLaps - a.completedLaps);
   renderRunners([...finished, ...running, ...dnf]);
 }
 
 function renderRunners(list) {
   runnerTableBody.innerHTML = "";
-  list.forEach((r,i)=>{
-    let rowClass = r.status === "FINISHER" ? "rank-finisher blink-finisher" :
-                   r.status === "DNF" ? "rank-dnf" : "rank-running";
+  list.forEach((r,i) => {
+    const rowClass = r.status === "FINISHER" ? "rank-finisher" : r.status === "DNF" ? "rank-dnf" : "rank-running";
     const totalTimeText = r.totalTime ? formatDuration(r.totalTime) : "-";
     const row = document.createElement("tr");
-    row.className = `${rowClass} border-b cursor-pointer`;
+    row.className = `${rowClass} border-b hover:bg-gray-50 cursor-pointer`;
     row.innerHTML = `
-      <td class="p-3 text-center font-semibold">${i+1}</td>
-      <td class="p-3 font-medium text-blue-700 hover:underline">${r.name}</td>
-      <td class="p-3 text-center">${r.type}</td>
-      <td class="p-3 text-center">${r.completedLaps}</td>
-      <td class="p-3 text-center">${r.distance}</td>
-      <td class="p-3 text-center">${totalTimeText}</td>
+      <td class="p-2 text-center">${i+1}</td>
+      <td class="p-2 font-medium text-blue-700 hover:underline">${r.name}</td>
+      <td class="p-2 text-center">${r.type}</td>
+      <td class="p-2 text-center">${r.completedLaps}</td>
+      <td class="p-2 text-center">${r.distance}</td>
+      <td class="p-2 text-center">${totalTimeText}</td>
     `;
     row.addEventListener("click",()=>showDetails(r));
     runnerTableBody.appendChild(row);
@@ -228,7 +160,6 @@ function renderRunners(list) {
 
 function showDetails(runner) {
   popup.style.display = "flex";
-  setTimeout(()=>popup.classList.add("show"),50);
   popupTitle.textContent = `${runner.name} (${runner.type})`;
   const totalTime = runner.totalTime ? formatDuration(runner.totalTime) : "-";
   popupSummary.innerHTML = `
@@ -249,32 +180,32 @@ function showDetails(runner) {
       totalLapTime += diff; count++;
     }
     popupContent.innerHTML += `
-      <tr class="border-t hover:bg-blue-50 transition">
-        <td class="p-2 text-center font-medium">${rec.lap + 1}</td>
+      <tr class="border-t">
+        <td class="p-2 text-center">${rec.lap + 1}</td>
         <td class="p-2 text-center">${rec.start_time ? new Date(rec.start_time).toLocaleTimeString("th-TH") : "-"}</td>
         <td class="p-2 text-center">${rec.finish_time ? new Date(rec.finish_time).toLocaleTimeString("th-TH") : "-"}</td>
         <td class="p-2 text-center">${rec.start_time && rec.finish_time ? formatDuration(new Date(rec.finish_time) - new Date(rec.start_time)) : "-"}</td>
       </tr>`;
   });
-  avgTime.textContent = count > 0 ? `⏱ เฉลี่ยต่อรอบ: ${formatDuration(totalLapTime / count)} (จาก ${count} รอบ)` : "";
+  avgTime.textContent = count > 0 ? `⏱ เวลาต่อรอบเฉลี่ย: ${formatDuration(totalLapTime / count)} (จาก ${count} รอบ)` : "";
 }
 
-typeTabs.forEach(tab=>{
-  tab.addEventListener("click",()=>{
-    typeTabs.forEach(t=>t.classList.remove("bg-blue-600","text-white"));
-    tab.classList.add("bg-blue-600","text-white");
+typeTabs.forEach(tab => {
+  tab.addEventListener("click", () => {
+    typeTabs.forEach(t => t.classList.remove("active-tab"));
+    tab.classList.add("active-tab");
     currentType = tab.dataset.type;
     loadDashboard();
   });
 });
 
-let searchTimeout=null;
-searchInput.addEventListener("input",()=>{
-  if(searchTimeout)clearTimeout(searchTimeout);
-  searchTimeout=setTimeout(()=>{
-    currentSearch=searchInput.value.trim();
+let searchTimeout = null;
+searchInput.addEventListener("input", () => {
+  if (searchTimeout) clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    currentSearch = searchInput.value.trim();
     loadDashboard();
-  },300);
+  }, 300);
 });
 
 loadDashboard();
