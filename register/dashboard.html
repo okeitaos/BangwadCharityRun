@@ -2,25 +2,32 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>🏃‍♂️ Race Analytics Dashboard (Realtime + Chart)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏃‍♂️ Race Leaderboard Pro</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   .rank-finisher { background-color: #d1fae5; }
   .rank-running { background-color: #fef9c3; }
   .rank-dnf { background-color: #fee2e2; }
   .active-tab { background-color: #2563eb !important; color: white !important; }
-  .popup-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; justify-content: center; align-items: center; z-index: 50; }
-  .popup { background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 500px; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 50; }
+  .modal { background: white; padding: 20px; border-radius: 16px; width: 90%; max-width: 600px; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+  .modal h2 { font-size: 1.25rem; font-weight: 700; color: #1e293b; }
+  .modal th, .modal td { padding: 8px; text-align: center; border-bottom: 1px solid #e5e7eb; }
+  .modal th { background-color: #f3f4f6; font-weight: 600; }
+  @media (max-width: 640px) {
+    th:nth-child(3), td:nth-child(3) { display: none; }
+    th:nth-child(4), td:nth-child(4) { display: none; }
+  }
 </style>
 </head>
-<body class="bg-gray-100 p-6">
+<body class="bg-gray-100 p-4 sm:p-6">
 
-<h1 class="text-3xl font-bold text-center mb-4">📊 DASHBOARD สรุปผลการแข่งขัน</h1>
+<h1 class="text-2xl sm:text-3xl font-bold text-center mb-4">🏁 RACE LEADERBOARD</h1>
 
 <!-- 🔘 ปุ่มเลือกประเภท -->
-<div class="flex flex-wrap justify-center space-x-2 mb-4">
+<div class="flex flex-wrap justify-center gap-2 mb-4">
   <button data-type="ALL" class="type-tab bg-gray-300 px-3 py-1 rounded active-tab">ทั้งหมด</button>
   <button data-type="BCR 50.4" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 50.4</button>
   <button data-type="BCR 69.3" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 69.3</button>
@@ -28,21 +35,18 @@
 </div>
 
 <!-- 🔍 ช่องค้นหา -->
-<div class="flex justify-center mb-6">
-  <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อหรือ Tag ID เพื่อค้นหา..." class="border p-2 rounded w-full max-w-md">
+<div class="flex justify-center mb-4">
+  <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อหรือ Tag ID เพื่อค้นหา..." class="border p-2 rounded w-full max-w-md shadow-sm focus:ring-2 focus:ring-blue-400">
 </div>
 
-<!-- 📊 กราฟ TOP10 -->
-<div class="max-w-4xl mx-auto bg-white p-4 rounded-lg shadow mb-6">
-  <h2 class="text-xl font-semibold mb-2 text-center">🏆 TOP 10 เวลารวมดีที่สุด</h2>
-  <canvas id="lapChart" height="100"></canvas>
-</div>
+<!-- 🏆 TOP3 Section -->
+<div id="top3Container" class="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 text-center"></div>
 
-<!-- ตาราง -->
-<div id="runner-list" class="max-w-5xl mx-auto bg-white p-4 rounded-lg shadow">
-  <table class="w-full text-sm text-left border-collapse">
+<!-- ตารางหลัก -->
+<div id="runner-list" class="max-w-5xl mx-auto bg-white p-4 rounded-lg shadow overflow-x-auto">
+  <table class="w-full text-sm text-left border-collapse min-w-[600px]">
     <thead>
-      <tr class="bg-gray-200">
+      <tr class="bg-gray-200 text-gray-700">
         <th class="p-2 text-center">🏅 อันดับ</th>
         <th class="p-2">ชื่อ</th>
         <th class="p-2 text-center">ประเภท</th>
@@ -55,34 +59,45 @@
   </table>
 </div>
 
-<!-- Popup แสดงรายละเอียด Lap -->
-<div id="popup" class="popup-bg">
-  <div class="popup">
-    <h2 id="popupTitle" class="text-lg font-semibold mb-2"></h2>
-    <div id="popupContent" class="text-sm mb-4"></div>
-    <button id="closePopup" class="bg-gray-700 text-white px-3 py-1 rounded w-full">ปิด</button>
+<!-- 🪟 Modal -->
+<div id="modal" class="modal-bg">
+  <div class="modal">
+    <h2 id="modalTitle"></h2>
+    <p id="modalSummary" class="text-sm text-gray-700 mt-2 mb-4"></p>
+    <table class="text-xs sm:text-sm">
+      <thead>
+        <tr>
+          <th>🏁 รอบ</th>
+          <th>🕒 เวลาเริ่ม</th>
+          <th>🏁 เวลาจบ</th>
+          <th>⏱ เวลาต่อรอบ</th>
+        </tr>
+      </thead>
+      <tbody id="modalContent"></tbody>
+    </table>
+    <button id="closeModal" class="bg-gray-700 text-white mt-4 px-4 py-2 rounded w-full">ปิดหน้าต่าง</button>
   </div>
 </div>
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 👈 ใส่ anon key ของคุณ
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const runnerTableBody = document.getElementById("runnerTableBody");
-const popup = document.getElementById("popup");
-const popupTitle = document.getElementById("popupTitle");
-const popupContent = document.getElementById("popupContent");
-const closePopup = document.getElementById("closePopup");
+const top3Container = document.getElementById("top3Container");
+const modal = document.getElementById("modal");
+const modalTitle = document.getElementById("modalTitle");
+const modalSummary = document.getElementById("modalSummary");
+const modalContent = document.getElementById("modalContent");
+const closeModal = document.getElementById("closeModal");
 const typeTabs = document.querySelectorAll(".type-tab");
 const searchInput = document.getElementById("searchInput");
-const ctx = document.getElementById("lapChart").getContext("2d");
 
 let currentType = "ALL";
 let currentSearch = "";
-let chartInstance = null;
 
-closePopup.onclick = () => popup.style.display = "none";
+closeModal.onclick = () => modal.style.display = "none";
 
 function formatDuration(ms) {
   const totalSeconds = Math.floor(ms / 1000);
@@ -128,10 +143,28 @@ async function loadDashboard() {
   const dnf = data.filter(r => r.status === "DNF").sort((a,b) => b.completedLaps - a.completedLaps);
   const all = [...finished, ...running, ...dnf];
 
+  updateTop3(finished.slice(0, 3));
   updateTable(all);
-  updateChart(finished.slice(0, 10));
 }
 
+// 🏆 แสดง Top 3
+function updateTop3(top3) {
+  if (top3.length === 0) {
+    top3Container.innerHTML = `<p class="col-span-3 text-gray-500 text-center">ยังไม่มีผู้เข้าเส้นชัยในรุ่นนี้</p>`;
+    return;
+  }
+  const medals = ["🥇", "🥈", "🥉"];
+  top3Container.innerHTML = top3.map((r, i) => `
+    <div class="bg-white shadow rounded-lg p-4 border border-gray-200 hover:shadow-md transition">
+      <div class="text-3xl">${medals[i]}</div>
+      <div class="font-semibold text-lg text-blue-700 mt-1">${r.name}</div>
+      <div class="text-sm text-gray-500">${r.type}</div>
+      <div class="text-sm mt-1">เวลารวม: <b>${formatDuration(r.totalTime)}</b></div>
+    </div>
+  `).join("");
+}
+
+// ตารางหลัก
 function updateTable(runners) {
   runnerTableBody.innerHTML = "";
   runners.forEach((r, i) => {
@@ -154,66 +187,45 @@ function updateTable(runners) {
   });
 }
 
-// 🧮 อัปเดตกราฟ TOP10
-function updateChart(top10) {
-  const labels = top10.map(r => r.name);
-  const times = top10.map(r => Math.floor(r.totalTime / 1000 / 60)); // แปลงเป็นนาที
-
-  if (chartInstance) chartInstance.destroy();
-  chartInstance = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [{
-        label: "เวลารวม (นาที)",
-        data: times,
-        backgroundColor: "rgba(37,99,235,0.6)",
-        borderColor: "#2563eb",
-        borderWidth: 1
-      }]
-    },
-    options: {
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { beginAtZero: true, title: { display: true, text: "นาที" } },
-        x: { title: { display: true, text: "นักวิ่ง Top 10" } }
-      }
-    }
-  });
-}
-
+// 🪟 Modal
 function showDetails(runner) {
-  popup.style.display = "flex";
-  popupTitle.textContent = `${runner.name} (${runner.type})`;
-  let content = "";
+  modal.style.display = "flex";
+  modalTitle.textContent = `${runner.name} (${runner.type})`;
+
+  let totalDur = formatDuration(runner.totalTime || 0);
+  modalSummary.innerHTML = `
+    <b>สถานะ:</b> ${runner.status} |
+    <b>รอบ:</b> ${runner.completedLaps} |
+    <b>ระยะทาง:</b> ${runner.distance} กม.<br>
+    <b>เวลารวม:</b> ${totalDur}
+  `;
 
   if (!runner.record || runner.record.length === 0) {
-    popupContent.innerHTML = "<p>ไม่มีข้อมูลรอบวิ่ง</p>";
+    modalContent.innerHTML = `<tr><td colspan="4" class="text-center py-2">ไม่มีข้อมูลรอบวิ่ง</td></tr>`;
     return;
   }
 
   const laps = runner.record.sort((a,b) => a.lap - b.lap);
-  laps.forEach(rec => {
-    const start = rec.start_time ? new Date(rec.start_time).toLocaleString("th-TH") : "-";
-    const finish = rec.finish_time ? new Date(rec.finish_time).toLocaleString("th-TH") : "-";
+  modalContent.innerHTML = laps.map(rec => {
+    const start = rec.start_time ? new Date(rec.start_time).toLocaleTimeString("th-TH") : "-";
+    const finish = rec.finish_time ? new Date(rec.finish_time).toLocaleTimeString("th-TH") : "-";
     let dur = "-";
     if (rec.start_time && rec.finish_time) {
       const diff = new Date(rec.finish_time) - new Date(rec.start_time);
       dur = formatDuration(diff);
     }
-    content += `
-      <div class="border-b py-1">
-        <b>Lap ${rec.lap}</b><br>
-        🕒 Start: ${start}<br>
-        🏁 Finish: ${finish}<br>
-        ⏱ Duration: ${dur}
-      </div>
+    return `
+      <tr>
+        <td>${rec.lap}</td>
+        <td>${start}</td>
+        <td>${finish}</td>
+        <td>${dur}</td>
+      </tr>
     `;
-  });
-  popupContent.innerHTML = content;
+  }).join("");
 }
 
-// 🔘 เปลี่ยนรุ่น
+// ปุ่มรุ่น
 typeTabs.forEach(tab => {
   tab.addEventListener("click", () => {
     typeTabs.forEach(t => t.classList.remove("active-tab"));
@@ -223,7 +235,7 @@ typeTabs.forEach(tab => {
   });
 });
 
-// 🔍 ค้นหา
+// ค้นหา
 let searchTimeout = null;
 searchInput.addEventListener("input", () => {
   if (searchTimeout) clearTimeout(searchTimeout);
@@ -233,7 +245,7 @@ searchInput.addEventListener("input", () => {
   }, 400);
 });
 
-// 🚀 เริ่มระบบ
+// เริ่มโหลด
 loadDashboard();
 setInterval(loadDashboard, 15000);
 supabase.channel("record-changes")
