@@ -2,57 +2,101 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>🏁 Admin - จัดการสถานะนักวิ่ง</title>
+<title>🏁 ระบบกรรมการสนาม (Supabase Auth)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
+
 <body class="bg-gray-100 p-6">
   <div class="max-w-3xl mx-auto bg-white rounded-lg shadow p-6">
-    <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม - จัดการสถานะนักวิ่ง</h1>
+    <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม</h1>
 
-    <!-- 🔐 ระบบล็อกอินกรรมการ -->
-    <div id="login-section" class="mb-6">
-      <input id="adminKey" type="password" placeholder="ใส่รหัสกรรมการ" class="border p-2 w-full rounded mb-2">
+    <!-- 🔐 ส่วนล็อกอิน -->
+    <div id="login-section">
+      <input id="email" type="email" placeholder="อีเมลกรรมการ" class="border p-2 w-full rounded mb-2">
+      <input id="password" type="password" placeholder="รหัสผ่าน" class="border p-2 w-full rounded mb-2">
       <button id="loginBtn" class="bg-blue-600 text-white px-4 py-2 rounded w-full">เข้าสู่ระบบ</button>
       <p id="loginStatus" class="text-center text-sm text-gray-600 mt-2"></p>
     </div>
 
-    <!-- 🏃 ส่วนจัดการนักวิ่ง -->
+    <!-- 🧑‍⚖️ ส่วนจัดการนักวิ่ง -->
     <div id="admin-section" class="hidden">
-      <input id="searchInput" type="text" placeholder="ค้นหาชื่อนักวิ่ง..." class="border p-2 w-full rounded mb-4">
+      <div class="flex justify-between mb-4">
+        <h2 class="text-lg font-semibold">จัดการสถานะนักวิ่ง</h2>
+        <button id="logoutBtn" class="bg-red-500 text-white px-3 py-1 rounded">ออกจากระบบ</button>
+      </div>
+
+      <input id="searchInput" type="text" placeholder="ค้นหาชื่อ..." class="border p-2 w-full rounded mb-4">
       <div id="runnerList" class="space-y-2"></div>
+
+      <hr class="my-6">
+      <h2 class="text-lg font-semibold mb-2">🧾 ประวัติการเปลี่ยนสถานะ (DNF / FINISHER)</h2>
+      <div id="logList" class="space-y-1 text-sm text-gray-700"></div>
     </div>
   </div>
 
 <script>
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // ของคุณ
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // 🔧 เปลี่ยนเป็นของคุณ
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// 🔐 ระบบล็อกอินกรรมการ
-const ADMIN_PASSWORD = "bcradmin2025"; // เปลี่ยนได้เอง
 const loginSection = document.getElementById("login-section");
 const adminSection = document.getElementById("admin-section");
 const loginBtn = document.getElementById("loginBtn");
-const adminKeyInput = document.getElementById("adminKey");
+const logoutBtn = document.getElementById("logoutBtn");
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
 const loginStatus = document.getElementById("loginStatus");
-
-loginBtn.addEventListener("click", () => {
-  if (adminKeyInput.value === ADMIN_PASSWORD) {
-    loginSection.classList.add("hidden");
-    adminSection.classList.remove("hidden");
-    loadRunners();
-  } else {
-    loginStatus.textContent = "❌ รหัสกรรมการไม่ถูกต้อง";
-  }
-});
-
-// 🏃 ค้นหาและแสดงรายชื่อนักวิ่ง
 const searchInput = document.getElementById("searchInput");
 const runnerList = document.getElementById("runnerList");
+const logList = document.getElementById("logList");
 
+let currentUser = null;
+
+// 🔐 ล็อกอินกรรมการ
+loginBtn.addEventListener("click", async () => {
+  loginStatus.textContent = "กำลังเข้าสู่ระบบ...";
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: emailInput.value,
+    password: passwordInput.value
+  });
+
+  if (error) {
+    loginStatus.textContent = "❌ เข้าสู่ระบบไม่สำเร็จ";
+    return;
+  }
+
+  const user = data.user;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_admin, full_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile || !profile.is_admin) {
+    await supabase.auth.signOut();
+    loginStatus.textContent = "⛔ ไม่มีสิทธิ์เข้าใช้งาน";
+    return;
+  }
+
+  currentUser = { id: user.id, name: profile.full_name || user.email };
+  loginSection.classList.add("hidden");
+  adminSection.classList.remove("hidden");
+  loadRunners();
+  loadLogs();
+});
+
+// 🚪 ออกจากระบบ
+logoutBtn.addEventListener("click", async () => {
+  await supabase.auth.signOut();
+  currentUser = null;
+  loginSection.classList.remove("hidden");
+  adminSection.classList.add("hidden");
+});
+
+// 📋 โหลดรายชื่อนักวิ่ง
 async function loadRunners(query = "") {
-  let { data: runners, error } = await supabase
+  const { data: runners, error } = await supabase
     .from("runner")
     .select("id, name, type, status")
     .ilike("name", `%${query}%`)
@@ -69,26 +113,23 @@ async function loadRunners(query = "") {
           <span class="text-sm text-gray-600">สถานะ: ${r.status}</span>
         </div>
         <div class="space-x-1">
-          <button class="bg-green-500 text-white px-2 py-1 rounded" onclick="updateStatus(${r.id}, 'RUNNING')">RUNNING</button>
-          <button class="bg-yellow-500 text-white px-2 py-1 rounded" onclick="updateStatus(${r.id}, 'DNF')">DNF</button>
-          <button class="bg-red-500 text-white px-2 py-1 rounded" onclick="updateStatus(${r.id}, 'FINISHER')">FINISHER</button>
+          <button class="bg-green-500 text-white px-2 py-1 rounded" onclick="updateStatus('${r.id}', 'RUNNING')">RUNNING</button>
+          <button class="bg-yellow-500 text-white px-2 py-1 rounded" onclick="updateStatus('${r.id}', 'DNF')">DNF</button>
+          <button class="bg-red-500 text-white px-2 py-1 rounded" onclick="updateStatus('${r.id}', 'FINISHER')">FINISHER</button>
         </div>
       </div>
     `;
   });
 }
 
-// พิมพ์ค้นหาแบบเรียลไทม์
-searchInput.addEventListener("input", (e) => {
-  loadRunners(e.target.value);
-});
+// 🔍 ค้นหานักวิ่ง
+searchInput.addEventListener("input", e => loadRunners(e.target.value));
 
-// ✅ เปลี่ยนสถานะนักวิ่ง + บันทึก Log
+// ✏️ อัปเดตสถานะนักวิ่ง
 async function updateStatus(runnerId, status) {
-  const reason = prompt("กรอกเหตุผลการเปลี่ยนสถานะ:", status === 'DNF' ? 'เจ็บระหว่างแข่งขัน' : '');
-  const updatedBy = "กรรมการสนาม";
+  const reason = prompt("เหตุผล:", status === "DNF" ? "เจ็บระหว่างแข่งขัน" : status === "FINISHER" ? "ครบจำนวนรอบ" : "");
+  if (!reason) return;
 
-  // อัปเดตในตาราง runner
   const { error: updateError } = await supabase
     .from("runner")
     .update({ status })
@@ -99,20 +140,43 @@ async function updateStatus(runnerId, status) {
     return;
   }
 
-  เพิ่ม log ใน dnf_log
-await supabase.from("dnf_log").insert({
-  runner_id: runnerId,
-  status,
-  reason,
-  updated_by: updatedBy
-});
-
+  // บันทึกลง dnf_log
+  await supabase.from("dnf_log").insert({
+    runner_id: runnerId,
+    status,
+    reason,
+    updated_by: currentUser.id
+  });
 
   alert(`✅ เปลี่ยนสถานะเป็น ${status} สำเร็จ`);
   loadRunners(searchInput.value);
+  loadLogs();
 }
 
-  
+// 🧾 โหลด Log การเปลี่ยนสถานะ
+async function loadLogs() {
+  const { data: logs, error } = await supabase
+    .from("dnf_log")
+    .select(`created_at, status, reason, runner_id, updated_by, runner(name), auth.users(email)`)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  logList.innerHTML = "";
+  if (error) return console.error(error);
+  if (!logs || logs.length === 0) {
+    logList.innerHTML = "<p class='text-gray-500'>ยังไม่มีประวัติ</p>";
+    return;
+  }
+
+  logs.forEach(l => {
+    const time = new Date(l.created_at).toLocaleString("th-TH");
+    logList.innerHTML += `<div class="border-b py-1">
+      🕐 ${time} — <b>${l.status}</b> (${l.reason || "-"})<br>
+      👤 Runner: ${l.runner?.name || l.runner_id}<br>
+      🧑‍⚖️ โดย: ${currentUser.name}
+    </div>`;
+  });
+}
 </script>
 </body>
 </html>
