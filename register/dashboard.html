@@ -12,7 +12,6 @@
     font-family: "Prompt", sans-serif;
   }
 
-  /* Card & Table */
   .dashboard-card {
     backdrop-filter: blur(10px);
     background: rgba(255,255,255,0.8);
@@ -20,33 +19,16 @@
     box-shadow: 0 4px 20px rgba(0,0,0,0.1);
   }
 
-  /* Row styles */
-  .rank-finisher {
-    background: linear-gradient(90deg, #dcfce7, #bbf7d0);
-    transition: all 0.3s ease;
-  }
+  .rank-finisher { background: linear-gradient(90deg, #dcfce7, #bbf7d0); transition: 0.3s; }
+  .rank-running  { background: linear-gradient(90deg, #dbeafe, #bfdbfe); transition: 0.3s; }
+  .rank-dnf      { background: linear-gradient(90deg, #fee2e2, #fecaca); }
 
-  .rank-running {
-    background: linear-gradient(90deg, #dbeafe, #bfdbfe);
-    transition: all 0.3s ease;
-  }
+  tr:hover { transform: scale(1.01); transition: 0.25s; }
 
-  .rank-dnf {
-    background: linear-gradient(90deg, #fee2e2, #fecaca);
-  }
-
-  tr:hover {
-    transform: scale(1.01);
-    transition: 0.25s ease;
-  }
-
-  /* Modal */
   .popup-bg {
     position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    display: none; justify-content: center; align-items: center;
-    z-index: 50;
+    display: none; justify-content: center; align-items: center; z-index: 50;
   }
-
   .popup {
     background: rgba(255,255,255,0.95);
     backdrop-filter: blur(10px);
@@ -56,29 +38,20 @@
     overflow-y: auto;
     box-shadow: 0 8px 24px rgba(0,0,0,0.2);
     transform: scale(0.95);
-    opacity: 0;
-    transition: all 0.3s ease;
+    opacity: 0; transition: all 0.3s ease;
   }
-
-  .popup.show {
-    transform: scale(1);
-    opacity: 1;
-  }
+  .popup.show { transform: scale(1); opacity: 1; }
 
   .modal-header {
     background: linear-gradient(to right, #2563eb, #3b82f6);
-    color: white;
-    padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
+    color: white; padding: 0.75rem 1rem; border-radius: 0.5rem;
   }
 
   @keyframes blinkFinisher {
     0%,100% { background-color: #bbf7d0; }
     50% { background-color: #4ade80; }
   }
-  .blink-finisher {
-    animation: blinkFinisher 3s infinite;
-  }
+  .blink-finisher { animation: blinkFinisher 3s infinite; }
 </style>
 </head>
 
@@ -96,7 +69,7 @@
 
 <!-- Search -->
 <div class="flex justify-center mb-8">
-  <input id="searchInput" type="text" placeholder="🔍 ค้นหาชื่อหรือ Tag ID..." class="border rounded-lg p-3 w-full max-w-md shadow focus:outline-none focus:ring-2 focus:ring-blue-400">
+  <input id="searchInput" type="text" placeholder="🔍 ค้นหาชื่อ, Tag ID หรือ BIB..." class="border rounded-lg p-3 w-full max-w-md shadow focus:outline-none focus:ring-2 focus:ring-blue-400">
 </div>
 
 <!-- Dashboard Table -->
@@ -104,7 +77,8 @@
   <table class="w-full text-sm text-left border-collapse">
     <thead class="bg-blue-50 border-b border-gray-200 text-gray-700 uppercase text-xs">
       <tr>
-        <th class="p-3 text-center">🏅 อันดับ</th>
+        <th class="p-3 text-center">🏅</th>
+        <th class="p-3 text-center">BIB</th>
         <th class="p-3">ชื่อ</th>
         <th class="p-3 text-center">ประเภท</th>
         <th class="p-3 text-center">รอบ</th>
@@ -121,6 +95,7 @@
   <div class="popup">
     <div class="modal-header">
       <h2 id="popupTitle" class="text-lg font-semibold"></h2>
+      <p id="popupBib" class="text-sm text-gray-100"></p>
     </div>
     <div id="popupSummary" class="text-sm my-3 text-gray-800"></div>
     <table class="w-full text-xs sm:text-sm mb-3 border">
@@ -141,13 +116,14 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // ใส่ anon key
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const runnerTableBody = document.getElementById("runnerTableBody");
 const popup = document.getElementById("popup");
 const popupContent = document.getElementById("popupContent");
 const popupTitle = document.getElementById("popupTitle");
+const popupBib = document.getElementById("popupBib");
 const popupSummary = document.getElementById("popupSummary");
 const avgTime = document.getElementById("avgTime");
 const closePopup = document.getElementById("closePopup");
@@ -173,7 +149,7 @@ function formatDuration(ms) {
 async function loadDashboard() {
   const { data: runners, error } = await supabase
     .from("runner")
-    .select("id,name,tag_id,type,status,record(lap,start_time,finish_time)")
+    .select("id,bib,name,tag_id,type,status,record(lap,start_time,finish_time)")
     .order("name",{ascending:true});
   if (error) return console.error(error);
 
@@ -181,9 +157,10 @@ async function loadDashboard() {
   if (currentType !== "ALL") filtered = filtered.filter(r => r.type === currentType);
   if (currentSearch.trim()) {
     const q = currentSearch.toLowerCase();
-    filtered = filtered.filter(r => 
+    filtered = filtered.filter(r =>
       (r.name || "").toLowerCase().includes(q) ||
-      (r.tag_id || "").toLowerCase().includes(q)
+      (r.tag_id || "").toLowerCase().includes(q) ||
+      (r.bib || "").toLowerCase().includes(q)
     );
   }
 
@@ -215,6 +192,7 @@ function renderRunners(list) {
     row.className = `${rowClass} border-b cursor-pointer`;
     row.innerHTML = `
       <td class="p-3 text-center font-semibold">${i+1}</td>
+      <td class="p-3 text-center font-bold text-gray-700">${r.bib || "-"}</td>
       <td class="p-3 font-medium text-blue-700 hover:underline">${r.name}</td>
       <td class="p-3 text-center">${r.type}</td>
       <td class="p-3 text-center">${r.completedLaps}</td>
@@ -230,6 +208,7 @@ function showDetails(runner) {
   popup.style.display = "flex";
   setTimeout(()=>popup.classList.add("show"),50);
   popupTitle.textContent = `${runner.name} (${runner.type})`;
+  popupBib.textContent = `BIB: ${runner.bib || "-"}`;
   const totalTime = runner.totalTime ? formatDuration(runner.totalTime) : "-";
   popupSummary.innerHTML = `
     สถานะ: <b>${runner.status}</b> |
