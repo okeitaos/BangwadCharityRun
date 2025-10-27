@@ -156,7 +156,7 @@ async function updateStatus(runnerId, status) {
 // 🧾 โหลด Log การเปลี่ยนสถานะ
 async function loadLogs() {
   const { data: logs, error } = await supabase
-    .from("dnf_log")
+    .from("v_dnf_log_full")
     .select(`created_at, status, reason, runner_id, updated_by, runner(name), auth.users(email)`)
     .order("created_at", { ascending: false })
     .limit(20);
