@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>🏁 ระบบกรรมการสนาม (Realtime + Auto Search)</title>
+<title>🏁 ระบบกรรมการสนาม (Realtime + Auto Search + Clear)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
@@ -10,7 +10,6 @@
   @keyframes blinkYellow { 0%,100%{background-color:#fff9c4;} 50%{background-color:#fde68a;} }
   .blink-finisher { animation: blinkGold 1.8s infinite; }
   .blink-dnf { animation: blinkYellow 1.8s infinite; }
-  .tab-active { background-color: #2563eb; color: white; }
   #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; }
   .toast { background: #333; color: #fff; padding: 10px 16px; border-radius: 8px; margin-top: 8px; min-width: 250px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); opacity: 0; transform: translateY(20px); animation: fadeInUp 0.4s forwards; }
   @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
@@ -19,7 +18,7 @@
 <body class="bg-gray-100 p-6">
 
 <div class="max-w-5xl mx-auto bg-white rounded-lg shadow p-6">
-  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Realtime + ค้นหาอัตโนมัติ)</h1>
+  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Realtime + Auto Search)</h1>
 
   <!-- 🔐 Login -->
   <div id="login-section">
@@ -35,7 +34,12 @@
       <button id="logoutBtn" class="bg-red-500 text-white px-3 py-1 rounded">ออกจากระบบ</button>
     </div>
 
-    <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อ หรือ Tag ID เพื่อค้นหา..." class="border p-2 w-full rounded mb-4">
+    <!-- ช่องค้นหา -->
+    <div class="flex space-x-2 mb-4">
+      <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อ หรือ Tag ID เพื่อค้นหา..." class="border p-2 rounded w-full">
+      <button id="clearBtn" class="bg-gray-300 px-3 py-2 rounded">ล้าง</button>
+      <button id="showAllBtn" class="bg-blue-500 text-white px-3 py-2 rounded">แสดงทั้งหมด</button>
+    </div>
 
     <p id="lastUpdate" class="text-xs text-gray-500 mb-4">อัปเดตล่าสุด: -</p>
 
@@ -70,6 +74,8 @@ const logoutBtn = document.getElementById("logoutBtn");
 const searchInput = document.getElementById("searchInput");
 const runnerList = document.getElementById("runnerList");
 const lastUpdate = document.getElementById("lastUpdate");
+const clearBtn = document.getElementById("clearBtn");
+const showAllBtn = document.getElementById("showAllBtn");
 
 // ============================ LOGIN ============================
 window.addEventListener("DOMContentLoaded", async () => {
@@ -106,9 +112,9 @@ async function autoLogin(user) {
   loginSection.classList.add("hidden");
   adminSection.classList.remove("hidden");
 
-  loadAll();
+  loadRunners();
   startRealtimeListener();
-  setInterval(loadAll, 10000);
+  setInterval(loadRunners, 10000);
 }
 
 function showLogin() {
@@ -117,45 +123,37 @@ function showLogin() {
   adminSection.classList.add("hidden");
 }
 
-// ============================ AUTO SEARCH ============================
+// ============================ SEARCH SYSTEM ============================
 searchInput.addEventListener("input", () => {
   if (searchTimeout) clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(() => {
-    loadRunners(searchInput.value);
-  }, 1000); // พิมพ์แล้ว 1 วิค่อยค้น
+  searchTimeout = setTimeout(() => loadRunners(searchInput.value), 800); // พิมพ์แล้ว 0.8 วิค่อยค้น
 });
 
-// ============================ LOADERS ============================
-function updateLastTime() {
-  lastUpdate.textContent = "อัปเดตล่าสุด: " + new Date().toLocaleTimeString("th-TH");
-}
-async function loadAll() {
-  loadRunners(searchInput.value);
-  updateLastTime();
-}
+clearBtn.addEventListener("click", () => {
+  searchInput.value = "";
+  loadRunners();
+});
 
-// ============================ RUNNERS ============================
+showAllBtn.addEventListener("click", () => {
+  searchInput.value = "";
+  loadRunners();
+});
+
+// ============================ RUNNER DATA ============================
 async function loadRunners(query = "") {
-  let runners = [];
-  if (query.trim() === "") {
-    const { data } = await supabase
-      .from("runner")
-      .select("id, name, tag_id, type, status, record(lap, start_time, finish_time)")
-      .order("name", { ascending: true });
-    runners = data || [];
-  } else {
-    const { data } = await supabase
-      .from("runner")
-      .select("id, name, tag_id, type, status, record(lap, start_time, finish_time)")
-      .or(`name.ilike.%${query}%,tag_id.ilike.%${query}%`)
-      .order("name", { ascending: true });
-    runners = data || [];
-  }
+  const { data: runners } = query.trim()
+    ? await supabase.from("runner")
+        .select("id, name, tag_id, type, status, record(lap, start_time, finish_time)")
+        .or(`name.ilike.%${query}%,tag_id.ilike.%${query}%`)
+        .order("name", { ascending: true })
+    : await supabase.from("runner")
+        .select("id, name, tag_id, type, status, record(lap, start_time, finish_time)")
+        .order("name", { ascending: true });
 
   runnerList.innerHTML = "";
-  runners.forEach(r => {
-    const startedLaps = (r.record || []).filter(x => x.start_time).map(x => x.lap);
-    const showLap = startedLaps.length ? Math.max(...startedLaps) : 0;
+  (runners || []).forEach(r => {
+    const laps = (r.record || []).filter(x => x.start_time).map(x => x.lap);
+    const showLap = laps.length ? Math.max(...laps) : 0;
     const distance = (showLap * 6.3).toFixed(2);
 
     const normalizedType = (r.type || "").replace(/\s+/g, "").toUpperCase();
@@ -201,9 +199,11 @@ async function loadRunners(query = "") {
         <div>${buttons}</div>
       </div>`;
   });
+
+  lastUpdate.textContent = "อัปเดตล่าสุด: " + new Date().toLocaleTimeString("th-TH");
 }
 
-// ============================ STATUS ============================
+// ============================ STATUS CONTROL ============================
 async function updateStatus(runnerId, status) {
   const reason = prompt(status === "DNF" ? "เหตุผล DNF:" : "ยืนยัน FINISHER:", "ครบระยะ / เจ็บ / อื่นๆ");
   if (!reason) return;
@@ -213,22 +213,15 @@ async function updateStatus(runnerId, status) {
   loadRunners(searchInput.value);
 }
 
-// ============================ REALTIME + ALERT ============================
+// ============================ REALTIME ============================
 function startRealtimeListener() {
   supabase.channel("record-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "record" }, (payload) => {
       const lap = payload.new?.lap;
       if (!lap) return;
       loadRunners(searchInput.value);
-
-      if ([4,6,8].includes(lap)) {
-        alertDnf.play();
-        showToast(`⚠️ นักวิ่งถึงระยะ DNF (รอบ ${lap})`);
-      }
-      if ([8,11,16].includes(lap)) {
-        alertFinisher.play();
-        showToast(`🏆 นักวิ่งถึงระยะ FINISHER (รอบ ${lap})`);
-      }
+      if ([4,6,8].includes(lap)) { alertDnf.play(); showToast(`⚠️ นักวิ่งถึงระยะ DNF (รอบ ${lap})`); }
+      if ([8,11,16].includes(lap)) { alertFinisher.play(); showToast(`🏆 นักวิ่งถึงระยะ FINISHER (รอบ ${lap})`); }
     })
     .subscribe();
 }
