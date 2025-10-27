@@ -11,6 +11,9 @@
   .blink-finisher { animation: blinkGold 1.8s infinite; }
   .blink-dnf { animation: blinkYellow 1.8s infinite; }
   .tab-active { background-color: #2563eb; color: white; }
+  #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; }
+  .toast { background: #333; color: #fff; padding: 10px 16px; border-radius: 8px; margin-top: 8px; min-width: 250px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); opacity: 0; transform: translateY(20px); animation: fadeInUp 0.4s forwards; }
+  @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
 </style>
 </head>
 <body class="bg-gray-100 p-6">
@@ -35,7 +38,6 @@
       </div>
     </div>
 
-    <!-- Tabs -->
     <div class="flex space-x-2 mb-4">
       <button id="tab-runners" class="tab-active px-3 py-1 rounded border">🏃‍♂️ นักวิ่ง</button>
       <button id="tab-logs" class="px-3 py-1 rounded border">🧾 Logs</button>
@@ -44,7 +46,6 @@
 
     <p id="lastUpdate" class="text-xs text-gray-500 mb-4">อัปเดตล่าสุด: -</p>
 
-    <!-- Sections -->
     <div id="section-runners">
       <input id="searchInput" type="text" placeholder="ค้นหาชื่อ..." class="border p-2 w-full rounded mb-4">
       <div id="runnerList" class="space-y-3"></div>
@@ -60,8 +61,12 @@
   </div>
 </div>
 
-<audio id="alertDnf" src="https://cdn.pixabay.com/download/audio/2023/07/05/audio_3b16c61a2b.mp3?filename=warning-beep-47243.mp3"></audio>
-<audio id="alertFinisher" src="https://cdn.pixabay.com/download/audio/2021/08/09/audio_3e72da0c5a.mp3?filename=win-sound-2019.mp3"></audio>
+<!-- เสียงแจ้งเตือน -->
+<audio id="alertDnf" preload="auto" src="https://cdn.jsdelivr.net/gh/napthedev/sounds@main/warning-beep.mp3"></audio>
+<audio id="alertFinisher" preload="auto" src="https://cdn.jsdelivr.net/gh/napthedev/sounds@main/win.mp3"></audio>
+
+<!-- Popup แจ้งเตือน -->
+<div id="toast-container"></div>
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
@@ -70,10 +75,11 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const alertDnf = document.getElementById("alertDnf");
 const alertFinisher = document.getElementById("alertFinisher");
+const toastContainer = document.getElementById("toast-container");
 
 let currentUser = null;
 
-// Elements
+// Login / Logout
 const loginSection = document.getElementById("login-section");
 const adminSection = document.getElementById("admin-section");
 const loginBtn = document.getElementById("loginBtn");
@@ -148,7 +154,7 @@ async function loadAll() {
   updateLastTime();
 }
 
-// ============================ Runners ============================
+// ============================ RUNNERS ============================
 async function loadRunners(query = "") {
   const { data: runners } = await supabase
     .from("runner")
@@ -168,7 +174,6 @@ async function loadRunners(query = "") {
     else if (normalizedType.includes("BCR69.3")) { finisherRequired = 11; dnfStart = 6; }
     else if (normalizedType.includes("BCR100.8")) { finisherRequired = 16; dnfStart = 8; }
 
-    let status = r.status;
     const canFinish = showLap >= finisherRequired;
     const reachedDNF = showLap >= dnfStart && showLap < finisherRequired;
 
@@ -199,10 +204,8 @@ async function loadRunners(query = "") {
     runnerList.innerHTML += `
       <div class="border p-3 rounded flex justify-between items-center ${bgClass}">
         <div>
-          <b>${r.name}</b> (${r.type})<br>
-          สถานะ: ${status}<br>${info}${notice}
-        </div>
-        <div>${buttons}</div>
+          <b>${r.name}</b> (${r.type})<br>สถานะ: ${r.status}<br>${info}${notice}
+        </div><div>${buttons}</div>
       </div>`;
   });
 }
@@ -213,52 +216,52 @@ async function updateStatus(runnerId, status) {
   if (!reason) return;
   await supabase.from("runner").update({ status }).eq("id", runnerId);
   await supabase.from("dnf_log").insert({ runner_id: runnerId, status, reason, updated_by: currentUser.id });
-  alert(`✅ เปลี่ยนสถานะเป็น ${status} สำเร็จ`);
+  showToast(`✅ เปลี่ยนสถานะเป็น ${status} สำเร็จ`);
   loadRunners(searchInput.value);
 }
 
-// ============================ LOGS ============================
+// ============================ LOGS / ULTRA ============================
 async function loadLogs() {
-  const { data: logs } = await supabase
-    .from("dnf_log")
-    .select("created_at, status, reason, runner_id")
-    .order("created_at", { ascending: false }).limit(20);
-
-  logList.innerHTML = logs.map(l => `
-    <div class="border-b py-1 text-sm">
-      🕒 ${new Date(l.created_at).toLocaleString("th-TH")} — <b>${l.status}</b> (${l.reason})
-    </div>`).join("");
+  const { data: logs } = await supabase.from("dnf_log").select("created_at, status, reason, runner_id").order("created_at",{ascending:false}).limit(20);
+  logList.innerHTML = logs.map(l => `<div class="border-b py-1 text-sm">🕒 ${new Date(l.created_at).toLocaleString("th-TH")} — <b>${l.status}</b> (${l.reason})</div>`).join("");
 }
-
-// ============================ ULTRA ============================
 async function loadUltra() {
-  const { data: ultra } = await supabase
-    .from("ultra_log")
-    .select("name, type, lap, recorded_at")
-    .eq("type","BCR 100.8")
-    .order("recorded_at",{ascending:false}).limit(50);
-
-  ultraList.innerHTML = (ultra || []).map(u => `
-    <div class="border-b py-1 text-sm">
-      🏅 ${u.name} (${u.type}) — รอบที่ ${u.lap} (${(u.lap*6.3).toFixed(2)} กม.)
-      <br>🕒 ${new Date(u.recorded_at).toLocaleString("th-TH")}
-    </div>`).join("");
+  const { data: ultra } = await supabase.from("ultra_log").select("name,type,lap,recorded_at").eq("type","BCR 100.8").order("recorded_at",{ascending:false}).limit(50);
+  ultraList.innerHTML = (ultra||[]).map(u=>`<div class="border-b py-1 text-sm">🏅 ${u.name} (${u.type}) — รอบที่ ${u.lap} (${(u.lap*6.3).toFixed(2)} กม.)<br>🕒 ${new Date(u.recorded_at).toLocaleString("th-TH")}</div>`).join("");
 }
 
-// ============================ REALTIME ============================
+// ============================ REALTIME + ALERT ============================
 function startRealtimeListener() {
   supabase.channel("record-changes")
-    .on("postgres_changes", { event: "*", schema: "public", table: "record" },
-      (payload) => {
-        console.log("Realtime:", payload);
-        loadRunners(searchInput.value);
-        if (payload.new?.lap) {
-          const lap = payload.new.lap;
-          if (lap === 4 || lap === 6 || lap === 8) alertDnf.play();
-          if (lap === 8 || lap === 11 || lap === 16) alertFinisher.play();
-        }
-      })
+    .on("postgres_changes", { event: "*", schema: "public", table: "record" }, (payload) => {
+      const lap = payload.new?.lap;
+      const runnerId = payload.new?.runner_id;
+      if (!lap || !runnerId) return;
+      loadRunners(searchInput.value);
+
+      if ([4,6,8].includes(lap)) {
+        alertDnf.play();
+        showToast(`⚠️ นักวิ่งถึงระยะ DNF (รอบ ${lap})`);
+      }
+      if ([8,11,16].includes(lap)) {
+        alertFinisher.play();
+        showToast(`🏆 นักวิ่งถึงระยะ FINISHER (รอบ ${lap})`);
+      }
+    })
     .subscribe();
+}
+
+// ============================ TOAST ============================
+function showToast(message) {
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.innerHTML = message;
+  toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.style.transition = "opacity 0.5s";
+    toast.style.opacity = "0";
+    setTimeout(() => toast.remove(), 500);
+  }, 3500);
 }
 </script>
 </body>
