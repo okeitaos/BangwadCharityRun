@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>🏁 ระบบกรรมการสนาม (Realtime + Auto Search + Clear)</title>
+<title>🏁 ระบบกรรมการสนาม (Realtime + Auto Search + Filter RUNNING)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
@@ -18,7 +18,7 @@
 <body class="bg-gray-100 p-6">
 
 <div class="max-w-5xl mx-auto bg-white rounded-lg shadow p-6">
-  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Realtime + Auto Search)</h1>
+  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Realtime)</h1>
 
   <!-- 🔐 Login -->
   <div id="login-section">
@@ -35,10 +35,11 @@
     </div>
 
     <!-- ช่องค้นหา -->
-    <div class="flex space-x-2 mb-4">
-      <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อ หรือ Tag ID เพื่อค้นหา..." class="border p-2 rounded w-full">
+    <div class="flex flex-wrap gap-2 mb-4">
+      <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อ หรือ Tag ID เพื่อค้นหา..." class="border p-2 rounded flex-grow">
       <button id="clearBtn" class="bg-gray-300 px-3 py-2 rounded">ล้าง</button>
       <button id="showAllBtn" class="bg-blue-500 text-white px-3 py-2 rounded">แสดงทั้งหมด</button>
+      <button id="showRunningBtn" class="bg-green-600 text-white px-3 py-2 rounded">เฉพาะ RUNNING</button>
     </div>
 
     <p id="lastUpdate" class="text-xs text-gray-500 mb-4">อัปเดตล่าสุด: -</p>
@@ -65,6 +66,7 @@ const toastContainer = document.getElementById("toast-container");
 
 let currentUser = null;
 let searchTimeout = null;
+let showOnlyRunning = false;
 
 // Elements
 const loginSection = document.getElementById("login-section");
@@ -76,6 +78,7 @@ const runnerList = document.getElementById("runnerList");
 const lastUpdate = document.getElementById("lastUpdate");
 const clearBtn = document.getElementById("clearBtn");
 const showAllBtn = document.getElementById("showAllBtn");
+const showRunningBtn = document.getElementById("showRunningBtn");
 
 // ============================ LOGIN ============================
 window.addEventListener("DOMContentLoaded", async () => {
@@ -123,10 +126,10 @@ function showLogin() {
   adminSection.classList.add("hidden");
 }
 
-// ============================ SEARCH SYSTEM ============================
+// ============================ SEARCH & FILTER ============================
 searchInput.addEventListener("input", () => {
   if (searchTimeout) clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(() => loadRunners(searchInput.value), 800); // พิมพ์แล้ว 0.8 วิค่อยค้น
+  searchTimeout = setTimeout(() => loadRunners(searchInput.value), 800);
 });
 
 clearBtn.addEventListener("click", () => {
@@ -135,20 +138,34 @@ clearBtn.addEventListener("click", () => {
 });
 
 showAllBtn.addEventListener("click", () => {
-  searchInput.value = "";
+  showOnlyRunning = false;
   loadRunners();
 });
 
-// ============================ RUNNER DATA ============================
+showRunningBtn.addEventListener("click", () => {
+  showOnlyRunning = true;
+  loadRunners();
+});
+
+// ============================ LOAD RUNNERS ============================
 async function loadRunners(query = "") {
-  const { data: runners } = query.trim()
-    ? await supabase.from("runner")
-        .select("id, name, tag_id, type, status, record(lap, start_time, finish_time)")
-        .or(`name.ilike.%${query}%,tag_id.ilike.%${query}%`)
-        .order("name", { ascending: true })
-    : await supabase.from("runner")
-        .select("id, name, tag_id, type, status, record(lap, start_time, finish_time)")
-        .order("name", { ascending: true });
+  let queryBuilder = supabase
+    .from("runner")
+    .select("id, name, tag_id, type, status, record(lap, start_time, finish_time)")
+    .order("name", { ascending: true });
+
+  if (query.trim() !== "") {
+    queryBuilder = queryBuilder.or(`name.ilike.%${query}%,tag_id.ilike.%${query}%`);
+  }
+  if (showOnlyRunning) {
+    queryBuilder = queryBuilder.eq("status", "RUNNING");
+  }
+
+  const { data: runners, error } = await queryBuilder;
+  if (error) {
+    console.error(error);
+    return;
+  }
 
   runnerList.innerHTML = "";
   (runners || []).forEach(r => {
@@ -203,7 +220,7 @@ async function loadRunners(query = "") {
   lastUpdate.textContent = "อัปเดตล่าสุด: " + new Date().toLocaleTimeString("th-TH");
 }
 
-// ============================ STATUS CONTROL ============================
+// ============================ STATUS ============================
 async function updateStatus(runnerId, status) {
   const reason = prompt(status === "DNF" ? "เหตุผล DNF:" : "ยืนยัน FINISHER:", "ครบระยะ / เจ็บ / อื่นๆ");
   if (!reason) return;
