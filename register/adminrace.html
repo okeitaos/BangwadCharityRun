@@ -27,7 +27,7 @@
     <p id="loginStatus" class="text-center text-sm text-gray-600 mt-2"></p>
   </div>
 
-  <!-- 🧑‍⚖️ ส่วนกรรมการ -->
+  <!-- 🧑‍⚖️ Admin Section -->
   <div id="admin-section" class="hidden">
     <div class="flex justify-between items-center mb-2">
       <h2 class="text-lg font-semibold">จัดการสถานะนักวิ่ง</h2>
@@ -64,7 +64,7 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // ✅ ใส่ anon key ของคุณ
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 👈 ใส่ anon key ของคุณ
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentUser = null;
@@ -174,7 +174,6 @@ async function loadRunners(query = "") {
     const canFinish = maxLap >= finisherRequired;
     const shouldWarnDNF = maxLap >= dnfStart && r.status === "RUNNING";
 
-    // Buttons
     let buttons = "";
     if (r.status === "DNF" || r.status === "FINISHER") {
       buttons = `<span class="text-gray-500 text-sm">🚫 ออกจากการแข่งขันแล้ว</span>`;
@@ -246,20 +245,35 @@ async function loadLogs() {
     </div>`).join("");
 }
 
-// ===================== Ultra Records =====================
+// ===================== Ultra Records (เฉพาะ BCR 100.8) =====================
 async function loadUltra() {
-  const { data: ultra } = await supabase
+  const { data: ultra, error } = await supabase
     .from("ultra_log")
     .select("name, type, lap, recorded_at")
+    .eq("type", "BCR 100.8") // ✅ เฉพาะรุ่น 100.8
     .order("recorded_at", { ascending: false })
     .limit(50);
 
-  ultraList.innerHTML = ultra.map(u => `
-    <div class="border-b py-1">
-      🏅 <b>${u.name}</b> (${u.type})<br>
-      รอบที่: ${u.lap}<br>
-      🕒 ${new Date(u.recorded_at).toLocaleString("th-TH")}
-    </div>`).join("");
+  if (error) {
+    console.error("Error loading ultra_log:", error);
+    return;
+  }
+
+  if (!ultra || ultra.length === 0) {
+    ultraList.innerHTML = `<div class="text-center text-gray-500">— ยังไม่มีนักวิ่งรุ่น 100.8 ทำลายสถิติ —</div>`;
+    return;
+  }
+
+  ultraList.innerHTML = ultra.map(u => {
+    const distance = (u.lap * 6.3).toFixed(2);
+    return `
+      <div class="border-b py-2">
+        🏅 <b>${u.name}</b> (${u.type})<br>
+        รอบที่: ${u.lap} | ระยะทางรวม: ${distance} กม.<br>
+        🕒 ${new Date(u.recorded_at).toLocaleString("th-TH")}
+      </div>
+    `;
+  }).join("");
 }
 </script>
 </body>
