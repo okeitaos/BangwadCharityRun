@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>🏁 Admin - จัดการสถานะนักวิ่ง</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+</head>
+<body class="bg-gray-100 p-6">
+  <div class="max-w-3xl mx-auto bg-white rounded-lg shadow p-6">
+    <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม - จัดการสถานะนักวิ่ง</h1>
+
+    <!-- 🔐 ระบบล็อกอินกรรมการ -->
+    <div id="login-section" class="mb-6">
+      <input id="adminKey" type="password" placeholder="ใส่รหัสกรรมการ" class="border p-2 w-full rounded mb-2">
+      <button id="loginBtn" class="bg-blue-600 text-white px-4 py-2 rounded w-full">เข้าสู่ระบบ</button>
+      <p id="loginStatus" class="text-center text-sm text-gray-600 mt-2"></p>
+    </div>
+
+    <!-- 🏃 ส่วนจัดการนักวิ่ง -->
+    <div id="admin-section" class="hidden">
+      <input id="searchInput" type="text" placeholder="ค้นหาชื่อนักวิ่ง..." class="border p-2 w-full rounded mb-4">
+      <div id="runnerList" class="space-y-2"></div>
+    </div>
+  </div>
+
+<script>
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // ของคุณ
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// 🔐 ระบบล็อกอินกรรมการ
+const ADMIN_PASSWORD = "bcradmin2025"; // เปลี่ยนได้เอง
+const loginSection = document.getElementById("login-section");
+const adminSection = document.getElementById("admin-section");
+const loginBtn = document.getElementById("loginBtn");
+const adminKeyInput = document.getElementById("adminKey");
+const loginStatus = document.getElementById("loginStatus");
+
+loginBtn.addEventListener("click", () => {
+  if (adminKeyInput.value === ADMIN_PASSWORD) {
+    loginSection.classList.add("hidden");
+    adminSection.classList.remove("hidden");
+    loadRunners();
+  } else {
+    loginStatus.textContent = "❌ รหัสกรรมการไม่ถูกต้อง";
+  }
+});
+
+// 🏃 ค้นหาและแสดงรายชื่อนักวิ่ง
+const searchInput = document.getElementById("searchInput");
+const runnerList = document.getElementById("runnerList");
+
+async function loadRunners(query = "") {
+  let { data: runners, error } = await supabase
+    .from("runner")
+    .select("id, name, type, status")
+    .ilike("name", `%${query}%`)
+    .order("name", { ascending: true });
+
+  if (error) return console.error(error);
+
+  runnerList.innerHTML = "";
+  runners.forEach(r => {
+    runnerList.innerHTML += `
+      <div class="border p-3 rounded flex justify-between items-center">
+        <div>
+          <b>${r.name}</b> (${r.type})<br>
+          <span class="text-sm text-gray-600">สถานะ: ${r.status}</span>
+        </div>
+        <div class="space-x-1">
+          <button class="bg-green-500 text-white px-2 py-1 rounded" onclick="updateStatus(${r.id}, 'RUNNING')">RUNNING</button>
+          <button class="bg-yellow-500 text-white px-2 py-1 rounded" onclick="updateStatus(${r.id}, 'DNF')">DNF</button>
+          <button class="bg-red-500 text-white px-2 py-1 rounded" onclick="updateStatus(${r.id}, 'FINISHER')">FINISHER</button>
+        </div>
+      </div>
+    `;
+  });
+}
+
+// พิมพ์ค้นหาแบบเรียลไทม์
+searchInput.addEventListener("input", (e) => {
+  loadRunners(e.target.value);
+});
+
+// ✅ เปลี่ยนสถานะนักวิ่ง + บันทึก Log
+async function updateStatus(runnerId, status) {
+  const reason = prompt("กรอกเหตุผลการเปลี่ยนสถานะ:", status === 'DNF' ? 'เจ็บระหว่างแข่งขัน' : '');
+  const updatedBy = "กรรมการสนาม";
+
+  // อัปเดตในตาราง runner
+  const { error: updateError } = await supabase
+    .from("runner")
+    .update({ status })
+    .eq("id", runnerId);
+
+  if (updateError) {
+    alert("❌ ไม่สามารถเปลี่ยนสถานะได้: " + updateError.message);
+    return;
+  }
+
+  เพิ่ม log ใน dnf_log
+await supabase.from("dnf_log").insert({
+  runner_id: runnerId,
+  status,
+  reason,
+  updated_by: updatedBy
+});
+
+
+  alert(`✅ เปลี่ยนสถานะเป็น ${status} สำเร็จ`);
+  loadRunners(searchInput.value);
+}
+
+  
+</script>
+</body>
+</html>
