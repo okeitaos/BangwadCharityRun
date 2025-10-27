@@ -14,11 +14,15 @@
   .blink-finisher {
     animation: blinkGold 2s infinite;
   }
+  .tab-active {
+    background-color: #2563eb;
+    color: white;
+  }
 </style>
 </head>
 
 <body class="bg-gray-100 p-6">
-  <div class="max-w-4xl mx-auto bg-white rounded-lg shadow p-6">
+  <div class="max-w-5xl mx-auto bg-white rounded-lg shadow p-6">
     <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม</h1>
 
     <!-- 🔐 ส่วนล็อกอิน -->
@@ -29,7 +33,7 @@
       <p id="loginStatus" class="text-center text-sm text-gray-600 mt-2"></p>
     </div>
 
-    <!-- 🧑‍⚖️ ส่วนจัดการนักวิ่ง -->
+    <!-- 🧑‍⚖️ ส่วนหลัก -->
     <div id="admin-section" class="hidden">
       <div class="flex justify-between items-center mb-2">
         <h2 class="text-lg font-semibold">จัดการสถานะนักวิ่ง</h2>
@@ -38,14 +42,29 @@
           <button id="logoutBtn" class="bg-red-500 text-white px-3 py-1 rounded">ออกจากระบบ</button>
         </div>
       </div>
+
+      <!-- 🔖 Tabs -->
+      <div class="flex space-x-2 mb-4">
+        <button id="tab-runners" class="tab-active px-3 py-1 rounded border">🏃‍♂️ นักวิ่ง</button>
+        <button id="tab-logs" class="px-3 py-1 rounded border">🧾 Logs</button>
+        <button id="tab-ultra" class="px-3 py-1 rounded border">🏅 Ultra Records</button>
+      </div>
+
       <p id="lastUpdate" class="text-xs text-gray-500 mb-4">อัปเดตล่าสุด: -</p>
 
-      <input id="searchInput" type="text" placeholder="ค้นหาชื่อ..." class="border p-2 w-full rounded mb-4">
-      <div id="runnerList" class="space-y-3"></div>
+      <!-- Sections -->
+      <div id="section-runners">
+        <input id="searchInput" type="text" placeholder="ค้นหาชื่อ..." class="border p-2 w-full rounded mb-4">
+        <div id="runnerList" class="space-y-3"></div>
+      </div>
 
-      <hr class="my-6">
-      <h2 class="text-lg font-semibold mb-2">🧾 ประวัติการเปลี่ยนสถานะ (DNF / FINISHER)</h2>
-      <div id="logList" class="space-y-1 text-sm text-gray-700"></div>
+      <div id="section-logs" class="hidden">
+        <div id="logList" class="space-y-1 text-sm text-gray-700"></div>
+      </div>
+
+      <div id="section-ultra" class="hidden">
+        <div id="ultraList" class="space-y-1 text-sm text-gray-700"></div>
+      </div>
     </div>
   </div>
 
@@ -54,105 +73,104 @@ const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+let currentUser = null;
+let autoRefreshInterval = null;
+
 const loginSection = document.getElementById("login-section");
 const adminSection = document.getElementById("admin-section");
 const loginBtn = document.getElementById("loginBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 const refreshBtn = document.getElementById("refreshBtn");
 const lastUpdate = document.getElementById("lastUpdate");
-const emailInput = document.getElementById("email");
-const passwordInput = document.getElementById("password");
-const loginStatus = document.getElementById("loginStatus");
 const searchInput = document.getElementById("searchInput");
 const runnerList = document.getElementById("runnerList");
 const logList = document.getElementById("logList");
+const ultraList = document.getElementById("ultraList");
 
-let currentUser = null;
-let autoRefreshInterval = null;
+// Tabs
+const tabRunners = document.getElementById("tab-runners");
+const tabLogs = document.getElementById("tab-logs");
+const tabUltra = document.getElementById("tab-ultra");
+const sectionRunners = document.getElementById("section-runners");
+const sectionLogs = document.getElementById("section-logs");
+const sectionUltra = document.getElementById("section-ultra");
 
 // 🔐 ล็อกอินกรรมการ
 loginBtn.addEventListener("click", async () => {
-  loginStatus.textContent = "กำลังเข้าสู่ระบบ...";
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: emailInput.value,
-    password: passwordInput.value
-  });
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return alert("❌ เข้าสู่ระบบไม่สำเร็จ");
 
-  if (error) {
-    loginStatus.textContent = "❌ เข้าสู่ระบบไม่สำเร็จ";
-    return;
-  }
-
-  const user = data.user;
   const { data: profile } = await supabase
     .from("adminrace")
     .select("is_admin, full_name")
-    .eq("id", user.id)
+    .eq("id", data.user.id)
     .maybeSingle();
 
   if (!profile || !profile.is_admin) {
     await supabase.auth.signOut();
-    loginStatus.textContent = "⛔ ไม่มีสิทธิ์เข้าใช้งาน";
-    return;
+    return alert("⛔ ไม่มีสิทธิ์เข้าใช้งาน");
   }
 
-  currentUser = { id: user.id, name: profile.full_name || user.email };
+  currentUser = { id: data.user.id, name: profile.full_name };
   loginSection.classList.add("hidden");
   adminSection.classList.remove("hidden");
   startAutoRefresh();
 });
 
-// 🚪 ออกจากระบบ
-logoutBtn.addEventListener("click", async () => {
-  clearInterval(autoRefreshInterval);
+// Tabs switching
+function showTab(tab) {
+  [tabRunners, tabLogs, tabUltra].forEach(t => t.classList.remove("tab-active"));
+  [sectionRunners, sectionLogs, sectionUltra].forEach(s => s.classList.add("hidden"));
+  if (tab === "runners") { tabRunners.classList.add("tab-active"); sectionRunners.classList.remove("hidden"); }
+  if (tab === "logs") { tabLogs.classList.add("tab-active"); sectionLogs.classList.remove("hidden"); }
+  if (tab === "ultra") { tabUltra.classList.add("tab-active"); sectionUltra.classList.remove("hidden"); }
+}
+tabRunners.onclick = () => showTab("runners");
+tabLogs.onclick = () => showTab("logs");
+tabUltra.onclick = () => showTab("ultra");
+
+// Logout
+logoutBtn.onclick = async () => {
   await supabase.auth.signOut();
   currentUser = null;
-  loginSection.classList.remove("hidden");
   adminSection.classList.add("hidden");
-});
+  loginSection.classList.remove("hidden");
+  clearInterval(autoRefreshInterval);
+};
 
-// 🔄 ปุ่ม Refresh ทันที
-refreshBtn.addEventListener("click", () => {
+// Refresh button
+refreshBtn.onclick = () => { loadAll(); };
+
+// Auto refresh every 10 sec
+function startAutoRefresh() {
+  loadAll();
+  autoRefreshInterval = setInterval(loadAll, 10000);
+}
+function updateLastTime() {
+  lastUpdate.textContent = "อัปเดตล่าสุด: " + new Date().toLocaleTimeString("th-TH");
+}
+
+// Load all data
+async function loadAll() {
   loadRunners(searchInput.value);
   loadLogs();
-});
-
-// 🕒 ตั้งค่าอัปเดตอัตโนมัติทุก 10 วินาที
-function startAutoRefresh() {
-  loadRunners();
-  loadLogs();
+  loadUltra();
   updateLastTime();
-  if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-  autoRefreshInterval = setInterval(() => {
-    loadRunners(searchInput.value);
-    loadLogs();
-    updateLastTime();
-  }, 10000);
 }
 
-// 📅 อัปเดตข้อความเวลาล่าสุด
-function updateLastTime() {
-  const now = new Date().toLocaleTimeString("th-TH");
-  lastUpdate.textContent = "อัปเดตล่าสุด: " + now;
-}
-
-// 📋 โหลดรายชื่อนักวิ่ง
+// =========================== RUNNERS ===========================
 async function loadRunners(query = "") {
-  const { data: runners, error } = await supabase
+  const { data: runners } = await supabase
     .from("runner")
     .select("id, name, type, status, record(lap)")
     .ilike("name", `%${query}%`)
     .order("name", { ascending: true });
 
-  if (error) return console.error(error);
   runnerList.innerHTML = "";
-
   runners.forEach(r => {
-    const isDNF = r.status === "DNF";
-    const isFinisher = r.status === "FINISHER";
-    const maxLap = r.record && r.record.length > 0
-      ? Math.max(...r.record.map(x => x.lap))
-      : 0;
+    const maxLap = r.record.length > 0 ? Math.max(...r.record.map(x => x.lap)) : 0;
     const distance = (maxLap * 6.3).toFixed(2);
 
     let finisherRequired = 0, dnfStart = 0;
@@ -161,115 +179,53 @@ async function loadRunners(query = "") {
     else if (r.type === "BCR 100.8") { finisherRequired = 16; dnfStart = 8; }
 
     const canFinish = maxLap >= finisherRequired;
-    const shouldWarnDNF = maxLap >= dnfStart && !isDNF && !isFinisher;
-
-    const finisherBtn = canFinish
-      ? `<button class="bg-red-500 text-white px-2 py-1 rounded"
-          onclick="updateStatus('${r.id}', 'FINISHER', event)">FINISHER</button>`
-      : "";
-    const dnfBtn = !canFinish
-      ? `<button class="bg-yellow-500 text-white px-2 py-1 rounded"
-          onclick="updateStatus('${r.id}', 'DNF', event)">DNF</button>`
-      : "";
-
-    let buttons = "";
-    if (isDNF || isFinisher) {
-      buttons = `<span class='text-gray-400'>🚫 ออกจากการแข่งขันแล้ว</span>`;
-    } else {
-      buttons = `${dnfBtn} ${finisherBtn}`;
-    }
+    const shouldWarnDNF = maxLap >= dnfStart && r.status === "RUNNING";
 
     let bgClass = "bg-green-50";
-    if (shouldWarnDNF) bgClass = "bg-yellow-50";
-    if (canFinish && !isFinisher) bgClass = "blink-finisher";
-    if (isDNF || isFinisher) bgClass = "bg-red-50";
-
-    const statusColor =
-      r.status === "DNF"
-        ? "text-yellow-700"
-        : r.status === "FINISHER"
-        ? "text-red-700"
-        : "text-green-700";
-
-    const dnfWarning = shouldWarnDNF && !canFinish
-      ? `<div class="text-xs text-yellow-600 mt-1">⚠️ ถึงระยะ DNF แล้ว แต่ยังไม่กดออกจากการแข่งขัน</div>`
-      : "";
-    const finisherNotice = canFinish && !isFinisher
-      ? `<div class="text-xs text-green-700 mt-1 font-medium">🎖️ FINISHER - ครบจำนวนรอบการแข่งขันแล้ว</div>`
-      : "";
+    if (shouldWarnDNF && !canFinish) bgClass = "bg-yellow-50";
+    if (canFinish && r.status === "RUNNING") bgClass = "blink-finisher";
+    if (r.status === "DNF" || r.status === "FINISHER") bgClass = "bg-red-50";
 
     runnerList.innerHTML += `
-      <div class="border p-3 rounded flex justify-between items-center ${bgClass}">
-        <div>
-          <b>${r.name}</b> (${r.type})<br>
-          <span class="text-sm ${statusColor}">สถานะ: ${r.status}</span><br>
-          <span class="text-sm text-gray-600">🏁 รอบที่: ${maxLap} | ระยะทาง: ${distance} กม.</span>
-          ${dnfWarning}
-          ${finisherNotice}
-        </div>
-        <div class="space-x-1">${buttons}</div>
+      <div class="border p-3 rounded ${bgClass}">
+        <b>${r.name}</b> (${r.type})<br>
+        สถานะ: ${r.status}<br>
+        🏁 รอบที่: ${maxLap} | ระยะทาง: ${distance} กม.
+        ${canFinish ? `<div class="text-green-700 text-xs mt-1">🎖️ FINISHER - ครบระยะแล้ว</div>` : ""}
       </div>
     `;
   });
 }
 
-// ✏️ อัปเดตสถานะ
-async function updateStatus(runnerId, status, event) {
-  const { data: runner } = await supabase
-    .from("runner")
-    .select("status")
-    .eq("id", runnerId)
-    .maybeSingle();
-
-  if (runner && (runner.status === "DNF" || runner.status === "FINISHER")) {
-    alert("⛔ นักวิ่งคนนี้ออกจากการแข่งขันแล้ว");
-    return;
-  }
-
-  const reason = prompt(
-    "เหตุผล:",
-    status === "DNF" ? "เจ็บระหว่างแข่งขัน" : "ครบจำนวนรอบ"
-  );
-  if (!reason) return;
-
-  const { error: updateError } = await supabase
-    .from("runner")
-    .update({ status })
-    .eq("id", runnerId);
-  if (updateError) {
-    alert("❌ ไม่สามารถเปลี่ยนสถานะได้: " + updateError.message);
-    return;
-  }
-
-  await supabase.from("dnf_log").insert({
-    runner_id: runnerId,
-    status,
-    reason,
-    updated_by: currentUser.id
-  });
-
-  alert(`✅ เปลี่ยนสถานะเป็น ${status} สำเร็จ`);
-  loadRunners(searchInput.value);
-  loadLogs();
-}
-
-// 🧾 โหลด Log
+// =========================== LOGS ===========================
 async function loadLogs() {
   const { data: logs } = await supabase
     .from("dnf_log")
-    .select(`created_at, status, reason, dnf_log_runner_fk(name)`)
+    .select("created_at, status, reason, dnf_log_runner_fk(name)")
     .order("created_at", { ascending: false })
     .limit(20);
 
-  logList.innerHTML = logs.map(l => {
-    const time = new Date(l.created_at).toLocaleString("th-TH");
-    const name = l.dnf_log_runner_fk?.name || "-";
-    return `<div class="border-b py-1">
-      🕐 ${time} — <b>${l.status}</b> (${l.reason})<br>
-      👤 Runner: ${name}<br>
-      🧑‍⚖️ โดย: ${currentUser.name}
-    </div>`;
-  }).join("");
+  logList.innerHTML = logs.map(l => `
+    <div class="border-b py-1">
+      🕐 ${new Date(l.created_at).toLocaleString("th-TH")} — <b>${l.status}</b> (${l.reason})
+      <br>👤 ${l.dnf_log_runner_fk?.name || "-"}
+    </div>`).join("");
+}
+
+// =========================== ULTRA LOG ===========================
+async function loadUltra() {
+  const { data: ultra } = await supabase
+    .from("ultra_log")
+    .select("name, type, lap, recorded_at")
+    .order("recorded_at", { ascending: false })
+    .limit(50);
+
+  ultraList.innerHTML = ultra.map(u => `
+    <div class="border-b py-1">
+      🏅 <b>${u.name}</b> (${u.type})<br>
+      รอบที่: ${u.lap}<br>
+      🕒 ${new Date(u.recorded_at).toLocaleString("th-TH")}
+    </div>`).join("");
 }
 </script>
 </body>
