@@ -169,7 +169,7 @@ function showDetails(runner) {
     เวลารวม: <b>${totalTime}</b>
   `;
   const laps = (runner.record || [])
-    .filter(rec => rec.lap > 0 && (rec.start_time || rec.finish_time))
+    .filter(rec => rec.lap >= 0 && (rec.start_time || rec.finish_time))
     .sort((a,b) => a.lap - b.lap);
 
   popupContent.innerHTML = "";
@@ -181,7 +181,7 @@ function showDetails(runner) {
     }
     popupContent.innerHTML += `
       <tr class="border-t">
-        <td class="p-2 text-center">${rec.lap}</td>
+        <td class="p-2 text-center">${rec.lap + 1}</td>
         <td class="p-2 text-center">${rec.start_time ? new Date(rec.start_time).toLocaleTimeString("th-TH") : "-"}</td>
         <td class="p-2 text-center">${rec.finish_time ? new Date(rec.finish_time).toLocaleTimeString("th-TH") : "-"}</td>
         <td class="p-2 text-center">${rec.start_time && rec.finish_time ? formatDuration(new Date(rec.finish_time) - new Date(rec.start_time)) : "-"}</td>
