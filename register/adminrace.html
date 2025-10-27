@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>🏁 ระบบกรรมการสนาม (Realtime + Tag Search)</title>
+<title>🏁 ระบบกรรมการสนาม (Realtime + Auto Search)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
@@ -19,7 +19,7 @@
 <body class="bg-gray-100 p-6">
 
 <div class="max-w-5xl mx-auto bg-white rounded-lg shadow p-6">
-  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Realtime + ค้นหา Tag ID)</h1>
+  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Realtime + ค้นหาอัตโนมัติ)</h1>
 
   <!-- 🔐 Login -->
   <div id="login-section">
@@ -35,7 +35,7 @@
       <button id="logoutBtn" class="bg-red-500 text-white px-3 py-1 rounded">ออกจากระบบ</button>
     </div>
 
-    <input id="searchInput" type="text" placeholder="🔍 ค้นหาชื่อ หรือ Tag ID..." class="border p-2 w-full rounded mb-4">
+    <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อ หรือ Tag ID เพื่อค้นหา..." class="border p-2 w-full rounded mb-4">
 
     <p id="lastUpdate" class="text-xs text-gray-500 mb-4">อัปเดตล่าสุด: -</p>
 
@@ -58,7 +58,9 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const alertDnf = document.getElementById("alertDnf");
 const alertFinisher = document.getElementById("alertFinisher");
 const toastContainer = document.getElementById("toast-container");
+
 let currentUser = null;
+let searchTimeout = null;
 
 // Elements
 const loginSection = document.getElementById("login-section");
@@ -103,6 +105,7 @@ async function autoLogin(user) {
   currentUser = { id: user.id, name: profile.full_name };
   loginSection.classList.add("hidden");
   adminSection.classList.remove("hidden");
+
   loadAll();
   startRealtimeListener();
   setInterval(loadAll, 10000);
@@ -113,6 +116,14 @@ function showLogin() {
   loginSection.classList.remove("hidden");
   adminSection.classList.add("hidden");
 }
+
+// ============================ AUTO SEARCH ============================
+searchInput.addEventListener("input", () => {
+  if (searchTimeout) clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    loadRunners(searchInput.value);
+  }, 1000); // พิมพ์แล้ว 1 วิค่อยค้น
+});
 
 // ============================ LOADERS ============================
 function updateLastTime() {
@@ -127,19 +138,18 @@ async function loadAll() {
 async function loadRunners(query = "") {
   let runners = [];
   if (query.trim() === "") {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("runner")
       .select("id, name, tag_id, type, status, record(lap, start_time, finish_time)")
       .order("name", { ascending: true });
-    if (!error) runners = data;
+    runners = data || [];
   } else {
-    // ✅ ค้นหาทั้ง name และ tag_id
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("runner")
       .select("id, name, tag_id, type, status, record(lap, start_time, finish_time)")
       .or(`name.ilike.%${query}%,tag_id.ilike.%${query}%`)
       .order("name", { ascending: true });
-    if (!error) runners = data;
+    runners = data || [];
   }
 
   runnerList.innerHTML = "";
