@@ -68,7 +68,7 @@ loginBtn.addEventListener("click", async () => {
 
   const user = data.user;
   const { data: profile } = await supabase
-    .from("profiles")
+    .from("adminrace")
     .select("is_admin, full_name")
     .eq("id", user.id)
     .maybeSingle();
