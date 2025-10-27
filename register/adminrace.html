@@ -5,6 +5,16 @@
 <title>🏁 ระบบกรรมการสนาม (Admin Panel)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<style>
+  /* ✨ เอฟเฟกต์กระพริบช้า สำหรับ FINISHER */
+  @keyframes blinkGold {
+    0%, 100% { background-color: #d1fae5; } /* เขียวทอง */
+    50% { background-color: #fef3c7; } /* ทองอ่อน */
+  }
+  .blink-finisher {
+    animation: blinkGold 2s infinite;
+  }
+</style>
 </head>
 
 <body class="bg-gray-100 p-6">
@@ -36,7 +46,7 @@
   </div>
 
 <script>
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // 🔧 ของคุณ
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -94,7 +104,7 @@ logoutBtn.addEventListener("click", async () => {
   adminSection.classList.add("hidden");
 });
 
-// 📋 โหลดรายชื่อนักวิ่ง (แสดงสีพื้นหลังตามสถานะ)
+// 📋 โหลดรายชื่อนักวิ่ง
 async function loadRunners(query = "") {
   const { data: runners, error } = await supabase
     .from("runner")
@@ -103,19 +113,17 @@ async function loadRunners(query = "") {
     .order("name", { ascending: true });
 
   if (error) return console.error(error);
-
   runnerList.innerHTML = "";
 
   runners.forEach(r => {
     const isDNF = r.status === "DNF";
     const isFinisher = r.status === "FINISHER";
-
     const maxLap = r.record && r.record.length > 0
       ? Math.max(...r.record.map(x => x.lap))
       : 0;
     const distance = (maxLap * 6.3).toFixed(2);
 
-    // เงื่อนไขรุ่น
+    // ✅ เงื่อนไขรุ่น
     let finisherRequired = 0, dnfStart = 0;
     if (r.type === "BCR 50.4") { finisherRequired = 8; dnfStart = 4; }
     else if (r.type === "BCR 69.3") { finisherRequired = 11; dnfStart = 6; }
@@ -141,10 +149,11 @@ async function loadRunners(query = "") {
       buttons = `${dnfBtn} ${finisherBtn}`;
     }
 
-    // สีพื้นหลัง
-    let bgColor = "bg-green-50"; // RUNNING
-    if (shouldWarnDNF) bgColor = "bg-yellow-50";
-    if (isDNF || isFinisher) bgColor = "bg-red-50";
+    // 🎨 พื้นหลังตามสถานะ
+    let bgClass = "bg-green-50"; // RUNNING
+    if (shouldWarnDNF) bgClass = "bg-yellow-50"; // ถึง DNF
+    if (canFinish && !isFinisher) bgClass = "blink-finisher"; // ครบ FINISHER แล้วยังกดไม่ออก
+    if (isDNF || isFinisher) bgClass = "bg-red-50"; // ออกจากการแข่งขันแล้ว
 
     const statusColor =
       r.status === "DNF"
@@ -153,17 +162,22 @@ async function loadRunners(query = "") {
         ? "text-red-700"
         : "text-green-700";
 
-    const dnfWarning = shouldWarnDNF
+    const dnfWarning = shouldWarnDNF && !canFinish
       ? `<div class="text-xs text-yellow-600 mt-1">⚠️ ถึงระยะ DNF แล้ว แต่ยังไม่กดออกจากการแข่งขัน</div>`
       : "";
 
+    const finisherNotice = canFinish && !isFinisher
+      ? `<div class="text-xs text-green-700 mt-1 font-medium">🎖️ FINISHER - ครบจำนวนรอบการแข่งขันแล้ว</div>`
+      : "";
+
     runnerList.innerHTML += `
-      <div class="border p-3 rounded flex justify-between items-center ${bgColor}">
+      <div class="border p-3 rounded flex justify-between items-center ${bgClass}">
         <div>
           <b>${r.name}</b> (${r.type})<br>
           <span class="text-sm ${statusColor}">สถานะ: ${r.status}</span><br>
           <span class="text-sm text-gray-600">🏁 รอบที่: ${maxLap} | ระยะทาง: ${distance} กม.</span>
           ${dnfWarning}
+          ${finisherNotice}
         </div>
         <div class="space-x-1">${buttons}</div>
       </div>
@@ -174,7 +188,7 @@ async function loadRunners(query = "") {
 // 🔍 ค้นหา
 searchInput.addEventListener("input", e => loadRunners(e.target.value));
 
-// ✏️ เปลี่ยนสถานะนักวิ่ง
+// ✏️ อัปเดตสถานะ
 async function updateStatus(runnerId, status, event) {
   const { data: runner } = await supabase
     .from("runner")
