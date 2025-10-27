@@ -91,19 +91,14 @@ const sectionUltra = document.getElementById("section-ultra");
 // ✅ ตรวจสอบ session ตอนเปิดหน้า
 window.addEventListener("DOMContentLoaded", async () => {
   const { data: { session } } = await supabase.auth.getSession();
-  if (session) {
-    console.log("🔐 Session found:", session);
-    autoLogin(session.user);
-  }
+  if (session) autoLogin(session.user);
 
-  // ถ้ามีการเปลี่ยนแปลง session (login/logout)
   supabase.auth.onAuthStateChange(async (event, session) => {
     if (event === "SIGNED_IN" && session) autoLogin(session.user);
     if (event === "SIGNED_OUT") showLogin();
   });
 });
 
-// ฟังก์ชันเข้าสู่ระบบอัตโนมัติ
 async function autoLogin(user) {
   const { data: profile } = await supabase
     .from("adminrace")
@@ -122,7 +117,6 @@ async function autoLogin(user) {
   startAutoRefresh();
 }
 
-// ฟังก์ชันกลับไปหน้า login
 function showLogin() {
   currentUser = null;
   loginSection.classList.remove("hidden");
@@ -142,26 +136,21 @@ tabRunners.onclick = () => showTab("runners");
 tabLogs.onclick = () => showTab("logs");
 tabUltra.onclick = () => showTab("ultra");
 
-// Login ปกติ
 loginBtn.onclick = async () => {
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return alert("❌ เข้าสู่ระบบไม่สำเร็จ");
-
   autoLogin(data.user);
 };
 
-// Logout
 logoutBtn.onclick = async () => {
   await supabase.auth.signOut();
   showLogin();
 };
 
-// Refresh
 refreshBtn.onclick = () => loadAll();
 
-// Auto Refresh
 function startAutoRefresh() {
   loadAll();
   autoRefreshInterval = setInterval(loadAll, 10000);
@@ -169,8 +158,6 @@ function startAutoRefresh() {
 function updateLastTime() {
   lastUpdate.textContent = "อัปเดตล่าสุด: " + new Date().toLocaleTimeString("th-TH");
 }
-
-// Load All
 async function loadAll() {
   loadRunners(searchInput.value);
   loadLogs();
@@ -196,8 +183,10 @@ async function loadRunners(query = "") {
     else if (r.type === "BCR 69.3") { finisherRequired = 11; dnfStart = 6; }
     else if (r.type === "BCR 100.8") { finisherRequired = 16; dnfStart = 8; }
 
-    const canFinish = maxLap >= finisherRequired;
-    const shouldWarnDNF = maxLap >= dnfStart && r.status === "RUNNING";
+    // ✅ ปรับ logic ใหม่: ต้องเริ่มวิ่งแล้วถึงจะเช็ก Finisher/DNF
+    const hasStarted = maxLap > 0;
+    const canFinish = hasStarted && maxLap >= finisherRequired;
+    const shouldWarnDNF = hasStarted && maxLap >= dnfStart && r.status === "RUNNING";
 
     let buttons = "";
     if (r.status === "DNF" || r.status === "FINISHER") {
@@ -215,9 +204,9 @@ async function loadRunners(query = "") {
     if (canFinish && r.status === "RUNNING") bgClass = "blink-finisher";
     if (r.status === "DNF" || r.status === "FINISHER") bgClass = "bg-red-50";
 
-    const finisherNotice = canFinish && r.status === "RUNNING"
+    const finisherNotice = hasStarted && canFinish && r.status === "RUNNING"
       ? `<div class="text-green-700 text-xs mt-1 font-medium">🎖️ FINISHER - ครบระยะแล้ว</div>` : "";
-    const dnfWarning = shouldWarnDNF && !canFinish
+    const dnfWarning = hasStarted && shouldWarnDNF && !canFinish
       ? `<div class="text-yellow-700 text-xs mt-1 font-medium">⚠️ ถึงระยะ DNF แล้ว แต่ยังไม่กดออกจากการแข่งขัน</div>` : "";
 
     runnerList.innerHTML += `
