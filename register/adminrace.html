@@ -36,7 +36,7 @@
   </div>
 
 <script>
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // 🔧 ของคุณ
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // เปลี่ยนเป็นของคุณ
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -94,11 +94,11 @@ logoutBtn.addEventListener("click", async () => {
   adminSection.classList.add("hidden");
 });
 
-// 📋 โหลดรายชื่อนักวิ่ง
+// 📋 โหลดรายชื่อนักวิ่ง (แสดงรอบสูงสุด + ระยะทาง)
 async function loadRunners(query = "") {
   const { data: runners, error } = await supabase
     .from("runner")
-    .select("id, name, type, status")
+    .select("id, name, type, status, record(lap)")
     .ilike("name", `%${query}%`)
     .order("name", { ascending: true });
 
@@ -109,6 +109,14 @@ async function loadRunners(query = "") {
     const isDNF = r.status === "DNF";
     const isFinisher = r.status === "FINISHER";
 
+    // ✅ หารอบสูงสุดจากข้อมูล record
+    const maxLap = r.record && r.record.length > 0
+      ? Math.max(...r.record.map(x => x.lap))
+      : 0;
+
+    // ✅ คำนวณระยะทาง (1 รอบ = 6.30 กม.)
+    const distance = (maxLap * 6.3).toFixed(2);
+
     // ปุ่มแต่ละสถานะ
     const runningBtn = `<button class="bg-green-500 text-white px-2 py-1 rounded"
         onclick="updateStatus('${r.id}', 'RUNNING', event)">RUNNING</button>`;
@@ -117,15 +125,12 @@ async function loadRunners(query = "") {
     const finisherBtn = `<button class="bg-red-500 text-white px-2 py-1 rounded"
         onclick="updateStatus('${r.id}', 'FINISHER', event)">FINISHER</button>`;
 
-    let buttons = "";
-
     // 🔒 ถ้า DNF หรือ FINISHER แล้ว → ล็อกถาวร
-    if (isDNF || isFinisher) {
-      buttons = `<span class='text-gray-400'>🚫 ออกจากการแข่งขันแล้ว</span>`;
-    } else {
-      buttons = `${runningBtn} ${dnfBtn} ${finisherBtn}`;
-    }
+    const buttons = (isDNF || isFinisher)
+      ? `<span class='text-gray-400'>🚫 ออกจากการแข่งขันแล้ว</span>`
+      : `${runningBtn} ${dnfBtn} ${finisherBtn}`;
 
+    // สีข้อความสถานะ
     const statusColor =
       r.status === "DNF"
         ? "text-yellow-600"
@@ -137,7 +142,8 @@ async function loadRunners(query = "") {
       <div class="border p-3 rounded flex justify-between items-center">
         <div>
           <b>${r.name}</b> (${r.type})<br>
-          <span class="text-sm ${statusColor}">สถานะ: ${r.status}</span>
+          <span class="text-sm ${statusColor}">สถานะ: ${r.status}</span><br>
+          <span class="text-sm text-gray-600">🏁 รอบที่: ${maxLap} | ระยะทาง: ${distance} กม.</span>
         </div>
         <div class="space-x-1">${buttons}</div>
       </div>
