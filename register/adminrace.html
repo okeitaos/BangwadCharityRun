@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>🏁 ระบบกรรมการสนาม (Realtime)</title>
+<title>🏁 ระบบกรรมการสนาม (Realtime + Tag Search)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
@@ -19,45 +19,27 @@
 <body class="bg-gray-100 p-6">
 
 <div class="max-w-5xl mx-auto bg-white rounded-lg shadow p-6">
-  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Realtime)</h1>
+  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Realtime + ค้นหา Tag ID)</h1>
 
   <!-- 🔐 Login -->
   <div id="login-section">
     <input id="email" type="email" placeholder="อีเมลกรรมการ" class="border p-2 w-full rounded mb-2">
     <input id="password" type="password" placeholder="รหัสผ่าน" class="border p-2 w-full rounded mb-2">
     <button id="loginBtn" class="bg-blue-600 text-white px-4 py-2 rounded w-full">เข้าสู่ระบบ</button>
-    <p id="loginStatus" class="text-center text-sm text-gray-600 mt-2"></p>
   </div>
 
   <!-- 🧑‍⚖️ Admin Section -->
   <div id="admin-section" class="hidden">
     <div class="flex justify-between items-center mb-2">
       <h2 class="text-lg font-semibold">จัดการสถานะนักวิ่ง</h2>
-      <div class="space-x-2">
-        <button id="logoutBtn" class="bg-red-500 text-white px-3 py-1 rounded">ออกจากระบบ</button>
-      </div>
+      <button id="logoutBtn" class="bg-red-500 text-white px-3 py-1 rounded">ออกจากระบบ</button>
     </div>
 
-    <div class="flex space-x-2 mb-4">
-      <button id="tab-runners" class="tab-active px-3 py-1 rounded border">🏃‍♂️ นักวิ่ง</button>
-      <button id="tab-logs" class="px-3 py-1 rounded border">🧾 Logs</button>
-      <button id="tab-ultra" class="px-3 py-1 rounded border">🏅 Ultra Records</button>
-    </div>
+    <input id="searchInput" type="text" placeholder="🔍 ค้นหาชื่อ หรือ Tag ID..." class="border p-2 w-full rounded mb-4">
 
     <p id="lastUpdate" class="text-xs text-gray-500 mb-4">อัปเดตล่าสุด: -</p>
 
-    <div id="section-runners">
-      <input id="searchInput" type="text" placeholder="ค้นหาชื่อ..." class="border p-2 w-full rounded mb-4">
-      <div id="runnerList" class="space-y-3"></div>
-    </div>
-
-    <div id="section-logs" class="hidden">
-      <div id="logList" class="space-y-1 text-sm text-gray-700"></div>
-    </div>
-
-    <div id="section-ultra" class="hidden">
-      <div id="ultraList" class="space-y-1 text-sm text-gray-700"></div>
-    </div>
+    <div id="runnerList" class="space-y-3"></div>
   </div>
 </div>
 
@@ -76,31 +58,21 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const alertDnf = document.getElementById("alertDnf");
 const alertFinisher = document.getElementById("alertFinisher");
 const toastContainer = document.getElementById("toast-container");
-
 let currentUser = null;
 
-// Login / Logout
+// Elements
 const loginSection = document.getElementById("login-section");
 const adminSection = document.getElementById("admin-section");
 const loginBtn = document.getElementById("loginBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 const searchInput = document.getElementById("searchInput");
 const runnerList = document.getElementById("runnerList");
-const logList = document.getElementById("logList");
-const ultraList = document.getElementById("ultraList");
 const lastUpdate = document.getElementById("lastUpdate");
-const tabRunners = document.getElementById("tab-runners");
-const tabLogs = document.getElementById("tab-logs");
-const tabUltra = document.getElementById("tab-ultra");
-const sectionRunners = document.getElementById("section-runners");
-const sectionLogs = document.getElementById("section-logs");
-const sectionUltra = document.getElementById("section-ultra");
 
 // ============================ LOGIN ============================
 window.addEventListener("DOMContentLoaded", async () => {
   const { data: { session } } = await supabase.auth.getSession();
   if (session) autoLogin(session.user);
-
   supabase.auth.onAuthStateChange(async (event, session) => {
     if (event === "SIGNED_IN" && session) autoLogin(session.user);
     if (event === "SIGNED_OUT") showLogin();
@@ -131,7 +103,6 @@ async function autoLogin(user) {
   currentUser = { id: user.id, name: profile.full_name };
   loginSection.classList.add("hidden");
   adminSection.classList.remove("hidden");
-
   loadAll();
   startRealtimeListener();
   setInterval(loadAll, 10000);
@@ -149,18 +120,27 @@ function updateLastTime() {
 }
 async function loadAll() {
   loadRunners(searchInput.value);
-  loadLogs();
-  loadUltra();
   updateLastTime();
 }
 
 // ============================ RUNNERS ============================
 async function loadRunners(query = "") {
-  const { data: runners } = await supabase
-    .from("runner")
-    .select("id, name, type, status, record(lap, start_time, finish_time)")
-    .ilike("name", `%${query}%`)
-    .order("name", { ascending: true });
+  let runners = [];
+  if (query.trim() === "") {
+    const { data, error } = await supabase
+      .from("runner")
+      .select("id, name, tag_id, type, status, record(lap, start_time, finish_time)")
+      .order("name", { ascending: true });
+    if (!error) runners = data;
+  } else {
+    // ✅ ค้นหาทั้ง name และ tag_id
+    const { data, error } = await supabase
+      .from("runner")
+      .select("id, name, tag_id, type, status, record(lap, start_time, finish_time)")
+      .or(`name.ilike.%${query}%,tag_id.ilike.%${query}%`)
+      .order("name", { ascending: true });
+    if (!error) runners = data;
+  }
 
   runnerList.innerHTML = "";
   runners.forEach(r => {
@@ -204,8 +184,11 @@ async function loadRunners(query = "") {
     runnerList.innerHTML += `
       <div class="border p-3 rounded flex justify-between items-center ${bgClass}">
         <div>
-          <b>${r.name}</b> (${r.type})<br>สถานะ: ${r.status}<br>${info}${notice}
-        </div><div>${buttons}</div>
+          <b>${r.name}</b> (${r.type})<br>
+          🏷️ Tag ID: ${r.tag_id || "-"}<br>
+          สถานะ: ${r.status}<br>${info}${notice}
+        </div>
+        <div>${buttons}</div>
       </div>`;
   });
 }
@@ -220,23 +203,12 @@ async function updateStatus(runnerId, status) {
   loadRunners(searchInput.value);
 }
 
-// ============================ LOGS / ULTRA ============================
-async function loadLogs() {
-  const { data: logs } = await supabase.from("dnf_log").select("created_at, status, reason, runner_id").order("created_at",{ascending:false}).limit(20);
-  logList.innerHTML = logs.map(l => `<div class="border-b py-1 text-sm">🕒 ${new Date(l.created_at).toLocaleString("th-TH")} — <b>${l.status}</b> (${l.reason})</div>`).join("");
-}
-async function loadUltra() {
-  const { data: ultra } = await supabase.from("ultra_log").select("name,type,lap,recorded_at").eq("type","BCR 100.8").order("recorded_at",{ascending:false}).limit(50);
-  ultraList.innerHTML = (ultra||[]).map(u=>`<div class="border-b py-1 text-sm">🏅 ${u.name} (${u.type}) — รอบที่ ${u.lap} (${(u.lap*6.3).toFixed(2)} กม.)<br>🕒 ${new Date(u.recorded_at).toLocaleString("th-TH")}</div>`).join("");
-}
-
 // ============================ REALTIME + ALERT ============================
 function startRealtimeListener() {
   supabase.channel("record-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "record" }, (payload) => {
       const lap = payload.new?.lap;
-      const runnerId = payload.new?.runner_id;
-      if (!lap || !runnerId) return;
+      if (!lap) return;
       loadRunners(searchInput.value);
 
       if ([4,6,8].includes(lap)) {
