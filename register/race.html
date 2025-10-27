@@ -2,22 +2,17 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>🏃 TOP100 4LAP</title>
+<title>🏃 Race Dashboard</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
 <body class="bg-gray-100 p-6">
-<h1 class="text-2xl font-bold mb-4 text-center">🏃 TOP100 4LAP</h1>
+<h1 class="text-2xl font-bold mb-4 text-center">🏃 TOP100 Dashboard</h1>
 
 <div class="max-w-3xl mx-auto bg-white p-4 rounded-lg shadow mb-4">
   <input id="tagInput" type="text" placeholder="สแกน Tag ID"
     class="w-full border rounded px-3 py-2 focus:outline-none" autofocus>
   <p id="status" class="text-sm text-gray-600 mt-2"></p>
-</div>
-
-<div class="max-w-3xl mx-auto flex space-x-4 mb-4">
-  <button data-type="TOP100MEN" class="tab bg-blue-500 text-white px-3 py-1 rounded">MEN</button>
-  <button data-type="TOP100WOMEN" class="tab bg-pink-500 text-white px-3 py-1 rounded">WOMEN</button>
 </div>
 
 <div class="max-w-3xl mx-auto bg-white p-4 rounded-lg shadow">
@@ -26,9 +21,9 @@
 </div>
 
 <script>
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // เปลี่ยนเป็นของคุณ
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";           // เปลี่ยนเป็นของคุณ
-const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/rfid-reader"; // เปลี่ยนเป็นของคุณ
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 👈 ใส่ anon key ของคุณ
+const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/rfid-reader";
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const tagInput = document.getElementById("tagInput");
@@ -37,8 +32,15 @@ const runnerList = document.getElementById("runner-list");
 
 let scanTimeout = null;
 const SCAN_DELAY = 200;
-let currentType = "TOP100MEN";
-const maxLaps = 4;
+
+// ✅ ฟังก์ชันกติกาแต่ละรุ่น
+function getRaceRules(type) {
+  const normalized = (type || "").replace(/\s+/g, "").toUpperCase();
+  if (normalized.includes("BCR50.4")) return { finisher: 8, dnf: 4 };
+  if (normalized.includes("BCR69.3")) return { finisher: 11, dnf: 6 };
+  if (normalized.includes("BCR100.8")) return { finisher: 16, dnf: 8 };
+  return { finisher: 4, dnf: 2 }; // default
+}
 
 // แปลงเวลาเป็น HH:MM:SS
 function formatDuration(ms) {
@@ -50,22 +52,12 @@ function formatDuration(ms) {
   return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
 }
 
-// Tab เลือกประเภท
-document.querySelectorAll(".tab").forEach(tab => {
-  tab.addEventListener("click", () => {
-    currentType = tab.dataset.type;
-    loadDashboard();
-  });
-});
-
 // Scan อัตโนมัติ
 tagInput.addEventListener("input", () => {
   if (scanTimeout) clearTimeout(scanTimeout);
-
   scanTimeout = setTimeout(async () => {
     const tagId = tagInput.value.trim();
     if (!tagId) return;
-
     try {
       const resp = await fetch(FUNCTION_URL, {
         method: "POST",
@@ -75,13 +67,10 @@ tagInput.addEventListener("input", () => {
         },
         body: JSON.stringify({ tag_id: tagId })
       });
-
       const result = await resp.json();
-
       if (result.error) statusEl.textContent = "❌ " + result.error;
       else if (result.message) statusEl.textContent = "🏁 " + result.message;
-      else statusEl.textContent = `✅ ${result.runner} บันทึกสำเร็จ รอบที่ ${result.lap}`;
-
+      else statusEl.textContent = `✅ ${result.runner} รอบที่ ${result.lap}`;
       tagInput.value = "";
       loadDashboard();
     } catch (err) {
@@ -90,25 +79,22 @@ tagInput.addEventListener("input", () => {
   }, SCAN_DELAY);
 });
 
-// โหลด Dashboard และคำนวณอันดับ
-// โหลด Dashboard และคำนวณอันดับ
+// โหลด Dashboard
 async function loadDashboard() {
-  const { data: runners, error } = await supabase.from("runner")
+  const { data: runners, error } = await supabase
+    .from("runner")
     .select(`id, name, type, record(lap, start_time, finish_time)`);
-
   if (error) return console.error(error);
 
-  // ตั้งค่าตามรุ่นการแข่งขัน
-  const raceSettings = {
-    "BCR 50.4": { finisher: 8, dnf: 4 },
-    "BCR69.3": { finisher: 11, dnf: 6 },
-    "BCR100.8": { finisher: 16, dnf: 8 },
-  };
+  runnerList.innerHTML = "";
 
-  const ranking = runners.map(r => {
+  runners.forEach(r => {
+    const rules = getRaceRules(r.type);
+    const finisherRequired = rules.finisher;
+
+    // คำนวณรอบและเวลารวม
     let totalTime = 0;
     let completedLaps = 0;
-
     r.record.forEach(rec => {
       if (rec.start_time && rec.finish_time) {
         totalTime += new Date(rec.finish_time) - new Date(rec.start_time);
@@ -116,58 +102,31 @@ async function loadDashboard() {
       }
     });
 
-    // 🏁 ตรวจสอบสถานะ
-    const setting = raceSettings[r.type] || { finisher: 4, dnf: 2 };
-    let status = "⏱️ Running";
-    if (completedLaps >= setting.finisher) status = "🏁 FINISHER";
-    else if (completedLaps >= setting.dnf) status = "⚠️ DNF";
+    const distance = (completedLaps * 6.3).toFixed(2);
+    const totalTimeText = totalTime ? formatDuration(totalTime) : "-";
 
-    return { ...r, totalTime, completedLaps, status, setting };
-  });
+    let status = "RUNNING";
+    if (completedLaps >= finisherRequired) status = "FINISHER";
+    else if (completedLaps >= rules.dnf) status = "DNF";
 
-  // จัดอันดับเฉพาะคนที่ FINISHER แล้วก่อน
-  const finished = ranking.filter(r => r.completedLaps >= r.setting.finisher)
-    .sort((a,b) => a.totalTime - b.totalTime)
-    .map((r,i) => ({ ...r, rank: i+1 }));
-
-  // ที่เหลือ
-  const unfinished = ranking.filter(r => r.completedLaps < r.setting.finisher)
-    .sort((a,b) => b.completedLaps - a.completedLaps);
-
-  const finalList = [...finished, ...unfinished];
-  runnerList.innerHTML = "";
-
-  finalList.forEach(r => {
-    let lapsHtml = r.record.sort((a,b)=>a.lap-b.lap).map(rec=>{
-      let dur = "-";
-      if (rec.start_time && rec.finish_time) {
-        const diff = new Date(rec.finish_time) - new Date(rec.start_time);
-        dur = formatDuration(diff);
-      }
-      return `Lap ${rec.lap}: ${dur}`;
-    }).join(", ");
-
-    let rankText = r.rank ? `🏆 ${r.rank}` : "-";
-    let totalTimeText = r.totalTime ? formatDuration(r.totalTime) : "-";
-
-    runnerList.innerHTML += `<div class="border-b py-2">
-      <div class="flex justify-between">
+    runnerList.innerHTML += `
+      <div class="border-b py-2 flex justify-between">
         <div>
-          <b>${r.name}</b> (${r.type})<br>${lapsHtml}
+          <b>${r.name}</b> (${r.type})<br>
+          สถานะ: ${status}<br>
+          🏁 รอบที่: ${completedLaps} / ${finisherRequired}<br>
+          ระยะทาง: ${distance} กม.
         </div>
-        <div class="text-right">
-          รอบ ${r.completedLaps}/${r.setting.finisher}<br>
-          เวลารวม: ${totalTimeText}<br>
-          สถานะ: ${r.status}<br>
-          อันดับ: ${rankText}
+        <div class="text-right text-sm text-gray-700">
+          ${status === "FINISHER" ? "🎖️ ครบระยะแล้ว" : ""}
+          ${status === "DNF" ? "⚠️ ถึงระยะ DNF แล้ว" : ""}
+          <br>รวมเวลา: ${totalTimeText}
         </div>
-      </div>
-    </div>`;
+      </div>`;
   });
 }
 
-
-// โหลด Dashboard ครั้งแรก
+// โหลดครั้งแรก
 loadDashboard();
 </script>
 </body>
