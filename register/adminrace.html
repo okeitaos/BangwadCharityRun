@@ -64,7 +64,7 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 👈 ใส่ anon key ของคุณ
+const SUPABASE_KEY = "YOUR_ANON_KEY"; // 👈 ใส่ anon key ของคุณ
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentUser = null;
@@ -178,15 +178,19 @@ async function loadRunners(query = "") {
     const maxLap = r.record.length > 0 ? Math.max(...r.record.map(x => x.lap)) : 0;
     const distance = (maxLap * 6.3).toFixed(2);
 
-    let finisherRequired = 0, dnfStart = 0;
-    if (r.type === "BCR 50.4") { finisherRequired = 8; dnfStart = 4; }
-    else if (r.type === "BCR 69.3") { finisherRequired = 11; dnfStart = 6; }
-    else if (r.type === "BCR 100.8") { finisherRequired = 16; dnfStart = 8; }
+    // ✅ Normalize type
+    const runnerType = (r.type || "").trim().toUpperCase();
 
-    // ✅ ปรับ logic ใหม่: ต้องเริ่มวิ่งแล้วถึงจะเช็ก Finisher/DNF
+    // ✅ กำหนดค่ารอบ Finisher / DNF แต่ละรุ่น
+    let finisherRequired = 0, dnfStart = 0;
+    if (runnerType === "BCR 50.4") { finisherRequired = 8; dnfStart = 4; }
+    else if (runnerType === "BCR 69.3") { finisherRequired = 11; dnfStart = 6; }
+    else if (runnerType === "BCR 100.8") { finisherRequired = 16; dnfStart = 8; }
+
+    // ✅ Logic การแสดงปุ่ม
     const hasStarted = maxLap > 0;
-    const canFinish = hasStarted && maxLap >= finisherRequired;
-    const shouldWarnDNF = hasStarted && maxLap >= dnfStart && r.status === "RUNNING";
+    const canFinish = hasStarted && finisherRequired > 0 && maxLap >= finisherRequired;
+    const shouldWarnDNF = hasStarted && dnfStart > 0 && maxLap >= dnfStart && r.status === "RUNNING";
 
     let buttons = "";
     if (r.status === "DNF" || r.status === "FINISHER") {
@@ -194,9 +198,11 @@ async function loadRunners(query = "") {
     } else if (canFinish) {
       buttons = `<button class="bg-red-500 text-white px-2 py-1 rounded"
         onclick="updateStatus('${r.id}', 'FINISHER', event)">FINISHER</button>`;
-    } else {
+    } else if (hasStarted) {
       buttons = `<button class="bg-yellow-500 text-white px-2 py-1 rounded"
         onclick="updateStatus('${r.id}', 'DNF', event)">DNF</button>`;
+    } else {
+      buttons = `<span class="text-gray-400 text-sm">ยังไม่เริ่มวิ่ง</span>`;
     }
 
     let bgClass = "bg-green-50";
@@ -259,7 +265,7 @@ async function loadLogs() {
     </div>`).join("");
 }
 
-// ===================== Ultra Records (เฉพาะ BCR 100.8) =====================
+// ===================== Ultra Records =====================
 async function loadUltra() {
   const { data: ultra, error } = await supabase
     .from("ultra_log")
