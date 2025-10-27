@@ -7,14 +7,16 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
 <body class="bg-gray-100 p-6">
-<h1 class="text-2xl font-bold mb-4 text-center">🏃 TOP100 Dashboard</h1>
+<h1 class="text-2xl font-bold mb-4 text-center">🏃 Race Dashboard</h1>
 
+<!-- สแกนแท็ก -->
 <div class="max-w-3xl mx-auto bg-white p-4 rounded-lg shadow mb-4">
   <input id="tagInput" type="text" placeholder="สแกน Tag ID"
     class="w-full border rounded px-3 py-2 focus:outline-none" autofocus>
   <p id="status" class="text-sm text-gray-600 mt-2"></p>
 </div>
 
+<!-- Dashboard -->
 <div class="max-w-3xl mx-auto bg-white p-4 rounded-lg shadow">
   <h2 class="text-lg font-semibold mb-4">📊 Dashboard - Ranking</h2>
   <div id="runner-list" class="space-y-2"></div>
@@ -33,13 +35,13 @@ const runnerList = document.getElementById("runner-list");
 let scanTimeout = null;
 const SCAN_DELAY = 200;
 
-// ✅ ฟังก์ชันกติกาแต่ละรุ่น
+// ✅ กติกาแต่ละรุ่น
 function getRaceRules(type) {
   const normalized = (type || "").replace(/\s+/g, "").toUpperCase();
   if (normalized.includes("BCR50.4")) return { finisher: 8, dnf: 4 };
   if (normalized.includes("BCR69.3")) return { finisher: 11, dnf: 6 };
   if (normalized.includes("BCR100.8")) return { finisher: 16, dnf: 8 };
-  return { finisher: 4, dnf: 2 }; // default
+  return { finisher: 4, dnf: 2 };
 }
 
 // แปลงเวลาเป็น HH:MM:SS
@@ -52,7 +54,7 @@ function formatDuration(ms) {
   return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
 }
 
-// Scan อัตโนมัติ
+// 🏷️ Scan อัตโนมัติ
 tagInput.addEventListener("input", () => {
   if (scanTimeout) clearTimeout(scanTimeout);
   scanTimeout = setTimeout(async () => {
@@ -70,7 +72,7 @@ tagInput.addEventListener("input", () => {
       const result = await resp.json();
       if (result.error) statusEl.textContent = "❌ " + result.error;
       else if (result.message) statusEl.textContent = "🏁 " + result.message;
-      else statusEl.textContent = `✅ ${result.runner} รอบที่ ${result.lap}`;
+      else statusEl.textContent = `✅ ${result.runner} บันทึกรอบที่ ${result.lap} สำเร็จ`;
       tagInput.value = "";
       loadDashboard();
     } catch (err) {
@@ -79,11 +81,12 @@ tagInput.addEventListener("input", () => {
   }, SCAN_DELAY);
 });
 
-// โหลด Dashboard
+// 🧭 โหลด Dashboard
 async function loadDashboard() {
   const { data: runners, error } = await supabase
     .from("runner")
-    .select(`id, name, type, record(lap, start_time, finish_time)`);
+    .select(`id, name, type, status, record(lap, start_time, finish_time)`)
+    .order("id", { ascending: true });
   if (error) return console.error(error);
 
   runnerList.innerHTML = "";
@@ -91,26 +94,29 @@ async function loadDashboard() {
   runners.forEach(r => {
     const rules = getRaceRules(r.type);
     const finisherRequired = rules.finisher;
+    const dnfStart = rules.dnf;
 
-    // คำนวณรอบและเวลารวม
+    // ✅ นับทุกรอบที่เริ่มแล้ว (start_time)
     let totalTime = 0;
     let completedLaps = 0;
     r.record.forEach(rec => {
+      if (rec.start_time) completedLaps++; // นับรวมรอบที่เริ่มแล้ว
       if (rec.start_time && rec.finish_time) {
         totalTime += new Date(rec.finish_time) - new Date(rec.start_time);
-        completedLaps++;
       }
     });
 
     const distance = (completedLaps * 6.3).toFixed(2);
     const totalTimeText = totalTime ? formatDuration(totalTime) : "-";
 
+    // ✅ สถานะการแข่งขัน
     let status = "RUNNING";
     if (completedLaps >= finisherRequired) status = "FINISHER";
-    else if (completedLaps >= rules.dnf) status = "DNF";
+    else if (completedLaps >= dnfStart) status = "DNF";
 
+    // 🏁 แสดงผลใน Dashboard
     runnerList.innerHTML += `
-      <div class="border-b py-2 flex justify-between">
+      <div class="border-b py-2 flex justify-between items-start">
         <div>
           <b>${r.name}</b> (${r.type})<br>
           สถานะ: ${status}<br>
@@ -119,15 +125,16 @@ async function loadDashboard() {
         </div>
         <div class="text-right text-sm text-gray-700">
           ${status === "FINISHER" ? "🎖️ ครบระยะแล้ว" : ""}
-          ${status === "DNF" ? "⚠️ ถึงระยะ DNF แล้ว" : ""}
+          ${status === "DNF" && completedLaps < finisherRequired ? "⚠️ ถึงระยะ DNF แล้ว" : ""}
           <br>รวมเวลา: ${totalTimeText}
         </div>
       </div>`;
   });
 }
 
-// โหลดครั้งแรก
+// 🔄 โหลดอัตโนมัติทุก 10 วิ
 loadDashboard();
+setInterval(loadDashboard, 10000);
 </script>
 </body>
 </html>
