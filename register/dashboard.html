@@ -75,6 +75,7 @@
       </thead>
       <tbody id="modalContent"></tbody>
     </table>
+    <p id="avgTime" class="text-center text-sm text-gray-600 mt-3"></p>
     <button id="closeModal" class="bg-gray-700 text-white mt-4 px-4 py-2 rounded w-full">ปิดหน้าต่าง</button>
   </div>
 </div>
@@ -90,6 +91,7 @@ const modal = document.getElementById("modal");
 const modalTitle = document.getElementById("modalTitle");
 const modalSummary = document.getElementById("modalSummary");
 const modalContent = document.getElementById("modalContent");
+const avgTime = document.getElementById("avgTime");
 const closeModal = document.getElementById("closeModal");
 const typeTabs = document.querySelectorAll(".type-tab");
 const searchInput = document.getElementById("searchInput");
@@ -195,22 +197,32 @@ function showDetails(runner) {
     <b>ระยะทาง:</b> ${runner.distance} กม.<br>
     <b>เวลารวม:</b> ${totalDur}
   `;
+
   if (!runner.record || runner.record.length === 0) {
     modalContent.innerHTML = `<tr><td colspan="4" class="text-center py-2">ไม่มีข้อมูลรอบวิ่ง</td></tr>`;
+    avgTime.textContent = "";
     return;
   }
-  // ✅ แสดงเฉพาะ Lap >= 1 (ซ่อนรอบ 0)
+
+  // ✅ ซ่อน Lap 0
   const laps = runner.record.filter(rec => rec.lap > 0).sort((a,b) => a.lap - b.lap);
   if (laps.length === 0) {
     modalContent.innerHTML = `<tr><td colspan="4" class="text-center py-2">ยังไม่มีข้อมูลการวิ่ง</td></tr>`;
+    avgTime.textContent = "";
     return;
   }
+
+  let totalLapTime = 0;
+  let countLap = 0;
+
   modalContent.innerHTML = laps.map(rec => {
     const start = rec.start_time ? new Date(rec.start_time).toLocaleTimeString("th-TH") : "-";
     const finish = rec.finish_time ? new Date(rec.finish_time).toLocaleTimeString("th-TH") : "-";
     let dur = "-";
     if (rec.start_time && rec.finish_time) {
       const diff = new Date(rec.finish_time) - new Date(rec.start_time);
+      totalLapTime += diff;
+      countLap++;
       dur = formatDuration(diff);
     }
     return `
@@ -222,6 +234,14 @@ function showDetails(runner) {
       </tr>
     `;
   }).join("");
+
+  // 🧮 แสดงเวลาต่อรอบเฉลี่ย
+  if (countLap > 0) {
+    const avg = totalLapTime / countLap;
+    avgTime.textContent = `⏱ เวลาต่อรอบเฉลี่ย: ${formatDuration(avg)} (จาก ${countLap} รอบ)`;
+  } else {
+    avgTime.textContent = "";
+  }
 }
 
 // เปลี่ยนรุ่น
