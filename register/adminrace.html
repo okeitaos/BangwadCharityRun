@@ -175,21 +175,22 @@ async function loadRunners(query = "") {
 
   runnerList.innerHTML = "";
   runners.forEach(r => {
-    // ✅ นับเฉพาะรอบที่จบแล้ว (มี finish_time)
-    const finishedLaps = (r.record || []).filter(x => x.finish_time).map(x => x.lap);
-    const maxLap = finishedLaps.length > 0 ? Math.max(...finishedLaps) : 0;
-    const distance = (maxLap * 6.3).toFixed(2);
+    // ✅ นับรวมรอบที่เริ่มแล้ว (start_time)
+    const startedLaps = (r.record || []).filter(x => x.start_time).map(x => x.lap);
+    const maxLap = startedLaps.length > 0 ? Math.max(...startedLaps) : 0;
+    const showLap = maxLap > 0 ? maxLap : 0;
+    const distance = (showLap * 6.3).toFixed(2);
 
-    // ✅ Normalize type และตั้งค่ากติกา
+    // ✅ Normalize type
     const normalizedType = (r.type || "").replace(/\s+/g, "").toUpperCase();
     let finisherRequired = 0, dnfStart = 0;
     if (normalizedType.includes("BCR50.4")) { finisherRequired = 8; dnfStart = 4; }
     else if (normalizedType.includes("BCR69.3")) { finisherRequired = 11; dnfStart = 6; }
     else if (normalizedType.includes("BCR100.8")) { finisherRequired = 16; dnfStart = 8; }
 
-    const hasStarted = maxLap > 0;
-    const canFinish = hasStarted && finisherRequired > 0 && maxLap >= finisherRequired;
-    const shouldWarnDNF = hasStarted && dnfStart > 0 && maxLap >= dnfStart && r.status === "RUNNING";
+    const hasStarted = showLap > 0;
+    const canFinish = hasStarted && finisherRequired > 0 && showLap >= finisherRequired;
+    const shouldWarnDNF = hasStarted && dnfStart > 0 && showLap >= dnfStart && r.status === "RUNNING";
 
     let buttons = "";
     if (r.status === "DNF" || r.status === "FINISHER") {
@@ -219,7 +220,10 @@ async function loadRunners(query = "") {
         <div>
           <b>${r.name}</b> (${r.type})<br>
           สถานะ: ${r.status}<br>
-          🏁 รอบที่: ${maxLap} / ${finisherRequired} | ระยะทาง: ${distance} กม.
+          ${showLap === 0 
+            ? '✅ Check-in แล้ว (ยังไม่เริ่มวิ่ง)<br>' 
+            : `🏁 รอบที่: ${showLap} / ${finisherRequired}<br>`}
+          ระยะทาง: ${distance} กม.
           ${dnfWarning}${finisherNotice}
         </div>
         <div>${buttons}</div>
