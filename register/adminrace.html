@@ -169,25 +169,24 @@ async function loadAll() {
 async function loadRunners(query = "") {
   const { data: runners } = await supabase
     .from("runner")
-    .select("id, name, type, status, record(lap)")
+    .select("id, name, type, status, record(lap, start_time, finish_time)")
     .ilike("name", `%${query}%`)
     .order("name", { ascending: true });
 
   runnerList.innerHTML = "";
   runners.forEach(r => {
-    const maxLap = r.record.length > 0 ? Math.max(...r.record.map(x => x.lap)) : 0;
+    // ✅ นับเฉพาะรอบที่จบแล้ว (มี finish_time)
+    const finishedLaps = (r.record || []).filter(x => x.finish_time).map(x => x.lap);
+    const maxLap = finishedLaps.length > 0 ? Math.max(...finishedLaps) : 0;
     const distance = (maxLap * 6.3).toFixed(2);
 
-    // ✅ Normalize type
-    const runnerType = (r.type || "").trim().toUpperCase();
-
-    // ✅ กำหนดค่ารอบ Finisher / DNF แต่ละรุ่น
+    // ✅ Normalize type และตั้งค่ากติกา
+    const normalizedType = (r.type || "").replace(/\s+/g, "").toUpperCase();
     let finisherRequired = 0, dnfStart = 0;
-    if (runnerType === "BCR 50.4") { finisherRequired = 8; dnfStart = 4; }
-    else if (runnerType === "BCR 69.3") { finisherRequired = 11; dnfStart = 6; }
-    else if (runnerType === "BCR 100.8") { finisherRequired = 16; dnfStart = 8; }
+    if (normalizedType.includes("BCR50.4")) { finisherRequired = 8; dnfStart = 4; }
+    else if (normalizedType.includes("BCR69.3")) { finisherRequired = 11; dnfStart = 6; }
+    else if (normalizedType.includes("BCR100.8")) { finisherRequired = 16; dnfStart = 8; }
 
-    // ✅ Logic การแสดงปุ่ม
     const hasStarted = maxLap > 0;
     const canFinish = hasStarted && finisherRequired > 0 && maxLap >= finisherRequired;
     const shouldWarnDNF = hasStarted && dnfStart > 0 && maxLap >= dnfStart && r.status === "RUNNING";
@@ -220,7 +219,7 @@ async function loadRunners(query = "") {
         <div>
           <b>${r.name}</b> (${r.type})<br>
           สถานะ: ${r.status}<br>
-          🏁 รอบที่: ${maxLap} | ระยะทาง: ${distance} กม.
+          🏁 รอบที่: ${maxLap} / ${finisherRequired} | ระยะทาง: ${distance} กม.
           ${dnfWarning}${finisherNotice}
         </div>
         <div>${buttons}</div>
