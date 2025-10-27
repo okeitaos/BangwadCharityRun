@@ -153,8 +153,16 @@ async function loadRunners(query = "") {
 searchInput.addEventListener("input", e => loadRunners(e.target.value));
 
 // ✏️ อัปเดตสถานะนักวิ่ง
+// ✏️ อัปเดตสถานะนักวิ่ง
 async function updateStatus(runnerId, status) {
-  const reason = prompt("เหตุผล:", status === "DNF" ? "เจ็บระหว่างแข่งขัน" : status === "FINISHER" ? "ครบจำนวนรอบ" : "");
+  const reason = prompt(
+    "เหตุผล:",
+    status === "DNF"
+      ? "เจ็บระหว่างแข่งขัน"
+      : status === "FINISHER"
+      ? "ครบจำนวนรอบ"
+      : ""
+  );
   if (!reason) return;
 
   const { error: updateError } = await supabase
@@ -175,10 +183,15 @@ async function updateStatus(runnerId, status) {
     updated_by: currentUser.id
   });
 
+  // ✅ ซ่อนปุ่มของนักวิ่งคนนั้นทันที (ในหน้า)
+  const buttonsDiv = event.target.closest(".border").querySelector("div.space-x-1");
+  if (buttonsDiv) buttonsDiv.innerHTML = "<span class='text-gray-400'>⛔ Locked</span>";
+
   alert(`✅ เปลี่ยนสถานะเป็น ${status} สำเร็จ`);
   loadRunners(searchInput.value);
   loadLogs();
 }
+
 
 // 🧾 โหลด Log การเปลี่ยนสถานะ
 async function loadLogs() {
