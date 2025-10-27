@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🏃‍♂️ Race Leaderboard Pro</title>
+<title>🏃‍♂️ Race Dashboard</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
@@ -24,7 +24,7 @@
 </head>
 <body class="bg-gray-100 p-4 sm:p-6">
 
-<h1 class="text-2xl sm:text-3xl font-bold text-center mb-4">🏁 RACE LEADERBOARD</h1>
+<h1 class="text-2xl sm:text-3xl font-bold text-center mb-4">📊 RACE DASHBOARD</h1>
 
 <!-- 🔘 ปุ่มเลือกประเภท -->
 <div class="flex flex-wrap justify-center gap-2 mb-4">
@@ -39,8 +39,8 @@
   <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อหรือ Tag ID เพื่อค้นหา..." class="border p-2 rounded w-full max-w-md shadow-sm focus:ring-2 focus:ring-blue-400">
 </div>
 
-<!-- 🏆 TOP3 Section -->
-<div id="top3Container" class="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 text-center"></div>
+<!-- 👥 จำนวนผู้เข้าแข่งขัน -->
+<div id="summary" class="text-center text-gray-700 font-semibold mb-4">กำลังโหลดข้อมูล...</div>
 
 <!-- ตารางหลัก -->
 <div id="runner-list" class="max-w-5xl mx-auto bg-white p-4 rounded-lg shadow overflow-x-auto">
@@ -81,11 +81,11 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 👈 ใส่ anon key ของคุณ
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+const summary = document.getElementById("summary");
 const runnerTableBody = document.getElementById("runnerTableBody");
-const top3Container = document.getElementById("top3Container");
 const modal = document.getElementById("modal");
 const modalTitle = document.getElementById("modalTitle");
 const modalSummary = document.getElementById("modalSummary");
@@ -99,6 +99,7 @@ let currentSearch = "";
 
 closeModal.onclick = () => modal.style.display = "none";
 
+// 🕒 แปลงเวลาเป็น HH:MM:SS
 function formatDuration(ms) {
   const totalSeconds = Math.floor(ms / 1000);
   const hours = Math.floor(totalSeconds / 3600);
@@ -107,6 +108,7 @@ function formatDuration(ms) {
   return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
 }
 
+// โหลดข้อมูลทั้งหมด
 async function loadDashboard() {
   const { data: runners, error } = await supabase
     .from("runner")
@@ -126,6 +128,20 @@ async function loadDashboard() {
     );
   }
 
+  // 🧮 นับจำนวนผู้เข้าแข่งขันในรุ่น
+  const total = filtered.length;
+  const finisher = filtered.filter(r => r.status === "FINISHER").length;
+  const dnf = filtered.filter(r => r.status === "DNF").length;
+  const running = filtered.filter(r => r.status === "RUNNING").length;
+
+  summary.innerHTML = `
+    รุ่น: <b>${currentType === "ALL" ? "ทั้งหมด" : currentType}</b> |
+    👟 ทั้งหมด: <b>${total}</b> คน |
+    🟢 RUNNING: <b>${running}</b> |
+    🏁 FINISHER: <b>${finisher}</b> |
+    ⛔ DNF: <b>${dnf}</b>
+  `;
+
   const data = filtered.map(r => {
     let totalTime = 0, completedLaps = 0;
     (r.record || []).forEach(rec => {
@@ -139,39 +155,20 @@ async function loadDashboard() {
   });
 
   const finished = data.filter(r => r.status === "FINISHER").sort((a,b) => a.totalTime - b.totalTime);
-  const running = data.filter(r => r.status === "RUNNING").sort((a,b) => b.completedLaps - a.completedLaps);
-  const dnf = data.filter(r => r.status === "DNF").sort((a,b) => b.completedLaps - a.completedLaps);
-  const all = [...finished, ...running, ...dnf];
+  const runningSorted = data.filter(r => r.status === "RUNNING").sort((a,b) => b.completedLaps - a.completedLaps);
+  const dnfSorted = data.filter(r => r.status === "DNF").sort((a,b) => b.completedLaps - a.completedLaps);
+  const all = [...finished, ...runningSorted, ...dnfSorted];
 
-  updateTop3(finished.slice(0, 3));
   updateTable(all);
 }
 
-// 🏆 แสดง Top 3
-function updateTop3(top3) {
-  if (top3.length === 0) {
-    top3Container.innerHTML = `<p class="col-span-3 text-gray-500 text-center">ยังไม่มีผู้เข้าเส้นชัยในรุ่นนี้</p>`;
-    return;
-  }
-  const medals = ["🥇", "🥈", "🥉"];
-  top3Container.innerHTML = top3.map((r, i) => `
-    <div class="bg-white shadow rounded-lg p-4 border border-gray-200 hover:shadow-md transition">
-      <div class="text-3xl">${medals[i]}</div>
-      <div class="font-semibold text-lg text-blue-700 mt-1">${r.name}</div>
-      <div class="text-sm text-gray-500">${r.type}</div>
-      <div class="text-sm mt-1">เวลารวม: <b>${formatDuration(r.totalTime)}</b></div>
-    </div>
-  `).join("");
-}
-
-// ตารางหลัก
+// 🏁 สร้างตารางลำดับ
 function updateTable(runners) {
   runnerTableBody.innerHTML = "";
   runners.forEach((r, i) => {
     const rowClass = r.status === "FINISHER" ? "rank-finisher"
                    : r.status === "DNF" ? "rank-dnf" : "rank-running";
     const totalTimeText = r.totalTime ? formatDuration(r.totalTime) : "-";
-
     const row = document.createElement("tr");
     row.className = `${rowClass} border-b hover:bg-gray-100 cursor-pointer`;
     row.innerHTML = `
@@ -187,11 +184,10 @@ function updateTable(runners) {
   });
 }
 
-// 🪟 Modal
+// 🪟 Modal แสดงรายละเอียด Lap
 function showDetails(runner) {
   modal.style.display = "flex";
   modalTitle.textContent = `${runner.name} (${runner.type})`;
-
   let totalDur = formatDuration(runner.totalTime || 0);
   modalSummary.innerHTML = `
     <b>สถานะ:</b> ${runner.status} |
@@ -199,13 +195,16 @@ function showDetails(runner) {
     <b>ระยะทาง:</b> ${runner.distance} กม.<br>
     <b>เวลารวม:</b> ${totalDur}
   `;
-
   if (!runner.record || runner.record.length === 0) {
     modalContent.innerHTML = `<tr><td colspan="4" class="text-center py-2">ไม่มีข้อมูลรอบวิ่ง</td></tr>`;
     return;
   }
-
-  const laps = runner.record.sort((a,b) => a.lap - b.lap);
+  // ✅ แสดงเฉพาะ Lap >= 1 (ซ่อนรอบ 0)
+  const laps = runner.record.filter(rec => rec.lap > 0).sort((a,b) => a.lap - b.lap);
+  if (laps.length === 0) {
+    modalContent.innerHTML = `<tr><td colspan="4" class="text-center py-2">ยังไม่มีข้อมูลการวิ่ง</td></tr>`;
+    return;
+  }
   modalContent.innerHTML = laps.map(rec => {
     const start = rec.start_time ? new Date(rec.start_time).toLocaleTimeString("th-TH") : "-";
     const finish = rec.finish_time ? new Date(rec.finish_time).toLocaleTimeString("th-TH") : "-";
@@ -225,7 +224,7 @@ function showDetails(runner) {
   }).join("");
 }
 
-// ปุ่มรุ่น
+// เปลี่ยนรุ่น
 typeTabs.forEach(tab => {
   tab.addEventListener("click", () => {
     typeTabs.forEach(t => t.classList.remove("active-tab"));
@@ -245,7 +244,7 @@ searchInput.addEventListener("input", () => {
   }, 400);
 });
 
-// เริ่มโหลด
+// โหลดครั้งแรก
 loadDashboard();
 setInterval(loadDashboard, 15000);
 supabase.channel("record-changes")
