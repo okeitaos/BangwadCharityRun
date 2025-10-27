@@ -1,410 +1,235 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>🏃 TOP100 4LAP — Mobile / Tablet Friendly</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-  <style>
-    /* small additional styles */
-    .card-hover:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.12); transform: translateY(-2px); transition: .18s; }
-    .blink-slow { animation: blinkSlow 2.8s infinite; }
-    @keyframes blinkSlow {
-      0%,100% { background-color: inherit; }
-      50% { background-color: rgba(253,230,138,0.45); }
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>🏃 ระบบนับรอบ — Race Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<style>
+  .blink-slow { animation: blinkSlow 2.5s infinite; }
+  @keyframes blinkSlow {
+    0%,100% { background-color: inherit; }
+    50% { background-color: rgba(253,230,138,0.45); }
+  }
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 50; }
+  .modal { background: white; padding: 20px; border-radius: 16px; width: 90%; max-width: 600px; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+</style>
 </head>
 <body class="bg-gray-100 min-h-screen text-sm leading-relaxed">
 
-  <div class="max-w-4xl mx-auto p-4">
-    <header class="mb-4">
-      <h1 class="text-2xl sm:text-3xl font-bold text-center">🏃 TOP100 4LAP</h1>
-      <p class="text-center text-xs text-gray-500 mt-1">รองรับมือถือ / แท็บเล็ต — ใช้งานจริงที่สนาม</p>
-    </header>
+<div class="max-w-4xl mx-auto p-4">
+  <header class="mb-4 text-center">
+    <h1 class="text-2xl sm:text-3xl font-bold">🏃 Race Dashboard</h1>
+    <p class="text-xs text-gray-500">รองรับมือถือ / แท็บเล็ต ใช้งานจริงที่สนาม</p>
+  </header>
 
-    <!-- Scan area -->
-    <section class="bg-white rounded-lg shadow p-4 mb-4">
-      <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-        <div class="flex-grow">
-          <label for="tagInput" class="block text-xs text-gray-600 mb-1">สแกน Tag ID</label>
-          <div class="flex gap-2">
-            <input id="tagInput" type="text" inputmode="numeric" autocomplete="off" placeholder="สแกน Tag ID หรือพิมพ์ที่นี่"
-              class="flex-grow border rounded-md px-3 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-              autofocus>
-            <button id="scanBtn" class="bg-blue-600 text-white px-4 py-2 rounded-md text-sm sm:text-base">Scan</button>
-          </div>
-          <p id="status" class="mt-2 text-sm text-gray-600"></p>
-        </div>
+  <!-- Input + Tabs -->
+  <section class="bg-white rounded-lg shadow p-4 mb-4">
+    <label class="block text-xs text-gray-600 mb-1">สแกน Tag ID</label>
+    <div class="flex gap-2 mb-2">
+      <input id="tagInput" type="text" inputmode="numeric" autocomplete="off"
+        placeholder="สแกน Tag ID ที่นี่..." 
+        class="flex-grow border rounded-md px-3 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-blue-400" autofocus>
+      <button id="scanBtn" class="bg-blue-600 text-white px-4 py-2 rounded-md">สแกน</button>
+    </div>
+    <p id="status" class="text-sm text-gray-700 mb-2"></p>
 
-        <div class="w-full sm:w-56">
-          <label class="block text-xs text-gray-600 mb-1">ประเภท</label>
-          <div class="flex gap-2">
-            <button data-type="TOP100MEN" class="type-btn flex-1 bg-blue-500 text-white px-3 py-2 rounded-md">MEN</button>
-            <button data-type="TOP100WOMEN" class="type-btn flex-1 bg-pink-500 text-white px-3 py-2 rounded-md">WOMEN</button>
-          </div>
-        </div>
-      </div>
-    </section>
+    <div class="flex gap-2 justify-center">
+      <button data-type="TOP100MEN" class="type-btn bg-blue-500 text-white px-3 py-2 rounded-md flex-1">MEN</button>
+      <button data-type="TOP100WOMEN" class="type-btn bg-pink-500 text-white px-3 py-2 rounded-md flex-1">WOMEN</button>
+    </div>
+  </section>
 
-    <!-- Dashboard -->
-    <section class="mb-4">
-      <div class="flex justify-between items-center mb-2">
-        <h2 class="text-lg font-semibold">📊 Dashboard — Ranking</h2>
-        <div class="text-xs text-gray-500">อัปเดตอัตโนมัติ • Latest</div>
-      </div>
+  <!-- Dashboard -->
+  <section class="mb-4">
+    <h2 class="text-lg font-semibold mb-2">📊 อันดับนักวิ่ง</h2>
+    <div id="runner-list" class="space-y-3"></div>
+  </section>
+</div>
 
-      <!-- responsive: table on md+, cards on mobile -->
-      <div id="runner-list" class="space-y-3">
-        <!-- populated by JS -->
-      </div>
-    </section>
-
-    <footer class="text-xs text-gray-500 text-center mt-6">
-      Data from Supabase • 1 รอบ = 6.30 กม.
-    </footer>
+<!-- Modal -->
+<div id="modal" class="modal-bg">
+  <div class="modal">
+    <h2 id="modalTitle" class="text-lg font-bold text-gray-800"></h2>
+    <p id="modalSummary" class="text-sm text-gray-700 mb-3"></p>
+    <table class="w-full text-xs sm:text-sm mb-3">
+      <thead>
+        <tr class="bg-gray-100 text-gray-700">
+          <th class="p-2 text-center">🏁 รอบ</th>
+          <th class="p-2 text-center">เวลาเริ่ม</th>
+          <th class="p-2 text-center">เวลาจบ</th>
+          <th class="p-2 text-center">เวลาต่อรอบ</th>
+        </tr>
+      </thead>
+      <tbody id="modalContent"></tbody>
+    </table>
+    <p id="avgTime" class="text-center text-sm text-gray-600 mb-4"></p>
+    <button id="closeModal" class="bg-gray-700 text-white w-full py-2 rounded">ปิด</button>
   </div>
+</div>
 
-  <script>
-    // --- CONFIG (เปลี่ยนเป็นของคุณ) ---
-    const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // เปลี่ยน
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // เปลี่ยน
-    const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/rfid-reader"; // เปลี่ยนหากจำเป็น
+<script>
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 🔧 ใส่ anon key
+const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/rfid-reader";
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const tagInput = document.getElementById("tagInput");
+const scanBtn = document.getElementById("scanBtn");
+const statusEl = document.getElementById("status");
+const runnerList = document.getElementById("runner-list");
+const modal = document.getElementById("modal");
+const modalTitle = document.getElementById("modalTitle");
+const modalSummary = document.getElementById("modalSummary");
+const modalContent = document.getElementById("modalContent");
+const avgTime = document.getElementById("avgTime");
+const closeModal = document.getElementById("closeModal");
 
-    // --- UI elements ---
-    const tagInput = document.getElementById("tagInput");
-    const scanBtn = document.getElementById("scanBtn");
-    const statusEl = document.getElementById("status");
-    const runnerList = document.getElementById("runner-list");
-    let currentType = "TOP100MEN";
+let currentType = "TOP100MEN";
 
-    // scan debounce
-    let scanTimeout = null;
-    const SCAN_DELAY = 200;
-
-    // attach type buttons
-    document.querySelectorAll(".type-btn").forEach(btn=>{
-      btn.addEventListener("click", ()=>{
-        currentType = btn.dataset.type;
-        document.querySelectorAll(".type-btn").forEach(b=>b.classList.remove("ring-4","ring-blue-300"));
-        btn.classList.add("ring-4","ring-blue-300");
-        loadDashboard();
-      });
-    });
-
-    // Scan handler (button)
-    scanBtn.addEventListener("click", () => {
-      const tag = tagInput.value.trim();
-      if (!tag) { statusEl.textContent = "กรุณาใส่หรือสแกน Tag ID"; return; }
-      handleScan(tag);
-    });
-
-    // Scan on input (with debounce)
-    tagInput.addEventListener("input", ()=>{
-      if (scanTimeout) clearTimeout(scanTimeout);
-      scanTimeout = setTimeout(() => {
-        const tagId = tagInput.value.trim();
-        if (!tagId) return;
-        handleScan(tagId);
-      }, SCAN_DELAY);
-    });
-
-    // central scan function
-    async function handleScan(tagId) {
-      try {
-        statusEl.textContent = "⏳ กำลังบันทึก...";
-        scanBtn.disabled = true;
-        tagInput.disabled = true;
-
-        const resp = await fetch(FUNCTION_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${SUPABASE_KEY}`
-          },
-          body: JSON.stringify({ tag_id: tagId })
-        });
-
-        const result = await resp.json();
-        if (result.error) {
-          statusEl.innerHTML = `<span class="text-red-600">❌ ${result.error}</span>`;
-        } else if (result.message) {
-          statusEl.innerHTML = `<span class="text-yellow-700">🏁 ${result.message}</span>`;
-        } else {
-          statusEl.innerHTML = `<span class="text-green-700">✅ ${result.runner} บันทึกสำเร็จ รอบที่ ${result.lap}</span>`;
-        }
-
-        tagInput.value = "";
-        await loadDashboard();
-      } catch (err) {
-        console.error(err);
-        statusEl.innerHTML = `<span class="text-red-600">❌ Error: ${err.message}</span>`;
-      } finally {
-        scanBtn.disabled = false;
-        tagInput.disabled = false;
-        tagInput.focus();
-      }
-    }
-
-    // format duration helper (HH:MM:SS)
-    function formatDuration(ms) {
-      if (!ms && ms !== 0) return "-";
-      let totalSeconds = Math.floor(ms/1000);
-      const hours = Math.floor(totalSeconds/3600);
-      totalSeconds %= 3600;
-      const minutes = Math.floor(totalSeconds/60);
-      const seconds = totalSeconds % 60;
-      return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
-    }
-
-    // get runners & compute ranking
-    async function loadDashboard() {
-      try {
-        // select runners of current type
-        const { data: runners, error } = await supabase.from("runner")
-          .select(`id, name, tag_id, type, status, record(lap, start_time, finish_time)`)
-          .eq("type", currentType);
-
-        if (error) { console.error(error); statusEl.textContent = "❌ Error loading runners"; return; }
-
-        // prepare ranking: totalTime and completedLaps
-        const ranking = (runners || []).map(r => {
-          let totalTime = 0;
-          let completedLaps = 0;
-          (r.record || []).forEach(rec => {
-            if (rec.start_time && rec.finish_time) {
-              totalTime += new Date(rec.finish_time) - new Date(rec.start_time);
-              completedLaps++;
-            }
-          });
-          return { ...r, totalTime, completedLaps };
-        });
-
-        // finished first, sort by totalTime asc
-        const finished = ranking.filter(r => r.completedLaps >= 4) // original maxLaps = 4
-          .sort((a,b)=>a.totalTime - b.totalTime)
-          .map((r,i)=> ({ ...r, rank: i+1 }));
-
-        // unfinished sorted by completedLaps desc, then name
-        const unfinished = ranking.filter(r => r.completedLaps < 4)
-          .sort((a,b)=> b.completedLaps - a.completedLaps || a.name.localeCompare(b.name));
-
-        const finalList = [...finished, ...unfinished];
-        renderRunners(finalList);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    // render runners responsive: cards on small, table rows on md+
-    function renderRunners(list) {
-      runnerList.innerHTML = "";
-
-      // Desktop/tablet: show as table when width >= 768 (md)
-      const isDesktop = window.matchMedia("(min-width: 768px)").matches;
-
-      if (isDesktop) {
-        // build table
-        const table = document.createElement("table");
-        table.className = "w-full text-sm border-collapse bg-white rounded-md overflow-hidden shadow";
-        table.innerHTML = `
-          <thead class="bg-gray-100 text-left text-xs text-gray-600">
-            <tr>
-              <th class="p-3 text-center w-12">#</th>
-              <th class="p-3">Name</th>
-              <th class="p-3 text-center w-28">Lap</th>
-              <th class="p-3 text-center w-36">Total Time</th>
-              <th class="p-3 text-center w-36">Distance</th>
-              <th class="p-3 text-center w-32">Status</th>
-            </tr>
-          </thead>
-          <tbody id="tblBody"></tbody>
-        `;
-        runnerList.appendChild(table);
-        const tblBody = document.getElementById("tblBody");
-
-        list.forEach((r, idx) => {
-          const tr = document.createElement("tr");
-          tr.className = "border-t hover:bg-gray-50 cursor-pointer";
-          const distance = (r.completedLaps * 6.3).toFixed(2);
-          const totalTimeText = r.totalTime ? formatDuration(r.totalTime) : "-";
-          tr.innerHTML = `
-            <td class="p-3 text-center">${idx+1}</td>
-            <td class="p-3 font-medium text-blue-700">${r.name} <div class="text-xs text-gray-500">Tag: ${r.tag_id || '-'}</div></td>
-            <td class="p-3 text-center">${r.completedLaps}/4</td>
-            <td class="p-3 text-center">${totalTimeText}</td>
-            <td class="p-3 text-center">${distance} กม.</td>
-            <td class="p-3 text-center">${r.status}</td>
-          `;
-          // click to show per-run detail (optional)
-          tr.addEventListener('click', ()=> showRunnerDetail(r));
-          tblBody.appendChild(tr);
-        });
-
-      } else {
-        // mobile: show as stacked cards
-        list.forEach((r, idx) => {
-          const card = document.createElement("div");
-          card.className = "bg-white p-3 rounded-lg card-hover shadow-sm flex flex-col gap-2";
-          const distance = (r.completedLaps * 6.3).toFixed(2);
-          const totalTimeText = r.totalTime ? formatDuration(r.totalTime) : "-";
-
-          // highlight if finished
-          let extraClass = "";
-          if (r.completedLaps >= 4 && r.status === "FINISHER") extraClass = "border-l-4 border-green-500";
-          else if (r.status === "DNF") extraClass = "border-l-4 border-red-400";
-          else if (r.completedLaps >= 4) extraClass = "blink-slow";
-
-          card.innerHTML = `
-            <div class="flex items-start justify-between ${extraClass}">
-              <div>
-                <div class="text-base font-semibold">${idx+1}. ${r.name}</div>
-                <div class="text-xs text-gray-500 mt-0.5">${r.type} • Tag: ${r.tag_id || '-'}</div>
-              </div>
-              <div class="text-right">
-                <div class="text-sm font-medium">${totalTimeText}</div>
-                <div class="text-xs text-gray-500">เวลารวม</div>
-              </div>
-            </div>
-
-            <div class="flex gap-2 flex-wrap text-xs text-gray-700">
-              <div class="px-2 py-1 bg-gray-50 rounded">${r.completedLaps}/4 รอบ</div>
-              <div class="px-2 py-1 bg-gray-50 rounded">${distance} กม.</div>
-              <div class="px-2 py-1 rounded ${r.status==='DNF' ? 'bg-red-100 text-red-800' : r.status==='FINISHER' ? 'bg-green-100 text-green-800' : 'bg-yellow-50 text-yellow-800'}">${r.status}</div>
-            </div>
-
-            <div class="mt-2 flex gap-2">
-              <button class="detail-btn flex-1 bg-gray-100 text-gray-700 px-3 py-2 rounded">รายละเอียด</button>
-              <button class="scan-again-btn flex-1 bg-blue-600 text-white px-3 py-2 rounded">สแกนซ้ำ</button>
-            </div>
-          `;
-
-          // attach handlers
-          card.querySelector(".detail-btn").addEventListener("click", ()=> showRunnerDetail(r));
-          card.querySelector(".scan-again-btn").addEventListener("click", ()=> {
-            // prefill tag and focus
-            tagInput.value = r.tag_id || "";
-            tagInput.focus();
-            statusEl.textContent = `เตรียมสแกนซ้ำสำหรับ ${r.name}`;
-          });
-
-          runnerList.appendChild(card);
-        });
-      }
-    }
-
-    // show runner detailed modal/alert (simple)
-    function showRunnerDetail(runner) {
-      // build a simple modal-like overlay using confirm/alert is not ideal on mobile.
-      // For simplicity here we'll open a small companion window (or alert) showing lap summary.
-      // Better: implement a proper modal in UI. For now use window.open to a summary page OR alert.
-      // We'll use a customizable modal built into a lightweight overlay — implement inline:
-
-      // create overlay element
-      const overlay = document.createElement('div');
-      overlay.style.position = 'fixed';
-      overlay.style.inset = '0';
-      overlay.style.background = 'rgba(0,0,0,0.5)';
-      overlay.style.display = 'flex';
-      overlay.style.justifyContent = 'center';
-      overlay.style.alignItems = 'center';
-      overlay.style.zIndex = 9999;
-
-      const box = document.createElement('div');
-      box.style.width = '92%';
-      box.style.maxWidth = '520px';
-      box.style.maxHeight = '85vh';
-      box.style.overflowY = 'auto';
-      box.style.background = '#fff';
-      box.style.borderRadius = '12px';
-      box.style.padding = '14px';
-
-      const title = document.createElement('div');
-      title.innerHTML = `<div style="font-weight:700;font-size:16px;margin-bottom:6px">${runner.name} <span style="font-size:12px;color:#666">(${runner.type})</span></div>`;
-      box.appendChild(title);
-
-      const summary = document.createElement('div');
-      const totalTimeText = runner.totalTime ? formatDuration(runner.totalTime) : '-';
-      const distance = (runner.completedLaps * 6.3).toFixed(2);
-      summary.innerHTML = `<div style="color:#444;font-size:13px;margin-bottom:8px">
-        สถานะ: <b>${runner.status}</b> • รอบ: <b>${runner.completedLaps}</b> • ระยะ: <b>${distance} กม.</b> • เวลารวม: <b>${totalTimeText}</b>
-      </div>`;
-      box.appendChild(summary);
-
-      // lap list
-      const list = document.createElement('div');
-      list.style.fontSize = '13px';
-      list.style.color = '#333';
-      list.innerHTML = '<div style="font-weight:600;margin-bottom:6px">Lap details</div>';
-      const laps = (runner.record || []).sort((a,b)=>a.lap-b.lap).filter(rec => rec.lap > 0);
-      if (laps.length === 0) {
-        list.innerHTML += '<div style="color:#777">ยังไม่มีรอบที่บันทึก</div>';
-      } else {
-        laps.forEach(rec => {
-          let start = rec.start_time ? new Date(rec.start_time).toLocaleString('th-TH') : '-';
-          let finish = rec.finish_time ? new Date(rec.finish_time).toLocaleString('th-TH') : '-';
-          let dur = '-';
-          if (rec.start_time && rec.finish_time) {
-            dur = formatDuration(new Date(rec.finish_time) - new Date(rec.start_time));
-          }
-          const row = document.createElement('div');
-          row.style.padding = '8px 0';
-          row.style.borderTop = '1px solid #f1f1f1';
-          row.innerHTML = `<div style="display:flex;justify-content:space-between">
-            <div style="font-weight:600">Lap ${rec.lap}</div>
-            <div style="color:#555">${dur}</div>
-          </div>
-          <div style="color:#666;font-size:12px;margin-top:6px">
-            Start: ${start} <br> Finish: ${finish}
-          </div>`;
-          list.appendChild(row);
-        });
-      }
-      box.appendChild(list);
-
-      // close
-      const btn = document.createElement('button');
-      btn.textContent = 'ปิด';
-      btn.style.marginTop = '12px';
-      btn.style.width = '100%';
-      btn.style.padding = '10px';
-      btn.style.border = 'none';
-      btn.style.background = '#374151';
-      btn.style.color = '#fff';
-      btn.style.borderRadius = '8px';
-      btn.addEventListener('click', ()=> overlay.remove());
-      box.appendChild(btn);
-
-      overlay.appendChild(box);
-      document.body.appendChild(overlay);
-    }
-
-    // initial load
+document.querySelectorAll(".type-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    currentType = btn.dataset.type;
+    document.querySelectorAll(".type-btn").forEach(b => b.classList.remove("ring-4","ring-blue-300"));
+    btn.classList.add("ring-4","ring-blue-300");
     loadDashboard();
+  });
+});
 
-    // realtime update via Supabase channel (record table)
-    supabase.channel("record-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "record" }, payload => {
-        loadDashboard(); // refresh view
-      })
-      .subscribe();
+scanBtn.onclick = () => handleScan(tagInput.value.trim());
+tagInput.addEventListener("keydown", e => { if (e.key === "Enter") handleScan(tagInput.value.trim()); });
 
-    // auto refresh every 12s to be safe (keeps UI in sync)
-    setInterval(loadDashboard, 12000);
+async function handleScan(tagId) {
+  if (!tagId) return;
+  try {
+    statusEl.textContent = "⏳ กำลังบันทึก...";
+    scanBtn.disabled = tagInput.disabled = true;
+    const resp = await fetch(FUNCTION_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_KEY}` },
+      body: JSON.stringify({ tag_id: tagId })
+    });
+    const result = await resp.json();
+    if (result.error) statusEl.innerHTML = `❌ ${result.error}`;
+    else if (result.message) statusEl.innerHTML = `🏁 ${result.message}`;
+    else statusEl.innerHTML = `✅ ${result.runner} รอบที่ ${result.lap}`;
+    tagInput.value = "";
+    loadDashboard();
+  } catch (err) {
+    statusEl.textContent = "❌ Error: " + err.message;
+  } finally {
+    scanBtn.disabled = tagInput.disabled = false;
+    tagInput.focus();
+  }
+}
 
-    // keyboard enter on tagInput triggers scan
-    tagInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        const v = tagInput.value.trim();
-        if (v) handleScan(v);
+function formatDuration(ms) {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${h.toString().padStart(2,"0")}:${m.toString().padStart(2,"0")}:${sec.toString().padStart(2,"0")}`;
+}
+
+async function loadDashboard() {
+  const { data: runners, error } = await supabase
+    .from("runner")
+    .select("id,name,tag_id,type,status,record(lap,start_time,finish_time)")
+    .eq("type", currentType);
+
+  if (error) return console.error(error);
+
+  const ranking = runners.map(r => {
+    let totalTime = 0, completedLaps = 0;
+    (r.record || []).forEach(rec => {
+      if (rec.start_time && rec.finish_time) {
+        totalTime += new Date(rec.finish_time) - new Date(rec.start_time);
+        completedLaps++;
       }
     });
+    return { ...r, totalTime, completedLaps };
+  });
 
-    // focus mobile keyboard numeric when supported
-    tagInput.addEventListener('focus', ()=> tagInput.setAttribute('inputmode','numeric'));
-  </script>
+  const finished = ranking.filter(r => r.completedLaps >= 4).sort((a,b)=>a.totalTime-b.totalTime);
+  const unfinished = ranking.filter(r => r.completedLaps < 4).sort((a,b)=>b.completedLaps-a.completedLaps);
+  const finalList = [...finished, ...unfinished];
+  renderRunners(finalList);
+}
+
+function renderRunners(list) {
+  runnerList.innerHTML = "";
+  list.forEach((r, i) => {
+    const distance = (r.completedLaps * 6.3).toFixed(2);
+    const totalTimeText = r.totalTime ? formatDuration(r.totalTime) : "-";
+    const card = document.createElement("div");
+    card.className = `bg-white rounded-lg shadow p-3 ${r.status==="FINISHER"?"border-l-4 border-green-500":r.status==="DNF"?"border-l-4 border-red-500":""} ${r.completedLaps>=4?"blink-slow":""}`;
+    card.innerHTML = `
+      <div class="flex justify-between items-start">
+        <div>
+          <div class="font-semibold text-blue-700">${i+1}. ${r.name}</div>
+          <div class="text-xs text-gray-500">Tag: ${r.tag_id||"-"} • ${r.type}</div>
+        </div>
+        <div class="text-right text-sm">
+          <div>${totalTimeText}</div>
+          <div class="text-xs text-gray-500">เวลารวม</div>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-2 text-xs mt-2">
+        <span class="px-2 py-1 bg-gray-50 rounded">รอบ ${r.completedLaps}/4</span>
+        <span class="px-2 py-1 bg-gray-50 rounded">${distance} กม.</span>
+        <span class="px-2 py-1 rounded ${r.status==='FINISHER'?'bg-green-100 text-green-800':r.status==='DNF'?'bg-red-100 text-red-800':'bg-yellow-50 text-yellow-800'}">${r.status}</span>
+      </div>
+      <button class="mt-3 w-full bg-gray-100 text-gray-700 py-2 rounded detail-btn">รายละเอียด</button>
+    `;
+    card.querySelector(".detail-btn").onclick = () => showModal(r);
+    runnerList.appendChild(card);
+  });
+}
+
+// Modal
+closeModal.onclick = () => modal.style.display = "none";
+
+function showModal(runner) {
+  modal.style.display = "flex";
+  modalTitle.textContent = `${runner.name} (${runner.type})`;
+  const totalDur = formatDuration(runner.totalTime || 0);
+  const distance = (runner.completedLaps * 6.3).toFixed(2);
+  modalSummary.innerHTML = `
+    สถานะ: <b>${runner.status}</b> |
+    รอบ: <b>${runner.completedLaps}</b> |
+    ระยะทาง: <b>${distance} กม.</b> |
+    เวลารวม: <b>${totalDur}</b>
+  `;
+  const laps = (runner.record||[]).filter(rec => rec.lap > 0).sort((a,b)=>a.lap-b.lap);
+  modalContent.innerHTML = "";
+  let totalLapTime = 0, count = 0;
+  laps.forEach(rec => {
+    if (rec.start_time && rec.finish_time) {
+      const diff = new Date(rec.finish_time) - new Date(rec.start_time);
+      totalLapTime += diff; count++;
+    }
+    modalContent.innerHTML += `
+      <tr>
+        <td class="p-2 text-center">${rec.lap}</td>
+        <td class="p-2 text-center">${rec.start_time ? new Date(rec.start_time).toLocaleTimeString("th-TH") : "-"}</td>
+        <td class="p-2 text-center">${rec.finish_time ? new Date(rec.finish_time).toLocaleTimeString("th-TH") : "-"}</td>
+        <td class="p-2 text-center">${rec.start_time && rec.finish_time ? formatDuration(new Date(rec.finish_time)-new Date(rec.start_time)) : "-"}</td>
+      </tr>
+    `;
+  });
+  if (count > 0) {
+    avgTime.textContent = `⏱ เวลาต่อรอบเฉลี่ย: ${formatDuration(totalLapTime / count)} (จาก ${count} รอบ)`;
+  } else {
+    avgTime.textContent = "";
+  }
+}
+
+loadDashboard();
+supabase.channel("record-changes")
+  .on("postgres_changes",{event:"*",schema:"public",table:"record"},()=>loadDashboard())
+  .subscribe();
+setInterval(loadDashboard,12000);
+</script>
 </body>
 </html>
