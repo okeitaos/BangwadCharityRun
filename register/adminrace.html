@@ -2,14 +2,16 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>🏁 ระบบกรรมการสนาม (Realtime + Confirm DNF/FINISHER)</title>
+<title>🏁 ระบบกรรมการสนาม (Realtime + Safe Mode)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
   @keyframes blinkGold { 0%,100%{background-color:#d1fae5;} 50%{background-color:#fef3c7;} }
   @keyframes blinkYellow { 0%,100%{background-color:#fff9c4;} 50%{background-color:#fde68a;} }
+  @keyframes blinkSlowGold { 0%,100%{background-color:#fef3c7;} 50%{background-color:#fde68a;} }
   .blink-finisher { animation: blinkGold 1.8s infinite; }
   .blink-dnf { animation: blinkYellow 1.8s infinite; }
+  .blink-slow-finisher { animation: blinkSlowGold 3s infinite; }
   #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; }
   .toast { background: #333; color: #fff; padding: 10px 16px; border-radius: 8px; margin-top: 8px; min-width: 250px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); opacity: 0; transform: translateY(20px); animation: fadeInUp 0.4s forwards; }
   @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
@@ -18,7 +20,7 @@
 <body class="bg-gray-100 p-6">
 
 <div class="max-w-5xl mx-auto bg-white rounded-lg shadow p-6">
-  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Realtime + Confirm DNF/FINISHER)</h1>
+  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Realtime + ป้องกันกดผิด)</h1>
 
   <!-- 🔐 Login -->
   <div id="login-section">
@@ -115,16 +117,13 @@ function showLogin() {
 
 // ============================ SEARCH / FILTER ============================
 const searchInput = document.getElementById("searchInput");
-const clearBtn = document.getElementById("clearBtn");
-const showAllBtn = document.getElementById("showAllBtn");
-const showRunningBtn = document.getElementById("showRunningBtn");
 searchInput.addEventListener("input", () => {
   if (searchTimeout) clearTimeout(searchTimeout);
   searchTimeout = setTimeout(() => loadRunners(searchInput.value), 800);
 });
-clearBtn.onclick = () => { searchInput.value = ""; loadRunners(); };
-showAllBtn.onclick = () => { showOnlyRunning = false; loadRunners(); };
-showRunningBtn.onclick = () => { showOnlyRunning = true; loadRunners(); };
+document.getElementById("clearBtn").onclick = () => { searchInput.value = ""; loadRunners(); };
+document.getElementById("showAllBtn").onclick = () => { showOnlyRunning = false; loadRunners(); };
+document.getElementById("showRunningBtn").onclick = () => { showOnlyRunning = true; loadRunners(); };
 
 // ============================ LOAD RUNNERS ============================
 async function loadRunners(query = "") {
@@ -154,29 +153,37 @@ async function loadRunners(query = "") {
     else if (normalizedType.includes("BCR100.8")) { finisherRequired = 16; dnfStart = 8; }
 
     const canFinish = showLap >= finisherRequired;
+    const reachedDNF = showLap >= dnfStart && showLap < finisherRequired;
 
-    let bgClass = r.status === "DNF" ? "bg-red-50" :
-                  r.status === "FINISHER" ? "blink-finisher" :
-                  "bg-green-50";
+    // 🎨 สีพื้นหลัง
+    let bgClass = "bg-green-50";
+    if (r.status === "DNF") bgClass = "bg-red-50";
+    else if (r.status === "FINISHER") bgClass = "blink-finisher";
+    else if (canFinish && r.status === "RUNNING") bgClass = "blink-slow-finisher";
+    else if (reachedDNF) bgClass = "blink-dnf";
 
+    // 📊 แสดงรอบ/ระยะ
     let info = showLap === 0
       ? "✅ Check-in แล้ว (ยังไม่เริ่มวิ่ง)"
       : `🏁 รอบที่: ${showLap} / ${finisherRequired}<br>ระยะทาง: ${distance} กม.`;
 
+    let notice = "";
+    if (canFinish && r.status === "RUNNING") {
+      notice = "<div class='text-green-700 text-xs mt-1 font-medium'>🎖️ ครบระยะแล้ว - พร้อมจบการแข่งขัน</div>";
+    } else if (reachedDNF && r.status === "RUNNING") {
+      notice = "<div class='text-yellow-700 text-xs mt-1 font-medium'>⚠️ ถึงระยะ DNF แล้ว</div>";
+    }
+
+    // 🟨 ปุ่มแสดงผล
     let buttons = "";
     if (r.status === "FINISHER" || r.status === "DNF") {
       buttons = `<span class="text-gray-500 text-sm">🚫 ออกจากการแข่งขันแล้ว</span>`;
-    } else if (canFinish) {
-      buttons = `
-        <div class="flex flex-col items-end gap-1">
-          <button class="bg-red-500 text-white px-2 py-1 rounded" onclick="confirmChange('${r.id}','FINISHER','${r.name}')">FINISHER</button>
-          <button class="bg-yellow-500 text-white px-2 py-1 rounded" onclick="confirmChange('${r.id}','DNF','${r.name}')">DNF</button>
-        </div>`;
+    } else if (canFinish && r.status === "RUNNING") {
+      // 🏁 ถึงระยะครบ → แสดงเฉพาะ FINISHER
+      buttons = `<button class="bg-red-500 text-white px-2 py-1 rounded" onclick="confirmChange('${r.id}','FINISHER','${r.name}')">FINISHER</button>`;
     } else if (r.status === "RUNNING") {
-      buttons = `
-        <div class="flex flex-col items-end gap-1">
-          <button class="bg-yellow-500 text-white px-2 py-1 rounded" onclick="confirmChange('${r.id}','DNF','${r.name}')">DNF</button>
-        </div>`;
+      // 🟡 ยังไม่ถึง → แสดงเฉพาะ DNF
+      buttons = `<button class="bg-yellow-500 text-white px-2 py-1 rounded" onclick="confirmChange('${r.id}','DNF','${r.name}')">DNF</button>`;
     }
 
     runnerList.innerHTML += `
@@ -184,7 +191,7 @@ async function loadRunners(query = "") {
         <div>
           <b>${r.name}</b> (${r.type})<br>
           🏷️ Tag ID: ${r.tag_id || "-"}<br>
-          สถานะ: ${r.status}<br>${info}
+          สถานะ: ${r.status}<br>${info}${notice}
         </div>
         <div>${buttons}</div>
       </div>`;
@@ -197,7 +204,7 @@ async function loadRunners(query = "") {
 async function confirmChange(runnerId, status, name) {
   const confirm1 = confirm(`⚠️ ยืนยันเปลี่ยนสถานะของ "${name}" เป็น ${status}?`);
   if (!confirm1) return;
-  const confirm2 = confirm("❗ นี่เป็นการเปลี่ยนสถานะถาวร นักวิ่งจะออกจากการแข่งขันทันที!\n\nต้องการดำเนินการต่อหรือไม่?");
+  const confirm2 = confirm("❗ การเปลี่ยนสถานะนี้เป็นถาวร นักวิ่งจะออกจากการแข่งขันทันที!\n\nต้องการดำเนินการต่อหรือไม่?");
   if (!confirm2) return;
 
   const reason = prompt(status === "DNF" ? "เหตุผล DNF:" : "หมายเหตุ FINISHER:", "ครบระยะ / บาดเจ็บ / อื่นๆ");
