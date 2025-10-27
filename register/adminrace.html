@@ -178,7 +178,7 @@ async function loadLogs() {
     const time = new Date(l.created_at).toLocaleString("th-TH");
     logList.innerHTML += `<div class="border-b py-1">
       🕐 ${time} — <b>${l.status}</b> (${l.reason || "-"})<br>
-      👤 Runner: ${l.runner?.name || l.runner_id}<br>
+      👤 Runner: ${l.dnf_log_runner_fk?.name || "-"}<br>
       🧑‍⚖️ โดย: ${currentUser.name}
     </div>`;
   });
