@@ -156,13 +156,18 @@ async function updateStatus(runnerId, status) {
 // 🧾 โหลด Log การเปลี่ยนสถานะ
 async function loadLogs() {
   const { data: logs, error } = await supabase
-    .from("v_dnf_log_full")
-    .select(`created_at, status, reason, runner_id, updated_by, runner(name), auth.users(email)`)
+    .from("dnf_log")
+    .select(`created_at, status, reason, runner_id, runner(name)`)
     .order("created_at", { ascending: false })
     .limit(20);
 
   logList.innerHTML = "";
-  if (error) return console.error(error);
+  if (error) {
+    console.error(error);
+    logList.innerHTML = "<p class='text-red-500'>เกิดข้อผิดพลาดในการโหลดข้อมูล</p>";
+    return;
+  }
+
   if (!logs || logs.length === 0) {
     logList.innerHTML = "<p class='text-gray-500'>ยังไม่มีประวัติ</p>";
     return;
