@@ -31,10 +31,14 @@
 
     <!-- 🧑‍⚖️ ส่วนจัดการนักวิ่ง -->
     <div id="admin-section" class="hidden">
-      <div class="flex justify-between mb-4">
+      <div class="flex justify-between items-center mb-2">
         <h2 class="text-lg font-semibold">จัดการสถานะนักวิ่ง</h2>
-        <button id="logoutBtn" class="bg-red-500 text-white px-3 py-1 rounded">ออกจากระบบ</button>
+        <div class="space-x-2">
+          <button id="refreshBtn" class="bg-blue-500 text-white px-3 py-1 rounded">🔄 Refresh</button>
+          <button id="logoutBtn" class="bg-red-500 text-white px-3 py-1 rounded">ออกจากระบบ</button>
+        </div>
       </div>
+      <p id="lastUpdate" class="text-xs text-gray-500 mb-4">อัปเดตล่าสุด: -</p>
 
       <input id="searchInput" type="text" placeholder="ค้นหาชื่อ..." class="border p-2 w-full rounded mb-4">
       <div id="runnerList" class="space-y-3"></div>
@@ -54,6 +58,8 @@ const loginSection = document.getElementById("login-section");
 const adminSection = document.getElementById("admin-section");
 const loginBtn = document.getElementById("loginBtn");
 const logoutBtn = document.getElementById("logoutBtn");
+const refreshBtn = document.getElementById("refreshBtn");
+const lastUpdate = document.getElementById("lastUpdate");
 const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
 const loginStatus = document.getElementById("loginStatus");
@@ -62,6 +68,7 @@ const runnerList = document.getElementById("runnerList");
 const logList = document.getElementById("logList");
 
 let currentUser = null;
+let autoRefreshInterval = null;
 
 // 🔐 ล็อกอินกรรมการ
 loginBtn.addEventListener("click", async () => {
@@ -92,17 +99,42 @@ loginBtn.addEventListener("click", async () => {
   currentUser = { id: user.id, name: profile.full_name || user.email };
   loginSection.classList.add("hidden");
   adminSection.classList.remove("hidden");
-  loadRunners();
-  loadLogs();
+  startAutoRefresh();
 });
 
 // 🚪 ออกจากระบบ
 logoutBtn.addEventListener("click", async () => {
+  clearInterval(autoRefreshInterval);
   await supabase.auth.signOut();
   currentUser = null;
   loginSection.classList.remove("hidden");
   adminSection.classList.add("hidden");
 });
+
+// 🔄 ปุ่ม Refresh ทันที
+refreshBtn.addEventListener("click", () => {
+  loadRunners(searchInput.value);
+  loadLogs();
+});
+
+// 🕒 ตั้งค่าอัปเดตอัตโนมัติทุก 10 วินาที
+function startAutoRefresh() {
+  loadRunners();
+  loadLogs();
+  updateLastTime();
+  if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+  autoRefreshInterval = setInterval(() => {
+    loadRunners(searchInput.value);
+    loadLogs();
+    updateLastTime();
+  }, 10000);
+}
+
+// 📅 อัปเดตข้อความเวลาล่าสุด
+function updateLastTime() {
+  const now = new Date().toLocaleTimeString("th-TH");
+  lastUpdate.textContent = "อัปเดตล่าสุด: " + now;
+}
 
 // 📋 โหลดรายชื่อนักวิ่ง
 async function loadRunners(query = "") {
@@ -123,7 +155,6 @@ async function loadRunners(query = "") {
       : 0;
     const distance = (maxLap * 6.3).toFixed(2);
 
-    // ✅ เงื่อนไขรุ่น
     let finisherRequired = 0, dnfStart = 0;
     if (r.type === "BCR 50.4") { finisherRequired = 8; dnfStart = 4; }
     else if (r.type === "BCR 69.3") { finisherRequired = 11; dnfStart = 6; }
@@ -136,7 +167,6 @@ async function loadRunners(query = "") {
       ? `<button class="bg-red-500 text-white px-2 py-1 rounded"
           onclick="updateStatus('${r.id}', 'FINISHER', event)">FINISHER</button>`
       : "";
-
     const dnfBtn = !canFinish
       ? `<button class="bg-yellow-500 text-white px-2 py-1 rounded"
           onclick="updateStatus('${r.id}', 'DNF', event)">DNF</button>`
@@ -149,11 +179,10 @@ async function loadRunners(query = "") {
       buttons = `${dnfBtn} ${finisherBtn}`;
     }
 
-    // 🎨 พื้นหลังตามสถานะ
-    let bgClass = "bg-green-50"; // RUNNING
-    if (shouldWarnDNF) bgClass = "bg-yellow-50"; // ถึง DNF
-    if (canFinish && !isFinisher) bgClass = "blink-finisher"; // ครบ FINISHER แล้วยังกดไม่ออก
-    if (isDNF || isFinisher) bgClass = "bg-red-50"; // ออกจากการแข่งขันแล้ว
+    let bgClass = "bg-green-50";
+    if (shouldWarnDNF) bgClass = "bg-yellow-50";
+    if (canFinish && !isFinisher) bgClass = "blink-finisher";
+    if (isDNF || isFinisher) bgClass = "bg-red-50";
 
     const statusColor =
       r.status === "DNF"
@@ -165,7 +194,6 @@ async function loadRunners(query = "") {
     const dnfWarning = shouldWarnDNF && !canFinish
       ? `<div class="text-xs text-yellow-600 mt-1">⚠️ ถึงระยะ DNF แล้ว แต่ยังไม่กดออกจากการแข่งขัน</div>`
       : "";
-
     const finisherNotice = canFinish && !isFinisher
       ? `<div class="text-xs text-green-700 mt-1 font-medium">🎖️ FINISHER - ครบจำนวนรอบการแข่งขันแล้ว</div>`
       : "";
@@ -185,9 +213,6 @@ async function loadRunners(query = "") {
   });
 }
 
-// 🔍 ค้นหา
-searchInput.addEventListener("input", e => loadRunners(e.target.value));
-
 // ✏️ อัปเดตสถานะ
 async function updateStatus(runnerId, status, event) {
   const { data: runner } = await supabase
@@ -203,11 +228,7 @@ async function updateStatus(runnerId, status, event) {
 
   const reason = prompt(
     "เหตุผล:",
-    status === "DNF"
-      ? "เจ็บระหว่างแข่งขัน"
-      : status === "FINISHER"
-      ? "ครบจำนวนรอบ"
-      : ""
+    status === "DNF" ? "เจ็บระหว่างแข่งขัน" : "ครบจำนวนรอบ"
   );
   if (!reason) return;
 
@@ -215,7 +236,6 @@ async function updateStatus(runnerId, status, event) {
     .from("runner")
     .update({ status })
     .eq("id", runnerId);
-
   if (updateError) {
     alert("❌ ไม่สามารถเปลี่ยนสถานะได้: " + updateError.message);
     return;
@@ -228,10 +248,6 @@ async function updateStatus(runnerId, status, event) {
     updated_by: currentUser.id
   });
 
-  const card = event.target.closest(".border");
-  const buttonsDiv = card.querySelector("div.space-x-1");
-  if (buttonsDiv) buttonsDiv.innerHTML = "<span class='text-gray-400'>🚫 ออกจากการแข่งขันแล้ว</span>";
-
   alert(`✅ เปลี่ยนสถานะเป็น ${status} สำเร็จ`);
   loadRunners(searchInput.value);
   loadLogs();
@@ -239,33 +255,21 @@ async function updateStatus(runnerId, status, event) {
 
 // 🧾 โหลด Log
 async function loadLogs() {
-  const { data: logs, error } = await supabase
+  const { data: logs } = await supabase
     .from("dnf_log")
     .select(`created_at, status, reason, dnf_log_runner_fk(name)`)
     .order("created_at", { ascending: false })
     .limit(20);
 
-  logList.innerHTML = "";
-  if (error) {
-    console.error(error);
-    logList.innerHTML = "<p class='text-red-500'>เกิดข้อผิดพลาดในการโหลดข้อมูล</p>";
-    return;
-  }
-
-  if (!logs || logs.length === 0) {
-    logList.innerHTML = "<p class='text-gray-500'>ยังไม่มีประวัติ</p>";
-    return;
-  }
-
-  logs.forEach(l => {
+  logList.innerHTML = logs.map(l => {
     const time = new Date(l.created_at).toLocaleString("th-TH");
-    const runnerName = l.dnf_log_runner_fk?.name || "-";
-    logList.innerHTML += `<div class="border-b py-1">
-      🕐 ${time} — <b>${l.status}</b> (${l.reason || "-"})<br>
-      👤 Runner: ${runnerName}<br>
+    const name = l.dnf_log_runner_fk?.name || "-";
+    return `<div class="border-b py-1">
+      🕐 ${time} — <b>${l.status}</b> (${l.reason})<br>
+      👤 Runner: ${name}<br>
       🧑‍⚖️ โดย: ${currentUser.name}
     </div>`;
-  });
+  }).join("");
 }
 </script>
 </body>
