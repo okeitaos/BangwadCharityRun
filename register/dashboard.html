@@ -14,47 +14,44 @@
 
   .dashboard-card {
     backdrop-filter: blur(10px);
-    background: rgba(255,255,255,0.8);
+    background: rgba(255,255,255,0.85);
     border-radius: 1rem;
     box-shadow: 0 4px 20px rgba(0,0,0,0.1);
   }
 
-  .rank-finisher { background: linear-gradient(90deg, #dcfce7, #bbf7d0); transition: 0.3s; }
-  .rank-running  { background: linear-gradient(90deg, #dbeafe, #bfdbfe); transition: 0.3s; }
+  .rank-finisher { background: linear-gradient(90deg, #dcfce7, #bbf7d0); }
+  .rank-running  { background: linear-gradient(90deg, #dbeafe, #bfdbfe); }
   .rank-dnf      { background: linear-gradient(90deg, #fee2e2, #fecaca); }
-
   tr:hover { transform: scale(1.01); transition: 0.25s; }
 
   .popup-bg {
     position: fixed; inset: 0; background: rgba(0,0,0,0.5);
     display: none; justify-content: center; align-items: center; z-index: 50;
   }
+
   .popup {
-    background: rgba(255,255,255,0.95);
+    background: rgba(255,255,255,0.97);
     backdrop-filter: blur(10px);
     padding: 1.5rem;
     border-radius: 1rem;
-    width: 95%; max-width: 550px; max-height: 85vh;
+    width: 95%; max-width: 600px; max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    transform: scale(0.95);
-    opacity: 0; transition: all 0.3s ease;
+    opacity: 0; transform: translateY(15px);
+    transition: all 0.3s ease;
   }
-  .popup.show { transform: scale(1); opacity: 1; }
+
+  .popup.show { opacity: 1; transform: translateY(0); }
 
   .modal-header {
     background: linear-gradient(to right, #2563eb, #3b82f6);
-    color: white; padding: 0.75rem 1rem; border-radius: 0.5rem;
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
   }
-
-  @keyframes blinkFinisher {
-    0%,100% { background-color: #bbf7d0; }
-    50% { background-color: #4ade80; }
-  }
-  .blink-finisher { animation: blinkFinisher 3s infinite; }
 </style>
 </head>
-
 <body class="min-h-screen p-6">
 
 <h1 class="text-3xl font-bold text-center mb-6 text-gray-800 drop-shadow">📊 Race Dashboard</h1>
@@ -69,10 +66,11 @@
 
 <!-- Search -->
 <div class="flex justify-center mb-8">
-  <input id="searchInput" type="text" placeholder="🔍 ค้นหาชื่อ, Tag ID หรือ BIB..." class="border rounded-lg p-3 w-full max-w-md shadow focus:outline-none focus:ring-2 focus:ring-blue-400">
+  <input id="searchInput" type="text" placeholder="🔍 ค้นหาชื่อ, BIB หรือ Tag ID..."
+    class="border rounded-lg p-3 w-full max-w-md shadow focus:outline-none focus:ring-2 focus:ring-blue-400">
 </div>
 
-<!-- Dashboard Table -->
+<!-- Dashboard -->
 <div id="runner-list" class="dashboard-card max-w-6xl mx-auto p-6 overflow-x-auto">
   <table class="w-full text-sm text-left border-collapse">
     <thead class="bg-blue-50 border-b border-gray-200 text-gray-700 uppercase text-xs">
@@ -98,6 +96,7 @@
       <p id="popupBib" class="text-sm text-gray-100"></p>
     </div>
     <div id="popupSummary" class="text-sm my-3 text-gray-800"></div>
+
     <table class="w-full text-xs sm:text-sm mb-3 border">
       <thead>
         <tr class="bg-gray-100 text-gray-700">
@@ -109,14 +108,17 @@
       </thead>
       <tbody id="popupContent"></tbody>
     </table>
+
     <p id="avgTime" class="text-center text-sm text-gray-600 mb-4"></p>
-    <button id="closePopup" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg w-full shadow">ปิด</button>
+    <button id="closePopup" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg w-full shadow">
+      ปิด
+    </button>
   </div>
 </div>
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // ใส่ anon key
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const runnerTableBody = document.getElementById("runnerTableBody");
@@ -135,7 +137,8 @@ let currentSearch = "";
 
 closePopup.onclick = () => {
   popup.classList.remove("show");
-  setTimeout(()=>popup.style.display="none",200);
+  document.body.style.overflow = "auto";
+  setTimeout(() => popup.style.display = "none", 200);
 };
 
 function formatDuration(ms) {
@@ -150,10 +153,14 @@ async function loadDashboard() {
   const { data: runners, error } = await supabase
     .from("runner")
     .select("id,bib,name,tag_id,type,status,record(lap,start_time,finish_time)")
-    .order("name",{ascending:true});
-  if (error) return console.error(error);
+    .order("name", { ascending: true });
 
-  let filtered = runners;
+  if (error) {
+    console.error("Error loading data:", error);
+    return;
+  }
+
+  let filtered = runners || [];
   if (currentType !== "ALL") filtered = filtered.filter(r => r.type === currentType);
   if (currentSearch.trim()) {
     const q = currentSearch.toLowerCase();
@@ -165,8 +172,9 @@ async function loadDashboard() {
   }
 
   const data = filtered.map(r => {
+    const laps = r.record || [];
     let totalTime = 0, completedLaps = 0;
-    (r.record || []).forEach(rec => {
+    laps.forEach(rec => {
       if (rec.start_time && rec.finish_time) {
         totalTime += new Date(rec.finish_time) - new Date(rec.start_time);
         completedLaps++;
@@ -177,18 +185,18 @@ async function loadDashboard() {
   });
 
   const finished = data.filter(r => r.status === "FINISHER").sort((a,b)=>a.totalTime-b.totalTime);
-  const running = data.filter(r => r.status === "RUNNING").sort((a,b)=>b.completedLaps-a.completedLaps);
-  const dnf = data.filter(r => r.status === "DNF").sort((a,b)=>b.completedLaps-a.completedLaps);
+  const running  = data.filter(r => r.status === "RUNNING").sort((a,b)=>b.completedLaps-a.completedLaps);
+  const dnf      = data.filter(r => r.status === "DNF").sort((a,b)=>b.completedLaps-a.completedLaps);
+
   renderRunners([...finished, ...running, ...dnf]);
 }
 
 function renderRunners(list) {
   runnerTableBody.innerHTML = "";
-  list.forEach((r,i)=>{
-    let rowClass = r.status === "FINISHER" ? "rank-finisher blink-finisher" :
-                   r.status === "DNF" ? "rank-dnf" : "rank-running";
-    const totalTimeText = r.totalTime ? formatDuration(r.totalTime) : "-";
+  list.forEach((r,i) => {
     const row = document.createElement("tr");
+    const totalTimeText = r.totalTime ? formatDuration(r.totalTime) : "-";
+    let rowClass = r.status === "FINISHER" ? "rank-finisher" : r.status === "DNF" ? "rank-dnf" : "rank-running";
     row.className = `${rowClass} border-b cursor-pointer`;
     row.innerHTML = `
       <td class="p-3 text-center font-semibold">${i+1}</td>
@@ -199,14 +207,16 @@ function renderRunners(list) {
       <td class="p-3 text-center">${r.distance}</td>
       <td class="p-3 text-center">${totalTimeText}</td>
     `;
-    row.addEventListener("click",()=>showDetails(r));
+    row.addEventListener("click", () => showDetails(r));
     runnerTableBody.appendChild(row);
   });
 }
 
 function showDetails(runner) {
   popup.style.display = "flex";
-  setTimeout(()=>popup.classList.add("show"),50);
+  document.body.style.overflow = "hidden";
+  setTimeout(() => popup.classList.add("show"), 30);
+
   popupTitle.textContent = `${runner.name} (${runner.type})`;
   popupBib.textContent = `BIB: ${runner.bib || "-"}`;
   const totalTime = runner.totalTime ? formatDuration(runner.totalTime) : "-";
@@ -216,51 +226,60 @@ function showDetails(runner) {
     ระยะทาง: <b>${runner.distance} กม.</b> |
     เวลารวม: <b>${totalTime}</b>
   `;
+
   const laps = (runner.record || [])
     .filter(rec => rec.lap >= 0 && (rec.start_time || rec.finish_time))
     .sort((a,b) => a.lap - b.lap);
 
   popupContent.innerHTML = "";
+  if (laps.length === 0) {
+    popupContent.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500 p-3">ไม่มีข้อมูลรอบการวิ่ง</td></tr>`;
+    avgTime.textContent = "";
+    return;
+  }
+
   let totalLapTime = 0, count = 0;
   laps.forEach(rec => {
+    let lapDiff = "-";
     if (rec.start_time && rec.finish_time) {
       const diff = new Date(rec.finish_time) - new Date(rec.start_time);
       totalLapTime += diff; count++;
+      lapDiff = formatDuration(diff);
     }
     popupContent.innerHTML += `
       <tr class="border-t hover:bg-blue-50 transition">
         <td class="p-2 text-center font-medium">${rec.lap + 1}</td>
         <td class="p-2 text-center">${rec.start_time ? new Date(rec.start_time).toLocaleTimeString("th-TH") : "-"}</td>
         <td class="p-2 text-center">${rec.finish_time ? new Date(rec.finish_time).toLocaleTimeString("th-TH") : "-"}</td>
-        <td class="p-2 text-center">${rec.start_time && rec.finish_time ? formatDuration(new Date(rec.finish_time) - new Date(rec.start_time)) : "-"}</td>
+        <td class="p-2 text-center">${lapDiff}</td>
       </tr>`;
   });
   avgTime.textContent = count > 0 ? `⏱ เฉลี่ยต่อรอบ: ${formatDuration(totalLapTime / count)} (จาก ${count} รอบ)` : "";
 }
 
-typeTabs.forEach(tab=>{
-  tab.addEventListener("click",()=>{
-    typeTabs.forEach(t=>t.classList.remove("bg-blue-600","text-white"));
+typeTabs.forEach(tab => {
+  tab.addEventListener("click", () => {
+    typeTabs.forEach(t => t.classList.remove("bg-blue-600","text-white"));
     tab.classList.add("bg-blue-600","text-white");
     currentType = tab.dataset.type;
     loadDashboard();
   });
 });
 
-let searchTimeout=null;
-searchInput.addEventListener("input",()=>{
-  if(searchTimeout)clearTimeout(searchTimeout);
-  searchTimeout=setTimeout(()=>{
-    currentSearch=searchInput.value.trim();
+let searchTimeout = null;
+searchInput.addEventListener("input", () => {
+  if (searchTimeout) clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    currentSearch = searchInput.value.trim();
     loadDashboard();
-  },300);
+  }, 300);
 });
 
 loadDashboard();
 supabase.channel("record-changes")
-  .on("postgres_changes",{event:"*",schema:"public",table:"record"},()=>loadDashboard())
+  .on("postgres_changes", { event: "*", schema: "public", table: "record" }, () => loadDashboard())
   .subscribe();
-setInterval(loadDashboard,15000);
+setInterval(loadDashboard, 15000);
 </script>
 </body>
 </html>
