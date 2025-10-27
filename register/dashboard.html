@@ -2,215 +2,207 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>Race Dashboard</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+<title>🏃‍♂️ Race Live Dashboard (Pro)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
-body {
-  font-family:'Prompt',sans-serif;
-  background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
-  color:#f1f1f1;
-  margin:0;
-  padding:0;
-}
-header {
-  text-align:center;
-  padding:20px 10px;
-  background:rgba(0,0,0,0.3);
-  box-shadow:0 4px 10px rgba(0,0,0,0.3);
-}
-header h1 {
-  margin:0;
-  font-size:2rem;
-  font-weight:600;
-  color:#00e6ff;
-  letter-spacing:1.5px;
-  text-transform:uppercase;
-}
-.container {
-  max-width:1000px;
-  margin:20px auto;
-  background:rgba(255,255,255,0.05);
-  border-radius:15px;
-  padding:20px;
-  box-shadow:0 6px 20px rgba(0,0,0,0.4);
-}
-.type-section {
-  margin-bottom:40px;
-}
-.type-section h2 {
-  border-bottom:2px solid #00e6ff;
-  padding-bottom:8px;
-  margin-bottom:15px;
-  font-size:1.5rem;
-  color:#00e6ff;
-}
-.table-wrapper {
-  width:100%;
-  overflow-x:auto;
-}
-.table-wrapper table {
-  width:100%;
-  border-collapse:collapse;
-  table-layout: fixed; /* บังคับ cell เท่าๆ กัน */
-  margin-bottom:20px;
-}
-th, td {
-  padding:10px;
-  text-align:center;
-}
-th {
-  background:rgba(0,0,0,0.5);
-  color:#00e6ff;
-  font-weight:600;
-}
-td.runner-name {
-  white-space: nowrap; /* บังคับชื่ออยู่บรรทัดเดียว */
-  text-overflow: ellipsis; /* ถ้ายาวเกิน cell แสดง ... */
-  overflow: hidden;
-}
-tr:nth-child(even) { background: rgba(255,255,255,0.05); }
-tr:hover { background: rgba(0,230,255,0.1); transform:scale(1.01); cursor:pointer; }
-.rank { font-weight:600; color:#ffd700; font-size:1rem; }
-.loading { text-align:center; font-size:1rem; padding:20px; color:#bbb; }
-
-/* Modal */
-.modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); justify-content:center; align-items:center; z-index:999; }
-.modal-content { background:#1c1c1c; padding:15px; border-radius:10px; max-width:450px; width:90%; color:#fff; }
-.modal-content h3 { margin-top:0; color:#00e6ff; font-size:1.2rem; }
-.modal-content table { width:100%; font-size:0.9rem; }
-.modal-content th, .modal-content td { padding:6px; }
-.close-btn { float:right; cursor:pointer; color:#ff5050; font-weight:bold; font-size:1rem; }
-
-/* Responsive */
-@media (max-width:768px){
-  header h1 { font-size:1.5rem; }
-  .container { padding:15px; }
-  th, td { padding:8px; font-size:0.9rem; }
-  .modal-content h3 { font-size:1rem; }
-}
-@media (max-width:480px){
-  header h1 { font-size:1.3rem; }
-  th, td { padding:6px; font-size:0.8rem; }
-  .modal-content { padding:10px; }
-}
+  .rank-finisher { background-color: #d1fae5; } /* เขียวอ่อน */
+  .rank-running { background-color: #fef9c3; }  /* เหลืองอ่อน */
+  .rank-dnf { background-color: #fee2e2; }      /* แดงอ่อน */
+  .active-tab { background-color: #2563eb !important; color: white !important; }
+  .popup-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; justify-content: center; align-items: center; z-index: 50; }
+  .popup { background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 500px; }
 </style>
 </head>
-<body>
-<header><h1>🏁 Race Dashboard 🏁</h1></header>
-<div class="container">
-  <div id="dashboard"></div>
-  <div class="loading" id="loading">กำลังโหลดข้อมูล...</div>
+<body class="bg-gray-100 p-6">
+
+<h1 class="text-3xl font-bold text-center mb-4">📊 DASHBOARD สรุปผลการแข่งขัน</h1>
+
+<!-- 🔘 ปุ่มเลือกประเภท -->
+<div class="flex flex-wrap justify-center space-x-2 mb-4">
+  <button data-type="ALL" class="type-tab bg-gray-300 px-3 py-1 rounded active-tab">ทั้งหมด</button>
+  <button data-type="BCR 50.4" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 50.4</button>
+  <button data-type="BCR 69.3" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 69.3</button>
+  <button data-type="BCR 100.8" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 100.8</button>
 </div>
 
-<!-- Modal -->
-<div id="modal" class="modal">
-  <div class="modal-content">
-    <span class="close-btn" id="closeModal">&times;</span>
-    <h3 id="modalName"></h3>
-    <div class="table-wrapper">
-      <table>
-        <thead><tr><th>Lap</th><th>เวลา</th></tr></thead>
-        <tbody id="modalBody"></tbody>
-      </table>
-    </div>
+<!-- 🔍 ช่องค้นหา -->
+<div class="flex justify-center mb-6">
+  <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อหรือ Tag ID เพื่อค้นหา..." class="border p-2 rounded w-full max-w-md">
+</div>
+
+<!-- ตาราง -->
+<div id="runner-list" class="max-w-5xl mx-auto bg-white p-4 rounded-lg shadow">
+  <table class="w-full text-sm text-left border-collapse">
+    <thead>
+      <tr class="bg-gray-200">
+        <th class="p-2 text-center">🏅 อันดับ</th>
+        <th class="p-2">ชื่อ</th>
+        <th class="p-2 text-center">ประเภท</th>
+        <th class="p-2 text-center">รอบ</th>
+        <th class="p-2 text-center">ระยะทาง (กม.)</th>
+        <th class="p-2 text-center">เวลารวม</th>
+      </tr>
+    </thead>
+    <tbody id="runnerTableBody"></tbody>
+  </table>
+</div>
+
+<!-- Popup แสดงรายละเอียด Lap -->
+<div id="popup" class="popup-bg">
+  <div class="popup">
+    <h2 id="popupTitle" class="text-lg font-semibold mb-2"></h2>
+    <div id="popupContent" class="text-sm mb-4"></div>
+    <button id="closePopup" class="bg-gray-700 text-white px-3 py-1 rounded w-full">ปิด</button>
   </div>
 </div>
 
-<script type="module">
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; 
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; 
+<script>
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 👈 ใส่ anon key ของคุณ
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const runnerTableBody = document.getElementById("runnerTableBody");
+const popup = document.getElementById("popup");
+const popupTitle = document.getElementById("popupTitle");
+const popupContent = document.getElementById("popupContent");
+const closePopup = document.getElementById("closePopup");
+const typeTabs = document.querySelectorAll(".type-tab");
+const searchInput = document.getElementById("searchInput");
 
-const modal = document.getElementById("modal");
-const modalName = document.getElementById("modalName");
-const modalBody = document.getElementById("modalBody");
-document.getElementById("closeModal").onclick = ()=> modal.style.display="none";
+let currentType = "ALL";
+let currentSearch = "";
 
-async function fetchData() {
-  const { data: runners } = await supabase.from('runner').select('id, name, type');
-  const { data: records } = await supabase.from('record').select('runner_id, lap, start_time, finish_time');
-  document.getElementById('loading').style.display='none';
-  renderDashboard(runners, records);
+// ปิด popup
+closePopup.onclick = () => popup.style.display = "none";
+
+// 🕒 แปลงเวลาเป็น HH:MM:SS
+function formatDuration(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
 }
 
-function msToTime(ms) {
-  const totalSeconds = Math.floor(ms/1000);
-  const hours = Math.floor(totalSeconds/3600);
-  const minutes = Math.floor((totalSeconds%3600)/60);
-  const seconds = totalSeconds%60;
-  return `${hours} ชม. ${minutes} นาที ${seconds} วินาที`;
-}
+// โหลดข้อมูล
+async function loadDashboard() {
+  const { data: runners, error } = await supabase
+    .from("runner")
+    .select("id, name, tag_id, type, status, record(lap, start_time, finish_time)")
+    .order("name", { ascending: true });
+  if (error) return console.error(error);
 
-function buildTable(title, data, records) {
-  if(data.length===0) return `<div class="type-section"><h2>${title}</h2><p>ไม่มีข้อมูล</p></div>`;
-  return `
-  <div class="type-section">
-    <h2>${title}</h2>
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr><th>อันดับ</th><th>ชื่อ</th><th>รอบทั้งหมด</th><th>เวลารวม</th></tr>
-        </thead>
-        <tbody>
-        ${data.map((r,i)=>{
-          const totalTime = r.totalTime ? msToTime(r.totalTime) : "-";
-          const totalLap = r.totalLap;
-          const myRecords = records.filter(rec=>rec.runner_id===r.id);
-          return `<tr data-runner='${JSON.stringify(myRecords)}' data-name='${r.name}'>
-            <td class="rank">${i+1}</td>
-            <td class="runner-name">${r.name}</td>
-            <td>${totalLap}</td>
-            <td>${totalTime}</td>
-          </tr>`;
-        }).join('')}
-        </tbody>
-      </table>
-    </div>
-  </div>`;
-}
+  let filtered = runners;
+  if (currentType !== "ALL") {
+    filtered = filtered.filter(r => (r.type || "").replace(/\s+/g,"").toUpperCase().includes(currentType.replace(" ","").toUpperCase()));
+  }
 
-function renderDashboard(runners, records){
-  const stats = runners.map(r=>{
-    const myRecords = records.filter(rec=>rec.runner_id===r.id);
-    const totalLap = myRecords.length;
-    const totalTime = myRecords.reduce((sum,rec)=>{
-      if(!rec.start_time||!rec.finish_time) return sum;
-      return sum + (new Date(rec.finish_time)-new Date(rec.start_time));
-    },0);
-    return {...r, totalLap, totalTime};
+  if (currentSearch.trim() !== "") {
+    const q = currentSearch.toLowerCase();
+    filtered = filtered.filter(r =>
+      (r.name || "").toLowerCase().includes(q) ||
+      (r.tag_id || "").toLowerCase().includes(q)
+    );
+  }
+
+  const data = filtered.map(r => {
+    let totalTime = 0, completedLaps = 0;
+    (r.record || []).forEach(rec => {
+      if (rec.start_time && rec.finish_time) {
+        totalTime += new Date(rec.finish_time) - new Date(rec.start_time);
+        completedLaps++;
+      }
+    });
+    const distance = (completedLaps * 6.3).toFixed(2);
+    return { ...r, totalTime, completedLaps, distance };
   });
-  const men = stats.filter(r=>r.type==="TOP100MEN").sort((a,b)=>b.totalLap-a.totalLap||a.totalTime-b.totalTime);
-  const women = stats.filter(r=>r.type==="TOP100WOMEN").sort((a,b)=>b.totalLap-a.totalLap||a.totalTime-b.totalTime);
 
-  document.getElementById('dashboard').innerHTML = `
-    ${buildTable('TOP100MEN', men, records)}
-    ${buildTable('TOP100WOMEN', women, records)}
-  `;
+  const finished = data.filter(r => r.status === "FINISHER").sort((a,b) => a.totalTime - b.totalTime);
+  const running = data.filter(r => r.status === "RUNNING").sort((a,b) => b.completedLaps - a.completedLaps);
+  const dnf = data.filter(r => r.status === "DNF").sort((a,b) => b.completedLaps - a.completedLaps);
+  const all = [...finished, ...running, ...dnf];
 
-  // คลิกชื่อดูเวลาแต่ละรอบ
-  document.querySelectorAll("tr td.runner-name").forEach(td=>{
-    td.onclick = ()=>{
-      const tr = td.parentElement;
-      const recs = JSON.parse(tr.getAttribute('data-runner'));
-      const name = tr.getAttribute('data-name');
-      modalName.textContent = name;
-      modalBody.innerHTML = recs.map(r=>{
-        let dur="-";
-        if(r.start_time && r.finish_time){
-          dur = msToTime(new Date(r.finish_time)-new Date(r.start_time));
-        }
-        return `<tr><td>${r.lap}</td><td>${dur}</td></tr>`;
-      }).join('');
-      modal.style.display="flex";
+  runnerTableBody.innerHTML = "";
+  all.forEach((r, i) => {
+    const rowClass = r.status === "FINISHER" ? "rank-finisher"
+                   : r.status === "DNF" ? "rank-dnf" : "rank-running";
+    const totalTimeText = r.totalTime ? formatDuration(r.totalTime) : "-";
+
+    const row = document.createElement("tr");
+    row.className = `${rowClass} border-b hover:bg-gray-100 cursor-pointer`;
+    row.innerHTML = `
+      <td class="p-2 text-center">${i + 1}</td>
+      <td class="p-2 font-medium text-blue-700 hover:underline">${r.name}</td>
+      <td class="p-2 text-center">${r.type}</td>
+      <td class="p-2 text-center">${r.completedLaps}</td>
+      <td class="p-2 text-center">${r.distance}</td>
+      <td class="p-2 text-center">${totalTimeText}</td>
+    `;
+    row.addEventListener("click", () => showDetails(r));
+    runnerTableBody.appendChild(row);
+  });
+}
+
+// แสดงรายละเอียด Lap
+function showDetails(runner) {
+  popup.style.display = "flex";
+  popupTitle.textContent = `${runner.name} (${runner.type})`;
+  let content = "";
+
+  if (!runner.record || runner.record.length === 0) {
+    popupContent.innerHTML = "<p>ไม่มีข้อมูลรอบวิ่ง</p>";
+    return;
+  }
+
+  const laps = runner.record.sort((a,b) => a.lap - b.lap);
+  laps.forEach(rec => {
+    const start = rec.start_time ? new Date(rec.start_time).toLocaleString("th-TH") : "-";
+    const finish = rec.finish_time ? new Date(rec.finish_time).toLocaleString("th-TH") : "-";
+    let dur = "-";
+    if (rec.start_time && rec.finish_time) {
+      const diff = new Date(rec.finish_time) - new Date(rec.start_time);
+      dur = formatDuration(diff);
     }
+    content += `
+      <div class="border-b py-1">
+        <b>Lap ${rec.lap}</b><br>
+        🕒 Start: ${start}<br>
+        🏁 Finish: ${finish}<br>
+        ⏱ Duration: ${dur}
+      </div>
+    `;
   });
+
+  popupContent.innerHTML = content;
 }
 
-fetchData();
-setInterval(fetchData,5000);
+// 🔘 เปลี่ยนรุ่น
+typeTabs.forEach(tab => {
+  tab.addEventListener("click", () => {
+    typeTabs.forEach(t => t.classList.remove("active-tab"));
+    tab.classList.add("active-tab");
+    currentType = tab.dataset.type;
+    loadDashboard();
+  });
+});
+
+// 🔍 ค้นหา
+let searchTimeout = null;
+searchInput.addEventListener("input", () => {
+  if (searchTimeout) clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    currentSearch = searchInput.value.trim();
+    loadDashboard();
+  }, 400);
+});
+
+// โหลดครั้งแรก + realtime
+loadDashboard();
+setInterval(loadDashboard, 15000);
+supabase.channel("record-changes")
+  .on("postgres_changes", { event: "*", schema: "public", table: "record" }, () => loadDashboard())
+  .subscribe();
 </script>
 </body>
 </html>
