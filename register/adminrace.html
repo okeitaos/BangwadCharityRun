@@ -36,8 +36,8 @@
   </div>
 
 <script>
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // 🧩 ใส่ URL ของคุณ
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 🧩 ใส่ anon key ของคุณ
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // 🔧 เปลี่ยนเป็นของคุณ
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const loginSection = document.getElementById("login-section");
@@ -111,13 +111,13 @@ async function loadRunners(query = "") {
 
     // ปุ่มแต่ละสถานะ
     const runningBtn = `<button class="bg-green-500 text-white px-2 py-1 rounded"
-        onclick="updateStatus('${r.id}', 'RUNNING')">RUNNING</button>`;
+        onclick="updateStatus('${r.id}', 'RUNNING', event)">RUNNING</button>`;
 
     const dnfBtn = `<button class="bg-yellow-500 text-white px-2 py-1 rounded"
-        onclick="updateStatus('${r.id}', 'DNF')">DNF</button>`;
+        onclick="updateStatus('${r.id}', 'DNF', event)">DNF</button>`;
 
     const finisherBtn = `<button class="bg-red-500 text-white px-2 py-1 rounded"
-        onclick="updateStatus('${r.id}', 'FINISHER')">FINISHER</button>`;
+        onclick="updateStatus('${r.id}', 'FINISHER', event)">FINISHER</button>`;
 
     // ✅ แสดงปุ่มตามสถานะ
     let buttons = "";
@@ -153,8 +153,7 @@ async function loadRunners(query = "") {
 searchInput.addEventListener("input", e => loadRunners(e.target.value));
 
 // ✏️ อัปเดตสถานะนักวิ่ง
-// ✏️ อัปเดตสถานะนักวิ่ง
-async function updateStatus(runnerId, status) {
+async function updateStatus(runnerId, status, event) {
   const reason = prompt(
     "เหตุผล:",
     status === "DNF"
@@ -183,15 +182,17 @@ async function updateStatus(runnerId, status) {
     updated_by: currentUser.id
   });
 
-  // ✅ ซ่อนปุ่มของนักวิ่งคนนั้นทันที (ในหน้า)
-  const buttonsDiv = event.target.closest(".border").querySelector("div.space-x-1");
-  if (buttonsDiv) buttonsDiv.innerHTML = "<span class='text-gray-400'>⛔ Locked</span>";
+  // ✅ ซ่อนปุ่มทันที (เฉพาะนักวิ่งที่ถูกคลิก)
+  const card = event.target.closest(".border");
+  const buttonsDiv = card.querySelector("div.space-x-1");
+  if (buttonsDiv) {
+    buttonsDiv.innerHTML = "<span class='text-gray-400'>⛔ Locked</span>";
+  }
 
   alert(`✅ เปลี่ยนสถานะเป็น ${status} สำเร็จ`);
   loadRunners(searchInput.value);
   loadLogs();
 }
-
 
 // 🧾 โหลด Log การเปลี่ยนสถานะ
 async function loadLogs() {
