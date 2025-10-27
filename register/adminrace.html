@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>🏁 ระบบกรรมการสนาม (Realtime + Safe Mode)</title>
+<title>🏁 ระบบกรรมการสนาม (Realtime + Search Fixed)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
@@ -20,7 +20,7 @@
 <body class="bg-gray-100 p-6">
 
 <div class="max-w-5xl mx-auto bg-white rounded-lg shadow p-6">
-  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Realtime + ป้องกันกดผิด)</h1>
+  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Realtime + ค้นหา)</h1>
 
   <!-- 🔐 Login -->
   <div id="login-section">
@@ -61,13 +61,15 @@ const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 👈 ใส่ anon key ของคุณ
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+let currentUser = null;
+let currentSearch = ""; // ✅ เก็บคำค้นล่าสุด
+let showOnlyRunning = false;
+let searchTimeout = null;
+
+// เสียงเตือน
 const alertDnf = document.getElementById("alertDnf");
 const alertFinisher = document.getElementById("alertFinisher");
 const toastContainer = document.getElementById("toast-container");
-
-let currentUser = null;
-let searchTimeout = null;
-let showOnlyRunning = false;
 
 // ============================ LOGIN ============================
 window.addEventListener("DOMContentLoaded", async () => {
@@ -95,9 +97,9 @@ async function autoLogin(user) {
   document.getElementById("login-section").classList.add("hidden");
   document.getElementById("admin-section").classList.remove("hidden");
 
-  loadRunners();
+  loadRunners(currentSearch);
   startRealtimeListener();
-  setInterval(loadRunners, 10000);
+  setInterval(() => loadRunners(currentSearch), 10000);
 }
 
 document.getElementById("loginBtn").onclick = async () => {
@@ -115,28 +117,36 @@ function showLogin() {
   document.getElementById("admin-section").classList.add("hidden");
 }
 
-// ============================ SEARCH / FILTER ============================
+// ============================ SEARCH ============================
 const searchInput = document.getElementById("searchInput");
 searchInput.addEventListener("input", () => {
   if (searchTimeout) clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(() => loadRunners(searchInput.value), 800);
+  searchTimeout = setTimeout(() => {
+    currentSearch = searchInput.value.trim(); // ✅ จำค่าค้นหา
+    loadRunners(currentSearch);
+  }, 600);
 });
-document.getElementById("clearBtn").onclick = () => { searchInput.value = ""; loadRunners(); };
-document.getElementById("showAllBtn").onclick = () => { showOnlyRunning = false; loadRunners(); };
-document.getElementById("showRunningBtn").onclick = () => { showOnlyRunning = true; loadRunners(); };
+document.getElementById("clearBtn").onclick = () => { searchInput.value = ""; currentSearch = ""; loadRunners(); };
+document.getElementById("showAllBtn").onclick = () => { showOnlyRunning = false; loadRunners(currentSearch); };
+document.getElementById("showRunningBtn").onclick = () => { showOnlyRunning = true; loadRunners(currentSearch); };
 
 // ============================ LOAD RUNNERS ============================
-async function loadRunners(query = "") {
+async function loadRunners(query = currentSearch) {
   let queryBuilder = supabase
     .from("runner")
     .select("id, name, tag_id, type, status, record(lap, start_time, finish_time)")
     .order("name", { ascending: true });
 
-  if (query.trim() !== "") queryBuilder = queryBuilder.or(`name.ilike.%${query}%,tag_id.ilike.%${query}%`);
-  if (showOnlyRunning) queryBuilder = queryBuilder.eq("status", "RUNNING");
+  if (query && query.trim() !== "") {
+    // ✅ ค้นหาทั้งชื่อและ tag_id
+    queryBuilder = queryBuilder.or(`name.ilike.%${query}%,tag_id.ilike.%${query}%`);
+  }
+  if (showOnlyRunning) {
+    queryBuilder = queryBuilder.eq("status", "RUNNING");
+  }
 
   const { data: runners, error } = await queryBuilder;
-  if (error) return console.error(error);
+  if (error) { console.error(error); return; }
 
   const runnerList = document.getElementById("runnerList");
   runnerList.innerHTML = "";
@@ -146,23 +156,21 @@ async function loadRunners(query = "") {
     const showLap = laps.length ? Math.max(...laps) : 0;
     const distance = (showLap * 6.3).toFixed(2);
 
-    const normalizedType = (r.type || "").replace(/\s+/g, "").toUpperCase();
+    const type = (r.type || "").replace(/\s+/g, "").toUpperCase();
     let finisherRequired = 0, dnfStart = 0;
-    if (normalizedType.includes("BCR50.4")) { finisherRequired = 8; dnfStart = 4; }
-    else if (normalizedType.includes("BCR69.3")) { finisherRequired = 11; dnfStart = 6; }
-    else if (normalizedType.includes("BCR100.8")) { finisherRequired = 16; dnfStart = 8; }
+    if (type.includes("BCR50.4")) { finisherRequired = 8; dnfStart = 4; }
+    else if (type.includes("BCR69.3")) { finisherRequired = 11; dnfStart = 6; }
+    else if (type.includes("BCR100.8")) { finisherRequired = 16; dnfStart = 8; }
 
     const canFinish = showLap >= finisherRequired;
     const reachedDNF = showLap >= dnfStart && showLap < finisherRequired;
 
-    // 🎨 สีพื้นหลัง
     let bgClass = "bg-green-50";
     if (r.status === "DNF") bgClass = "bg-red-50";
     else if (r.status === "FINISHER") bgClass = "blink-finisher";
     else if (canFinish && r.status === "RUNNING") bgClass = "blink-slow-finisher";
     else if (reachedDNF) bgClass = "blink-dnf";
 
-    // 📊 แสดงรอบ/ระยะ
     let info = showLap === 0
       ? "✅ Check-in แล้ว (ยังไม่เริ่มวิ่ง)"
       : `🏁 รอบที่: ${showLap} / ${finisherRequired}<br>ระยะทาง: ${distance} กม.`;
@@ -174,15 +182,12 @@ async function loadRunners(query = "") {
       notice = "<div class='text-yellow-700 text-xs mt-1 font-medium'>⚠️ ถึงระยะ DNF แล้ว</div>";
     }
 
-    // 🟨 ปุ่มแสดงผล
     let buttons = "";
     if (r.status === "FINISHER" || r.status === "DNF") {
       buttons = `<span class="text-gray-500 text-sm">🚫 ออกจากการแข่งขันแล้ว</span>`;
     } else if (canFinish && r.status === "RUNNING") {
-      // 🏁 ถึงระยะครบ → แสดงเฉพาะ FINISHER
       buttons = `<button class="bg-red-500 text-white px-2 py-1 rounded" onclick="confirmChange('${r.id}','FINISHER','${r.name}')">FINISHER</button>`;
     } else if (r.status === "RUNNING") {
-      // 🟡 ยังไม่ถึง → แสดงเฉพาะ DNF
       buttons = `<button class="bg-yellow-500 text-white px-2 py-1 rounded" onclick="confirmChange('${r.id}','DNF','${r.name}')">DNF</button>`;
     }
 
@@ -214,7 +219,7 @@ async function confirmChange(runnerId, status, name) {
   await supabase.from("dnf_log").insert({ runner_id: runnerId, status, reason, updated_by: currentUser.id });
 
   showToast(`✅ เปลี่ยนสถานะของ ${name} เป็น ${status} สำเร็จ`);
-  loadRunners(searchInput.value);
+  loadRunners(currentSearch);
 }
 
 // ============================ REALTIME ============================
@@ -223,7 +228,7 @@ function startRealtimeListener() {
     .on("postgres_changes", { event: "*", schema: "public", table: "record" }, payload => {
       const lap = payload.new?.lap;
       if (!lap) return;
-      loadRunners(searchInput.value);
+      loadRunners(currentSearch);
       if ([4,6,8].includes(lap)) { alertDnf.play(); showToast(`⚠️ นักวิ่งถึงระยะ DNF (รอบ ${lap})`); }
       if ([8,11,16].includes(lap)) { alertFinisher.play(); showToast(`🏆 นักวิ่งถึงระยะ FINISHER (รอบ ${lap})`); }
     })
