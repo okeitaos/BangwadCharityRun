@@ -158,7 +158,7 @@ async function updateStatus(runnerId, status) {
 async function loadLogs() {
   const { data: logs, error } = await supabase
     .from("dnf_log")
-    .select(`created_at, status, reason, runner_id, runner(name)`)
+    .select(`created_at, status, reason, dnf_log_runner_fk(name)`)
     .order("created_at", { ascending: false })
     .limit(20);
 
