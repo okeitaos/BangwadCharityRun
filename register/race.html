@@ -1,16 +1,17 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>🏃 Race Check-in System</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏁 ระบบบันทึกการวิ่ง Race Tracking</title>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 p-6 font-[Prompt]">
-  <h1 class="text-2xl font-bold text-center mb-4">🏁 ระบบบันทึกการวิ่ง Race Tracking</h1>
+
+  <h1 class="text-2xl font-bold text-center mb-4">🏃‍♂️ ระบบบันทึกการวิ่ง</h1>
 
   <div class="max-w-md mx-auto bg-white p-4 rounded-lg shadow">
-    <input id="tagInput" type="text" placeholder="สแกน Tag ID..."
+    <input id="tagInput" type="text" placeholder="สแกน Tag ID..." 
       class="w-full border rounded px-3 py-2 focus:outline-none" autofocus>
     <p id="status" class="text-sm text-gray-700 mt-2 text-center"></p>
   </div>
@@ -21,8 +22,8 @@
   </div>
 
 <script>
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/rfid-reader";
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // ของคุณ
+const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/rfid-reader"; // ของคุณ
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 
 const tagInput = document.getElementById("tagInput");
@@ -36,6 +37,7 @@ const SCAN_DELAY = 200;
 
 tagInput.addEventListener("input", () => {
   if (scanTimeout) clearTimeout(scanTimeout);
+
   scanTimeout = setTimeout(async () => {
     const tagId = tagInput.value.trim();
     if (!tagId) return;
@@ -56,19 +58,28 @@ tagInput.addEventListener("input", () => {
       if (result.error) {
         statusEl.textContent = "❌ " + result.error;
         runnerInfo.classList.add("hidden");
-      } else if (result.success) {
-        statusEl.textContent = `✅ ${result.runner} (BIB: ${result.bib || "-"}) บันทึกสำเร็จ รอบที่ ${result.lap}`;
-        runnerInfo.classList.remove("hidden");
-        runnerName.textContent = `${result.runner} (BIB: ${result.bib || "-"})`;
-        runnerDetails.textContent = `🏁 รอบที่: ${result.lap} | ⏰ เวลา: ${result.time}`;
-      } else if (result.message) {
+      } 
+      else if (result.message) {
         statusEl.textContent = "🏁 " + result.message;
-      } else {
+        runnerInfo.classList.add("hidden");
+      } 
+      else if (result.success) {
+        // ✅ เพิ่มการแสดง BIB ที่นี่
+        const bibText = result.bib ? ` (BIB: ${result.bib})` : "";
+        statusEl.textContent = `✅ ${result.runner}${bibText} บันทึกสำเร็จ รอบที่ ${result.lap}`;
+
+        runnerInfo.classList.remove("hidden");
+        runnerName.textContent = `${result.runner}${bibText}`;
+        runnerDetails.textContent = `🏁 รอบที่: ${result.lap} | ⏰ เวลา: ${result.time}`;
+      } 
+      else {
         statusEl.textContent = "⚠️ ไม่พบข้อมูล";
+        runnerInfo.classList.add("hidden");
       }
 
     } catch (err) {
       statusEl.textContent = "❌ Error: " + err.message;
+      runnerInfo.classList.add("hidden");
     }
   }, SCAN_DELAY);
 });
