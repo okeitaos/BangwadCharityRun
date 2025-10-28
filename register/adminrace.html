@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>🏁 Runner Management ( CHARITY RUN 2025 )</title>
+<title>🏁 ระบบกรรมการสนาม (Turbo Load Edition)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
@@ -20,7 +20,7 @@
 <body class="bg-gray-100 p-6">
 
 <div class="max-w-5xl mx-auto bg-white rounded-lg shadow p-6">
-  <h1 class="text-2xl font-bold mb-4 text-center">🏁 Runner Management ( CHARITY RUN 2025 )</h1>
+  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (โหลดเร็วพิเศษ)</h1>
 
   <!-- 🔐 Login -->
   <div id="login-section">
@@ -64,7 +64,6 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentUser = null;
 let currentSearch = "";
 let showOnlyRunning = false;
-let runnerCache = [];
 let searchTimeout = null;
 
 // เสียงเตือน
@@ -134,82 +133,108 @@ function renderAdminSection() {
   document.getElementById("showRunningBtn").onclick = () => { showOnlyRunning = true; loadRunners(); };
 }
 
-// ============================ LOAD RUNNERS (Optimized) ============================
+// ============================ LOAD RUNNERS (Turbo Async) ============================
 async function loadRunners(query = "") {
   const runnerList = document.getElementById("runnerList");
-  runnerList.innerHTML = `<p class='text-center text-gray-500'>⏳ กำลังโหลดข้อมูล...</p>`;
-  const t0 = performance.now();
+  runnerList.innerHTML = `<p class='text-center text-gray-500'>⏳ กำลังโหลดข้อมูลนักวิ่ง...</p>`;
 
-  let queryBuilder = supabase.from("runner").select("id,name,tag_id,bib,type,status").order("name",{ascending:true});
-  if (query) queryBuilder = queryBuilder.or(`name.ilike.%${query}%,tag_id.ilike.%${query}%,bib.ilike.%${query}%`);
-  if (showOnlyRunning) queryBuilder = queryBuilder.eq("status","RUNNING");
+  const t0 = performance.now();
+  let queryBuilder = supabase.from("runner")
+    .select("id,name,tag_id,bib,type,status")
+    .order("name", { ascending: true });
+
+  if (query)
+    queryBuilder = queryBuilder.or(`name.ilike.%${query}%,tag_id.ilike.%${query}%,bib.ilike.%${query}%`);
+  if (showOnlyRunning)
+    queryBuilder = queryBuilder.eq("status", "RUNNING");
 
   const { data: runners, error } = await queryBuilder;
   if (error) { console.error(error); return; }
 
-  runnerCache = runners;
-  renderRunners(runners);
   const t1 = performance.now();
-  console.log(`✅ โหลดข้อมูล ${runners.length} คน ใช้เวลา ${(t1-t0).toFixed(1)} ms`);
-}
+  console.log(`✅ ดึงข้อมูลนักวิ่ง ${runners.length} คน ใช้เวลา ${(t1 - t0).toFixed(0)} ms`);
 
-function renderRunners(runners) {
-  const runnerList = document.getElementById("runnerList");
-  runnerList.innerHTML = "";
-  runners.forEach(r => {
-    const div = document.createElement("div");
-    div.className = "border p-3 rounded bg-gray-50";
-    div.innerHTML = `
-      <div><b>${r.name}</b> (${r.type})<br>
-      🏷️ BIB: ${r.bib || "-"}<br>🪪 Tag ID: ${r.tag_id || "-"}<br>
-      สถานะ: ${r.status}<br><span class="text-xs text-gray-400">กำลังโหลดรอบ...</span></div>`;
-    runnerList.appendChild(div);
+  runnerList.innerHTML = runners.map(r => `
+    <div id="runner-${r.id}" class="border p-3 rounded bg-gray-50 mb-2">
+      <div>
+        <b>${r.name}</b> (${r.type})<br>
+        🏷️ BIB: ${r.bib || "-"}<br>🪪 Tag ID: ${r.tag_id || "-"}<br>
+        สถานะ: ${r.status}<br>
+        <span class="text-xs text-gray-400">📡 กำลังโหลดข้อมูลรอบ...</span>
+      </div>
+    </div>
+  `).join("");
 
-    supabase.from("record").select("lap").eq("runner_id",r.id).then(({data})=>{
-      const laps = data?.map(x=>x.lap)||[];
-      const showLap = laps.length?Math.max(...laps):0;
-      const distance = (showLap*6.3).toFixed(2);
-      div.querySelector("span").outerHTML = `
-        🏁 รอบที่: ${showLap}<br>ระยะทาง: ${distance} กม.
-      `;
+  const batchSize = 25;
+  for (let i = 0; i < runners.length; i += batchSize) {
+    const batch = runners.slice(i, i + batchSize);
+    const ids = batch.map(r => r.id);
+    const { data: records } = await supabase
+      .from("record")
+      .select("runner_id, lap")
+      .in("runner_id", ids);
+
+    const grouped = {};
+    (records || []).forEach(rec => {
+      if (!grouped[rec.runner_id]) grouped[rec.runner_id] = [];
+      grouped[rec.runner_id].push(rec.lap);
     });
-  });
-  document.getElementById("lastUpdate").textContent = "อัปเดตล่าสุด: " + new Date().toLocaleTimeString("th-TH");
+
+    batch.forEach(r => {
+      const laps = grouped[r.id] || [];
+      const maxLap = laps.length ? Math.max(...laps) : 0;
+      const distance = (maxLap * 6.3).toFixed(2);
+      const element = document.getElementById(`runner-${r.id}`);
+      if (element) {
+        element.querySelector("span").outerHTML = `
+          🏁 รอบที่: ${maxLap}<br>ระยะทาง: ${distance} กม.
+        `;
+      }
+    });
+  }
+
+  document.getElementById("lastUpdate").textContent =
+    "อัปเดตล่าสุด: " + new Date().toLocaleTimeString("th-TH");
 }
 
 // ============================ REALTIME ============================
-function startRealtimeListener(){
+function startRealtimeListener() {
   supabase.channel("record-changes")
-  .on("postgres_changes",{event:"*",schema:"public",table:"record"},payload=>{
-    const lap=payload.new?.lap;
-    if(!lap)return;
-    if([4,6,8].includes(lap)){alertDnf.play();showToast(`⚠️ นักวิ่งถึงระยะ DNF (รอบ ${lap})`);}
-    if([8,11,16].includes(lap)){alertFinisher.play();showToast(`🏆 นักวิ่งถึงระยะ FINISHER (รอบ ${lap})`);}
-    loadRunners(currentSearch);
-  })
-  .subscribe();
+    .on("postgres_changes", { event: "*", schema: "public", table: "record" }, payload => {
+      const lap = payload.new?.lap;
+      if (!lap) return;
+      if ([4,6,8].includes(lap)) { alertDnf.play(); showToast(`⚠️ นักวิ่งถึงระยะ DNF (รอบ ${lap})`); }
+      if ([8,11,16].includes(lap)) { alertFinisher.play(); showToast(`🏆 นักวิ่งถึงระยะ FINISHER (รอบ ${lap})`); }
+      loadRunners(currentSearch);
+    })
+    .subscribe();
 }
 
 // ============================ TOAST ============================
-function showToast(message){
-  const t=document.createElement("div");
-  t.className="toast";
-  t.innerHTML=message;
+function showToast(message) {
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.innerHTML = message;
   toastContainer.appendChild(t);
-  setTimeout(()=>{t.style.transition="opacity 0.5s";t.style.opacity="0";setTimeout(()=>t.remove(),500);},3000);
+  setTimeout(() => {
+    t.style.transition = "opacity 0.5s";
+    t.style.opacity = "0";
+    setTimeout(() => t.remove(), 500);
+  }, 3000);
 }
 
 // ============================ LOGIN ============================
-function showLogin(){
-  currentUser=null;
+function showLogin() {
+  currentUser = null;
   document.getElementById("login-section").classList.remove("hidden");
   document.getElementById("admin-section").classList.add("hidden");
 }
-document.getElementById("loginBtn").onclick=async()=>{
-  const email=document.getElementById("email").value;
-  const password=document.getElementById("password").value;
-  const {data,error}=await supabase.auth.signInWithPassword({email,password});
-  if(error)return alert("❌ เข้าสู่ระบบไม่สำเร็จ");
+
+document.getElementById("loginBtn").onclick = async () => {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return alert("❌ เข้าสู่ระบบไม่สำเร็จ");
   autoLogin(data.user);
 };
 </script>
