@@ -34,7 +34,7 @@
 
 <!-- Search -->
 <div class="flex justify-center mb-6">
-  <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อหรือ Tag ID เพื่อค้นหา..." class="border p-2 rounded w-full max-w-md">
+  <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อ, Tag ID หรือ BIB เพื่อค้นหา..." class="border p-2 rounded w-full max-w-md">
 </div>
 
 <!-- Table -->
@@ -43,6 +43,7 @@
     <thead>
       <tr class="bg-gray-200">
         <th class="p-2 text-center">🏅 อันดับ</th>
+        <th class="p-2 text-center">BIB</th>
         <th class="p-2">ชื่อ</th>
         <th class="p-2 text-center">ประเภท</th>
         <th class="p-2 text-center">รอบ</th>
@@ -55,9 +56,10 @@
 </div>
 
 <!-- Popup -->
-<div id="popup" class="popup-bg">
+<div id="popup" class="popup-bg" role="dialog" aria-modal="true">
   <div class="popup">
-    <h2 id="popupTitle" class="text-lg font-semibold mb-2"></h2>
+    <h2 id="popupTitle" class="text-lg font-semibold mb-1"></h2>
+    <div id="popupBib" class="text-sm text-gray-600 mb-2"></div>
     <div id="popupSummary" class="text-sm mb-3 text-gray-700"></div>
     <table class="w-full text-xs sm:text-sm mb-3 border">
       <thead>
@@ -77,12 +79,13 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // ใส่ anon key ของคุณ
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const runnerTableBody = document.getElementById("runnerTableBody");
 const popup = document.getElementById("popup");
 const popupTitle = document.getElementById("popupTitle");
+const popupBib = document.getElementById("popupBib");
 const popupSummary = document.getElementById("popupSummary");
 const popupContent = document.getElementById("popupContent");
 const avgTime = document.getElementById("avgTime");
@@ -93,8 +96,12 @@ const searchInput = document.getElementById("searchInput");
 let currentType = "ALL";
 let currentSearch = "";
 
-closePopup.onclick = () => popup.style.display = "none";
+// close handler
+closePopup.onclick = () => {
+  popup.style.display = "none";
+};
 
+// helper
 function formatDuration(ms) {
   const s = Math.floor(ms / 1000);
   const h = Math.floor(s / 3600);
@@ -106,7 +113,8 @@ function formatDuration(ms) {
 async function loadDashboard() {
   const { data: runners, error } = await supabase
     .from("runner")
-    .select("id,name,tag_id,type,status,record(lap,start_time,finish_time)")
+    // เพิ่ม bib ใน select
+    .select("id,bib,name,tag_id,type,status,record(lap,start_time,finish_time)")
     .order("name",{ascending:true});
   if (error) return console.error(error);
 
@@ -116,7 +124,8 @@ async function loadDashboard() {
     const q = currentSearch.toLowerCase();
     filtered = filtered.filter(r => 
       (r.name || "").toLowerCase().includes(q) ||
-      (r.tag_id || "").toLowerCase().includes(q)
+      (r.tag_id || "").toLowerCase().includes(q) ||
+      (r.bib || "").toLowerCase().includes(q) // เพิ่มการค้นหาจาก bib
     );
   }
 
@@ -145,22 +154,27 @@ function renderRunners(list) {
     const totalTimeText = r.totalTime ? formatDuration(r.totalTime) : "-";
     const row = document.createElement("tr");
     row.className = `${rowClass} border-b hover:bg-gray-50 cursor-pointer`;
+    // เพิ่มคอลัมน์ BIB (r.bib)
     row.innerHTML = `
       <td class="p-2 text-center">${i+1}</td>
+      <td class="p-2 text-center font-medium">${r.bib || "-"}</td>
       <td class="p-2 font-medium text-blue-700 hover:underline">${r.name}</td>
       <td class="p-2 text-center">${r.type}</td>
       <td class="p-2 text-center">${r.completedLaps}</td>
       <td class="p-2 text-center">${r.distance}</td>
       <td class="p-2 text-center">${totalTimeText}</td>
     `;
-    row.addEventListener("click",()=>showDetails(r));
+    row.addEventListener("click", ()=> showDetails(r));
     runnerTableBody.appendChild(row);
   });
 }
 
 function showDetails(runner) {
+  // แสดง popup_background
   popup.style.display = "flex";
+  // แสดงข้อมูล BIB ใน popup
   popupTitle.textContent = `${runner.name} (${runner.type})`;
+  popupBib.textContent = `BIB: ${runner.bib || "-"}`;
   const totalTime = runner.totalTime ? formatDuration(runner.totalTime) : "-";
   popupSummary.innerHTML = `
     สถานะ: <b>${runner.status}</b> |
