@@ -62,7 +62,7 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentUser = null;
-let currentSearch = ""; // ✅ เก็บคำค้นล่าสุด
+let currentSearch = ""; 
 let showOnlyRunning = false;
 let searchTimeout = null;
 
@@ -122,7 +122,7 @@ const searchInput = document.getElementById("searchInput");
 searchInput.addEventListener("input", () => {
   if (searchTimeout) clearTimeout(searchTimeout);
   searchTimeout = setTimeout(() => {
-    currentSearch = searchInput.value.trim(); // ✅ จำค่าค้นหา
+    currentSearch = searchInput.value.trim(); 
     loadRunners(currentSearch);
   }, 600);
 });
@@ -134,16 +134,13 @@ document.getElementById("showRunningBtn").onclick = () => { showOnlyRunning = tr
 async function loadRunners(query = currentSearch) {
   let queryBuilder = supabase
     .from("runner")
-    .select("id, name, tag_id, type, status, record(lap, start_time, finish_time)")
+    .select("id, name, tag_id, bib, type, status, record(lap, start_time, finish_time)")  // ✅ เพิ่ม bib เข้ามา
     .order("name", { ascending: true });
 
   if (query && query.trim() !== "") {
-    // ✅ ค้นหาทั้งชื่อและ tag_id
     queryBuilder = queryBuilder.or(`name.ilike.%${query}%,tag_id.ilike.%${query}%`);
   }
-  if (showOnlyRunning) {
-    queryBuilder = queryBuilder.eq("status", "RUNNING");
-  }
+  if (showOnlyRunning) queryBuilder = queryBuilder.eq("status", "RUNNING");
 
   const { data: runners, error } = await queryBuilder;
   if (error) { console.error(error); return; }
@@ -195,7 +192,8 @@ async function loadRunners(query = currentSearch) {
       <div class="border p-3 rounded flex justify-between items-center ${bgClass}">
         <div>
           <b>${r.name}</b> (${r.type})<br>
-          🏷️ Tag ID: ${r.tag_id || "-"}<br>
+          🏷️ BIB: ${r.bib || "-"}<br> <!-- ✅ เพิ่มแสดง BIB -->
+          🪪 Tag ID: ${r.tag_id || "-"}<br>
           สถานะ: ${r.status}<br>${info}${notice}
         </div>
         <div>${buttons}</div>
