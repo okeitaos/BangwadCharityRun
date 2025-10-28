@@ -41,8 +41,8 @@
 
 <script>
 /* ------------- CONFIG ------------- */
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/rfid-reader";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // <-- ใส่ของจริง
+const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/rfid-reader"; // <-- ใส่ของจริง
 
 /* ------------- UI ------------- */
 const tagInput = document.getElementById("tagInput");
@@ -53,9 +53,13 @@ const helper = document.getElementById("helper");
 
 /* ------------- Auto-scan settings ------------- */
 let scanTimeout = null;
-const SCAN_DEBOUNCE_MS = 180;
-const COOLDOWN_MS = 1500;
+const SCAN_DEBOUNCE_MS = 180;    // รอสั้น ๆ ก่อนส่ง (ปรับได้)
+const COOLDOWN_MS = 1500;        // ป้องกันสแกนซ้ำ (same tag) ภายในเวลานี้
+
+/* เก็บเวลาสแกนล่าสุดของแต่ละ tag เพื่อป้องกันซ้ำ */
 const recentScans = new Map();
+
+/* ปิดการส่งหากกำลังส่งอยู่ */
 let sending = false;
 
 /* ------------- Helpers ------------- */
@@ -67,11 +71,13 @@ function showStatus(message, kind = "info") {
   else statusBox.classList.add("bg-gray-50","border","border-gray-200");
 
   statusEl.innerHTML = message;
+  // small vibration if available
   if (navigator.vibrate && (kind === "success" || kind === "error")) {
     navigator.vibrate(kind === "success" ? 70 : 150);
   }
 }
 
+/* ตรวจสอบว่า tag ควรส่งหรือยัง (cooldown) */
 function shouldSendTag(tag) {
   if (!tag) return false;
   const now = Date.now();
@@ -80,8 +86,10 @@ function shouldSendTag(tag) {
   return (now - last) > COOLDOWN_MS;
 }
 
+/* บันทึกเวลาสแกนล่าสุด */
 function markScanned(tag) {
   recentScans.set(tag, Date.now());
+  // ลบรายการหลัง 10s เพื่อไม่ให้ Map โตไม่จำเป็น
   setTimeout(() => recentScans.delete(tag), 10000);
 }
 
@@ -113,21 +121,20 @@ async function sendTag(tag) {
     });
 
     let result;
-    try { result = await resp.json(); } 
-    catch(e) { result = { error: "ไม่สามารถอ่านผลจากเซิร์ฟเวอร์" }; }
+    try { result = await resp.json(); } catch(e) { result = { error: "ไม่สามารถอ่านผลจากเซิร์ฟเวอร์" }; }
 
     if (result.error) {
       showStatus(`❌ ${result.error}`, "error");
     } else if (result.message) {
+      // ฟังก์ชันส่งกลับข้อความเตือน (เช่น finished/limit)
       showStatus(`⚠️ ${result.message}`, "warn");
-      markScanned(tag);
+      markScanned(tag); // บันทึกเพื่อป้องกันส่งซ้ำโดยไม่ตั้งใจ
     } else {
-      // ✅ เพิ่มแสดง BIB ตรงนี้ (ไม่มีผลต่อระบบเดิม)
+      // success
       const runnerName = result.runner || "นักวิ่งไม่ทราบชื่อ";
-      const bibText = result.bib ? ` (BIB: ${result.bib})` : "";
       const lap = result.lap !== undefined ? `รอบที่ ${result.lap}` : "";
       const time = result.time ? `<div class="text-xs text-gray-500 mt-1">${result.time}</div>` : "";
-      showStatus(`✅ ${runnerName}${bibText} บันทึกสำเร็จ ${lap} ${time}`, "success");
+      showStatus(`✅ ${runnerName} บันทึกสำเร็จ ${lap} ${time}`, "success");
       markScanned(tag);
     }
   } catch (err) {
@@ -138,23 +145,28 @@ async function sendTag(tag) {
     manualBtn.disabled = false;
     tagInput.disabled = false;
     tagInput.focus();
-    tagInput.select();
+    tagInput.select(); // เตรียมรับค่าใหม่จาก scanner
   }
 }
 
 /* ------------- Events: auto-scan ------------- */
+/* Debounced input: เหมาะกับการวาง (paste) หรือสแกนที่ส่งค่าเป็นกลุ่ม */
 tagInput.addEventListener("input", () => {
   if (scanTimeout) clearTimeout(scanTimeout);
   scanTimeout = setTimeout(() => {
     const val = tagInput.value.trim();
     if (!val) return;
+    // ถ้าเป็นหลายบรรทัด (จาก reader) ให้เอาแถวสุดท้ายที่ไม่ว่าง
     const lines = val.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     const candidate = lines.length ? lines[lines.length - 1] : val;
+    // อัตโนมัติส่ง
     sendTag(candidate);
+    // ล้างช่องทันทีเพื่อพร้อมรับครั้งถัดไป
     tagInput.value = "";
   }, SCAN_DEBOUNCE_MS);
 });
 
+/* Enter: ส่งทันที (สำหรับกรอกมือ) */
 tagInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     e.preventDefault();
@@ -169,6 +181,7 @@ tagInput.addEventListener("keydown", (e) => {
   }
 });
 
+/* ปุ่มส่งด้วยมือ (สำรอง) */
 manualBtn.addEventListener("click", () => {
   if (scanTimeout) { clearTimeout(scanTimeout); scanTimeout = null; }
   const val = tagInput.value.trim();
@@ -177,11 +190,13 @@ manualBtn.addEventListener("click", () => {
   tagInput.value = "";
 });
 
+/* focus เมื่อหน้าโหลด และรองรับการเปิดแป้นตัวเลขบนมือถือ */
 window.addEventListener("load", () => {
   tagInput.focus();
   try { tagInput.setAttribute("inputmode", "numeric"); } catch(e){}
 });
 
+/* ถ้ามีการ paste ยาว ๆ (หลาย tag) จะส่งแถวสุดท้ายเท่านั้น — ป้องกันส่งทั้งก้อน */
 tagInput.addEventListener("paste", () => {
   if (scanTimeout) clearTimeout(scanTimeout);
   scanTimeout = setTimeout(() => {
@@ -193,6 +208,7 @@ tagInput.addEventListener("paste", () => {
   }, SCAN_DEBOUNCE_MS);
 });
 
+/* Small: clear old recentScans every minute (cleanup safety) */
 setInterval(() => recentScans.clear(), 60000);
 </script>
 </body>
