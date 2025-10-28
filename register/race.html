@@ -1,88 +1,215 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🏁 ระบบบันทึกการวิ่ง Race Tracking</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>🏃 ระบบบันทึกรอบ — สแกนอัตโนมัติ</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+  .fade-in { animation: fadeIn 0.28s ease-in; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
+  .success-bg { background: #ecfdf5; border: 1px solid #bbf7d0; color: #065f46; }
+  .warn-bg { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+  .error-bg { background: #fff1f2; border: 1px solid #fecaca; color: #7f1d1d; }
+</style>
 </head>
-<body class="bg-gray-100 p-6 font-[Prompt]">
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
-  <h1 class="text-2xl font-bold text-center mb-4">🏃‍♂️ ระบบบันทึกการวิ่ง</h1>
+<div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-6">
+  <h1 class="text-2xl font-bold text-center mb-4">🏁 ระบบสแกนรอบ (อัตโนมัติ)</h1>
 
-  <div class="max-w-md mx-auto bg-white p-4 rounded-lg shadow">
-    <input id="tagInput" type="text" placeholder="สแกน Tag ID..." 
-      class="w-full border rounded px-3 py-2 focus:outline-none" autofocus>
-    <p id="status" class="text-sm text-gray-700 mt-2 text-center"></p>
+  <div class="mb-4">
+    <label for="tagInput" class="block text-sm text-gray-600 mb-1">สแกนหรือวาง Tag ID (ระบบจะส่งอัตโนมัติ)</label>
+    <div class="flex gap-2">
+      <input id="tagInput" type="text" inputmode="numeric" autocomplete="off"
+        placeholder="สแกนหรือวาง Tag ID ที่นี่..." 
+        class="flex-grow border rounded-md px-3 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-blue-400" autofocus>
+      <button id="manualBtn" class="bg-blue-600 text-white px-4 rounded-md font-medium">ส่ง</button>
+    </div>
+    <p id="helper" class="mt-2 text-xs text-gray-500">ระบบจะรอสั้น ๆ หลังวางค่า แล้วส่งให้โดยอัตโนมัติ (สามารถกด "ส่ง" ได้ด้วย)</p>
   </div>
 
-  <div id="runnerInfo" class="max-w-md mx-auto mt-6 bg-white p-4 rounded-lg shadow hidden">
-    <h2 id="runnerName" class="text-lg font-semibold text-center"></h2>
-    <p id="runnerDetails" class="text-sm text-center text-gray-600"></p>
+  <div id="statusBox" class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center min-h-[92px]">
+    <p id="status" class="text-gray-600 text-sm">พร้อมสำหรับสแกน — วาง / สแกน Tag แล้วระบบจะส่งให้เอง</p>
   </div>
+
+  <footer class="mt-4 text-xs text-gray-500 text-center">
+    1 รอบ = 6.30 กม. • ระบบส่งไปยังฟังก์ชัน Supabase
+  </footer>
+</div>
 
 <script>
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // ของคุณ
-const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/rfid-reader"; // ของคุณ
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+/* ------------- CONFIG ------------- */
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // <-- ใส่ของจริง
+const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/rfid-reader"; // <-- ใส่ของจริง
 
+/* ------------- UI ------------- */
 const tagInput = document.getElementById("tagInput");
+const manualBtn = document.getElementById("manualBtn");
 const statusEl = document.getElementById("status");
-const runnerInfo = document.getElementById("runnerInfo");
-const runnerName = document.getElementById("runnerName");
-const runnerDetails = document.getElementById("runnerDetails");
+const statusBox = document.getElementById("statusBox");
+const helper = document.getElementById("helper");
 
+/* ------------- Auto-scan settings ------------- */
 let scanTimeout = null;
-const SCAN_DELAY = 200;
+const SCAN_DEBOUNCE_MS = 180;    // รอสั้น ๆ ก่อนส่ง (ปรับได้)
+const COOLDOWN_MS = 1500;        // ป้องกันสแกนซ้ำ (same tag) ภายในเวลานี้
 
+/* เก็บเวลาสแกนล่าสุดของแต่ละ tag เพื่อป้องกันซ้ำ */
+const recentScans = new Map();
+
+/* ปิดการส่งหากกำลังส่งอยู่ */
+let sending = false;
+
+/* ------------- Helpers ------------- */
+function showStatus(message, kind = "info") {
+  statusBox.className = "rounded-lg p-4 fade-in";
+  if (kind === "success") statusBox.classList.add("success-bg");
+  else if (kind === "warn") statusBox.classList.add("warn-bg");
+  else if (kind === "error") statusBox.classList.add("error-bg");
+  else statusBox.classList.add("bg-gray-50","border","border-gray-200");
+
+  statusEl.innerHTML = message;
+  // small vibration if available
+  if (navigator.vibrate && (kind === "success" || kind === "error")) {
+    navigator.vibrate(kind === "success" ? 70 : 150);
+  }
+}
+
+/* ตรวจสอบว่า tag ควรส่งหรือยัง (cooldown) */
+function shouldSendTag(tag) {
+  if (!tag) return false;
+  const now = Date.now();
+  const last = recentScans.get(tag);
+  if (!last) return true;
+  return (now - last) > COOLDOWN_MS;
+}
+
+/* บันทึกเวลาสแกนล่าสุด */
+function markScanned(tag) {
+  recentScans.set(tag, Date.now());
+  // ลบรายการหลัง 10s เพื่อไม่ให้ Map โตไม่จำเป็น
+  setTimeout(() => recentScans.delete(tag), 10000);
+}
+
+/* ส่ง request ไป function */
+async function sendTag(tag) {
+  if (!tag) return;
+  if (!shouldSendTag(tag)) {
+    showStatus(`⚠️ ป้องกันการส่งซ้ำสำหรับ Tag: ${tag}`, "warn");
+    return;
+  }
+  if (sending) {
+    showStatus("⏳ กำลังส่งคำขอก่อนหน้า — กรุณารอสักครู่", "warn");
+    return;
+  }
+
+  sending = true;
+  manualBtn.disabled = true;
+  tagInput.disabled = true;
+  showStatus(`⏳ กำลังบันทึก Tag: ${tag} ...`, "info");
+
+  try {
+    const resp = await fetch(FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SUPABASE_KEY}`
+      },
+      body: JSON.stringify({ tag_id: tag })
+    });
+
+    let result;
+    try { result = await resp.json(); } catch(e) { result = { error: "ไม่สามารถอ่านผลจากเซิร์ฟเวอร์" }; }
+
+    if (result.error) {
+      showStatus(`❌ ${result.error}`, "error");
+    } else if (result.message) {
+      // ฟังก์ชันส่งกลับข้อความเตือน (เช่น finished/limit)
+      showStatus(`⚠️ ${result.message}`, "warn");
+      markScanned(tag); // บันทึกเพื่อป้องกันส่งซ้ำโดยไม่ตั้งใจ
+    } else {
+      // success
+      const runnerName = result.runner || "นักวิ่งไม่ทราบชื่อ";
+      const lap = result.lap !== undefined ? `รอบที่ ${result.lap}` : "";
+      const time = result.time ? `<div class="text-xs text-gray-500 mt-1">${result.time}</div>` : "";
+      showStatus(`✅ ${runnerName} บันทึกสำเร็จ ${lap} ${time}`, "success");
+      markScanned(tag);
+    }
+  } catch (err) {
+    console.error(err);
+    showStatus(`❌ Error: ${err.message}`, "error");
+  } finally {
+    sending = false;
+    manualBtn.disabled = false;
+    tagInput.disabled = false;
+    tagInput.focus();
+    tagInput.select(); // เตรียมรับค่าใหม่จาก scanner
+  }
+}
+
+/* ------------- Events: auto-scan ------------- */
+/* Debounced input: เหมาะกับการวาง (paste) หรือสแกนที่ส่งค่าเป็นกลุ่ม */
 tagInput.addEventListener("input", () => {
   if (scanTimeout) clearTimeout(scanTimeout);
-
-  scanTimeout = setTimeout(async () => {
-    const tagId = tagInput.value.trim();
-    if (!tagId) return;
+  scanTimeout = setTimeout(() => {
+    const val = tagInput.value.trim();
+    if (!val) return;
+    // ถ้าเป็นหลายบรรทัด (จาก reader) ให้เอาแถวสุดท้ายที่ไม่ว่าง
+    const lines = val.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const candidate = lines.length ? lines[lines.length - 1] : val;
+    // อัตโนมัติส่ง
+    sendTag(candidate);
+    // ล้างช่องทันทีเพื่อพร้อมรับครั้งถัดไป
     tagInput.value = "";
-
-    try {
-      const resp = await fetch(FUNCTION_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${SUPABASE_KEY}`
-        },
-        body: JSON.stringify({ tag_id: tagId })
-      });
-
-      const result = await resp.json();
-
-      if (result.error) {
-        statusEl.textContent = "❌ " + result.error;
-        runnerInfo.classList.add("hidden");
-      } 
-      else if (result.message) {
-        statusEl.textContent = "🏁 " + result.message;
-        runnerInfo.classList.add("hidden");
-      } 
-      else if (result.success) {
-        // ✅ เพิ่มการแสดง BIB ที่นี่
-        const bibText = result.bib ? ` (BIB: ${result.bib})` : "";
-        statusEl.textContent = `✅ ${result.runner}${bibText} บันทึกสำเร็จ รอบที่ ${result.lap}`;
-
-        runnerInfo.classList.remove("hidden");
-        runnerName.textContent = `${result.runner}${bibText}`;
-        runnerDetails.textContent = `🏁 รอบที่: ${result.lap} | ⏰ เวลา: ${result.time}`;
-      } 
-      else {
-        statusEl.textContent = "⚠️ ไม่พบข้อมูล";
-        runnerInfo.classList.add("hidden");
-      }
-
-    } catch (err) {
-      statusEl.textContent = "❌ Error: " + err.message;
-      runnerInfo.classList.add("hidden");
-    }
-  }, SCAN_DELAY);
+  }, SCAN_DEBOUNCE_MS);
 });
+
+/* Enter: ส่งทันที (สำหรับกรอกมือ) */
+tagInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    if (scanTimeout) { clearTimeout(scanTimeout); scanTimeout = null; }
+    const val = tagInput.value.trim();
+    if (!val) {
+      showStatus("กรุณาใส่ Tag ID ก่อนกด Enter", "warn");
+      return;
+    }
+    sendTag(val);
+    tagInput.value = "";
+  }
+});
+
+/* ปุ่มส่งด้วยมือ (สำรอง) */
+manualBtn.addEventListener("click", () => {
+  if (scanTimeout) { clearTimeout(scanTimeout); scanTimeout = null; }
+  const val = tagInput.value.trim();
+  if (!val) { showStatus("กรุณาใส่ Tag ID ก่อนกดส่ง", "warn"); return; }
+  sendTag(val);
+  tagInput.value = "";
+});
+
+/* focus เมื่อหน้าโหลด และรองรับการเปิดแป้นตัวเลขบนมือถือ */
+window.addEventListener("load", () => {
+  tagInput.focus();
+  try { tagInput.setAttribute("inputmode", "numeric"); } catch(e){}
+});
+
+/* ถ้ามีการ paste ยาว ๆ (หลาย tag) จะส่งแถวสุดท้ายเท่านั้น — ป้องกันส่งทั้งก้อน */
+tagInput.addEventListener("paste", () => {
+  if (scanTimeout) clearTimeout(scanTimeout);
+  scanTimeout = setTimeout(() => {
+    const val = tagInput.value.trim();
+    const lines = val.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const candidate = lines.length ? lines[lines.length - 1] : val;
+    sendTag(candidate);
+    tagInput.value = "";
+  }, SCAN_DEBOUNCE_MS);
+});
+
+/* Small: clear old recentScans every minute (cleanup safety) */
+setInterval(() => recentScans.clear(), 60000);
 </script>
 </body>
 </html>
