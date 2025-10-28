@@ -38,7 +38,7 @@
 
     <!-- ช่องค้นหา -->
     <div class="flex flex-wrap gap-2 mb-4">
-      <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อ หรือ Tag ID เพื่อค้นหา..." class="border p-2 rounded flex-grow">
+      <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อ, Tag ID หรือ BIB เพื่อค้นหา..." class="border p-2 rounded flex-grow">
       <button id="clearBtn" class="bg-gray-300 px-3 py-2 rounded">ล้าง</button>
       <button id="showAllBtn" class="bg-blue-500 text-white px-3 py-2 rounded">แสดงทั้งหมด</button>
       <button id="showRunningBtn" class="bg-green-600 text-white px-3 py-2 rounded">เฉพาะ RUNNING</button>
@@ -58,15 +58,14 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 👈 ใส่ anon key ของคุณ
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentUser = null;
-let currentSearch = ""; 
+let currentSearch = "";
 let showOnlyRunning = false;
 let searchTimeout = null;
 
-// เสียงเตือน
 const alertDnf = document.getElementById("alertDnf");
 const alertFinisher = document.getElementById("alertFinisher");
 const toastContainer = document.getElementById("toast-container");
@@ -122,7 +121,7 @@ const searchInput = document.getElementById("searchInput");
 searchInput.addEventListener("input", () => {
   if (searchTimeout) clearTimeout(searchTimeout);
   searchTimeout = setTimeout(() => {
-    currentSearch = searchInput.value.trim(); 
+    currentSearch = searchInput.value.trim();
     loadRunners(currentSearch);
   }, 600);
 });
@@ -134,11 +133,12 @@ document.getElementById("showRunningBtn").onclick = () => { showOnlyRunning = tr
 async function loadRunners(query = currentSearch) {
   let queryBuilder = supabase
     .from("runner")
-    .select("id, name, tag_id, bib, type, status, record(lap, start_time, finish_time)")  // ✅ เพิ่ม bib เข้ามา
+    .select("id, name, tag_id, bib, type, status, record(lap, start_time, finish_time)")
     .order("name", { ascending: true });
 
   if (query && query.trim() !== "") {
-    queryBuilder = queryBuilder.or(`name.ilike.%${query}%,tag_id.ilike.%${query}%`);
+    // ✅ เพิ่มค้นหาด้วย bib
+    queryBuilder = queryBuilder.or(`name.ilike.%${query}%,tag_id.ilike.%${query}%,bib.ilike.%${query}%`);
   }
   if (showOnlyRunning) queryBuilder = queryBuilder.eq("status", "RUNNING");
 
@@ -192,7 +192,7 @@ async function loadRunners(query = currentSearch) {
       <div class="border p-3 rounded flex justify-between items-center ${bgClass}">
         <div>
           <b>${r.name}</b> (${r.type})<br>
-          🏷️ BIB: ${r.bib || "-"}<br> <!-- ✅ เพิ่มแสดง BIB -->
+          🏷️ BIB: ${r.bib || "-"}<br>
           🪪 Tag ID: ${r.tag_id || "-"}<br>
           สถานะ: ${r.status}<br>${info}${notice}
         </div>
