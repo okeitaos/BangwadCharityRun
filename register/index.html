@@ -14,16 +14,20 @@
       color: #fff;
       text-align: center;
       overflow-x: hidden;
+      position: relative;
+      min-height: 100vh;
     }
 
     header {
       padding: 60px 20px 40px;
       border-bottom: 1px solid rgba(255,255,255,0.1);
+      position: relative;
+      z-index: 2;
     }
 
     header img {
       width: 120px;
-      height: 140px;
+      height: 120px;
       border-radius: 50%;
       border: 4px solid rgba(255,255,255,0.3);
       margin-bottom: 20px;
@@ -51,6 +55,8 @@
       line-height: 1.9;
       color: #e8e8e8;
       font-size: 1.05rem;
+      position: relative;
+      z-index: 2;
     }
 
     .quote {
@@ -87,6 +93,8 @@
       color: #aaa;
       font-size: 0.9rem;
       border-top: 1px solid rgba(255,255,255,0.1);
+      position: relative;
+      z-index: 2;
     }
 
     .ribbon {
@@ -95,6 +103,32 @@
       bottom: 20px;
       right: 20px;
       opacity: 0.6;
+      z-index: 3;
+    }
+
+    /* เอฟเฟกต์กลีบดอกไม้ร่วง */
+    .petal {
+      position: fixed;
+      top: -50px;
+      width: 15px;
+      height: 15px;
+      background: radial-gradient(circle, rgba(200,200,200,0.8) 30%, rgba(255,255,255,0.2) 100%);
+      border-radius: 50%;
+      opacity: 0.8;
+      pointer-events: none;
+      animation: fall linear infinite;
+      z-index: 1;
+    }
+
+    @keyframes fall {
+      0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(110vh) rotate(360deg);
+        opacity: 0;
+      }
     }
 
     @media (max-width: 600px) {
@@ -130,14 +164,29 @@
       และจะน้อมนำแนวพระราชดำริมาปฏิบัติเพื่อสืบสานพระราชปณิธานสืบไป
     </p>
 
-    <a href="TOP100.html" class="btn-back">HOME</a>
+    <a href="4laptop100.html" class="btn-back">กลับหน้าเว็บไซต์หลัก</a>
   </section>
 
   <footer>
     <p>ขอน้อมถวายความอาลัย ด้วยสำนึกในพระมหากรุณาธิคุณอันหาที่สุดมิได้</p>
-    <p>© 2025 — BANGWAD CHARITY RUN</p>
+    <p>© 2025 — เว็บไซต์จัดทำเพื่อการถวายอาลัย</p>
   </footer>
 
   <img src="https://lh5.googleusercontent.com/d/1oe96fQJojyd8m7WXRfYATi3wWZQ9ZOVn" class="ribbon" alt="black ribbon">
+
+  <script>
+    // สร้างกลีบดอกไม้ร่วง
+    const petalCount = 20;
+    for (let i = 0; i < petalCount; i++) {
+      const petal = document.createElement("div");
+      petal.classList.add("petal");
+      petal.style.left = Math.random() * 100 + "vw";
+      petal.style.animationDuration = 8 + Math.random() * 5 + "s";
+      petal.style.animationDelay = Math.random() * 5 + "s";
+      petal.style.opacity = 0.4 + Math.random() * 0.6;
+      petal.style.transform = `scale(${0.5 + Math.random()})`;
+      document.body.appendChild(petal);
+    }
+  </script>
 </body>
 </html>
