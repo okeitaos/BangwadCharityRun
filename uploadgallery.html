@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LINE Login Upload | BCR RUN</title>
+<title>LINE Upload | BCR RUN</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -28,6 +28,14 @@
     transition: 0.3s;
   }
   button:hover { opacity: 0.9; transform: scale(1.03); }
+  .delete-btn {
+    background: #dc2626;
+    border-radius: 15px;
+    padding: 5px 10px;
+    margin-left: 8px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
   #userProfile img {
     border-radius: 50%;
     width: 100px;
@@ -46,17 +54,40 @@
     text-align: left;
   }
   ul { list-style: none; padding: 0; margin: 0; }
-  li { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.1); word-break: break-all; }
+  li { 
+    padding: 6px 10px; 
+    border-bottom: 1px solid rgba(255,255,255,0.1); 
+    word-break: break-all;
+    display: flex; 
+    justify-content: space-between;
+    align-items: center;
+  }
   #status { margin-top: 10px; color: #facc15; font-weight: bold; }
+  #progressContainer {
+    width: 90%;
+    max-width: 500px;
+    height: 10px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 10px;
+    margin: 10px auto;
+    overflow: hidden;
+  }
+  #progressBar {
+    height: 100%;
+    background: linear-gradient(90deg, #06C755, #00B900);
+    width: 0%;
+    transition: width 0.2s;
+  }
   @media (max-width:600px){
     body { padding: 12px; }
     h1 { font-size: 1.4rem; }
     button { width: 90%; font-size: 1rem; }
+    li { flex-direction: column; align-items: flex-start; }
   }
 </style>
 </head>
 <body>
-  <h1>📤 Upload with LINE Login</h1>
+  <h1>📤 LINE Upload</h1>
 
   <!-- Section: Login -->
   <div id="loginSection">
@@ -72,6 +103,7 @@
     <button style="background:#dc2626" onclick="logout()">🚪 ออกจากระบบ</button>
 
     <div id="status"></div>
+    <div id="progressContainer"><div id="progressBar"></div></div>
 
     <div class="file-list">
       <ul id="fileList"></ul>
@@ -84,8 +116,7 @@ const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-const LIFF_ID = "2001781240-k2PJ3Ap2"; // 👈 ใส่ LIFF ID ที่ได้จาก LINE Developer
+const LIFF_ID = "2001781240-k2PJ3Ap2"; // 🔹 ใส่ LIFF ID จริงของคุณ
 
 let userId = "", userName = "", userPic = "";
 
@@ -103,18 +134,10 @@ async function main() {
   }
 }
 
-/* ✅ เข้าสู่ระบบ LINE */
+/* ✅ Login LINE */
 function login() { liff.login(); }
 
-/* ✅ แสดงส่วนอัปโหลด */
-function showUploadSection() {
-  document.getElementById("loginSection").style.display = "none";
-  document.getElementById("uploadSection").style.display = "block";
-  document.getElementById("userProfile").innerHTML =
-    `<img src="${userPic}" alt="profile"><p>${userName}</p>`;
-}
-
-/* ✅ ออกจากระบบ LINE */
+/* ✅ Logout LINE */
 async function logout() {
   if (confirm("ต้องการออกจากระบบใช่ไหม?")) {
     await liff.logout();
@@ -122,37 +145,46 @@ async function logout() {
   }
 }
 
-/* ✅ อัปโหลดไฟล์ */
+/* ✅ แสดงส่วน Upload */
+function showUploadSection() {
+  document.getElementById("loginSection").style.display = "none";
+  document.getElementById("uploadSection").style.display = "block";
+  document.getElementById("userProfile").innerHTML =
+    `<img src="${userPic}" alt="profile"><p>${userName}</p>`;
+}
+
+/* ✅ Upload Files พร้อม Progress */
 async function uploadFiles() {
   const files = document.getElementById("fileInput").files;
   const status = document.getElementById("status");
+  const progressBar = document.getElementById("progressBar");
+
   if (!files.length) return alert("กรุณาเลือกไฟล์");
 
   status.innerText = "⏳ กำลังอัปโหลด...";
+  progressBar.style.width = "0%";
   let success = 0, skipped = 0;
+  const total = files.length;
 
-  for (const file of files) {
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit
-      skipped++;
-      continue;
-    }
+  for (let i = 0; i < total; i++) {
+    const file = files[i];
+    if (file.size > 5 * 1024 * 1024) { skipped++; continue; }
+
     const path = `${userId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
     const { error } = await sb.storage.from(BUCKET).upload(path, file);
+
     if (!error) success++;
+    progressBar.style.width = `${((i + 1) / total) * 100}%`;
   }
 
-  // ✅ เคลียร์ input หลังอัปโหลดเสร็จ
-  document.getElementById("fileInput").value = "";
-
-  // ✅ แสดงผลลัพธ์
+  document.getElementById("fileInput").value = ""; // clear input
   status.innerText = `✅ อัปโหลดสำเร็จ ${success} ไฟล์` +
                      (skipped ? ` (ข้าม ${skipped} ไฟล์ >5MB)` : "");
-
-  // ✅ โหลดรายชื่อใหม่
+  progressBar.style.width = "100%";
   listFiles();
 }
 
-/* ✅ แสดงรายชื่อไฟล์ */
+/* ✅ แสดงรายการไฟล์ */
 async function listFiles() {
   const { data, error } = await sb.storage.from(BUCKET).list(`${userId}/`, {
     limit: 1000,
@@ -163,10 +195,39 @@ async function listFiles() {
   const list = document.getElementById("fileList");
   const count = document.getElementById("count");
   const files = (data || []).filter(f => f.name !== ".emptyFolderPlaceholder");
-  list.innerHTML = files.length
-    ? files.map(f => `<li>${f.name}</li>`).join("")
-    : "<li>ไม่มีไฟล์</li>";
+
+  if (files.length === 0) {
+    list.innerHTML = "<li>ไม่มีไฟล์</li>";
+    count.innerText = "";
+    return;
+  }
+
+  const now = new Date();
+  list.innerHTML = files.map(f => {
+    const date = new Date(f.created_at || now);
+    const time = date.toLocaleString("th-TH", { hour12: false });
+    return `
+      <li>
+        <span>${f.name}</span>
+        <div>
+          <small style="opacity:0.7;">${time}</small>
+          <button class="delete-btn" onclick="deleteFile('${f.name}')">ลบ</button>
+        </div>
+      </li>`;
+  }).join("");
+
   count.innerText = `📦 จำนวนไฟล์ทั้งหมด: ${files.length}`;
+}
+
+/* ✅ ลบไฟล์ */
+async function deleteFile(filename) {
+  if (!confirm(`ต้องการลบไฟล์นี้หรือไม่?\n${filename}`)) return;
+  const { error } = await sb.storage.from(BUCKET).remove([`${userId}/${filename}`]);
+  if (error) alert("❌ ลบไฟล์ไม่สำเร็จ");
+  else {
+    alert("🗑️ ลบไฟล์สำเร็จ");
+    listFiles();
+  }
 }
 
 /* ✅ เริ่มทำงาน */
