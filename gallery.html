@@ -1,369 +1,270 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📤 LINE Upload Gallery</title>
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<style>
-  :root {
-    --gold: #facc15;
-    --green: #06C755;
-    --dark: #0f172a;
-    --panel: rgba(255,255,255,0.08);
-    --border: rgba(255,255,255,0.1);
-  }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔍 ค้นหารูปด้วยใบหน้า | BCR RUN GALLERY</title>
 
-  body {
-    font-family: "Prompt", sans-serif;
-    margin: 0;
-    background: radial-gradient(circle at top, #1e293b, var(--dark));
-    color: #fff;
-    text-align: center;
-    padding: 25px;
-    min-height: 100vh;
-  }
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  h1 {
-    color: var(--gold);
-    font-size: 2rem;
-    margin-bottom: 15px;
-    text-shadow: 0 0 10px rgba(250,204,21,0.5);
-  }
+  <!-- Face Recognition -->
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
-  #userProfile img {
-    border-radius: 50%;
-    width: 90px;
-    height: 90px;
-    border: 3px solid var(--gold);
-    margin-bottom: 10px;
-  }
+  <!-- Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet">
 
-  #userProfile p { font-weight: 600; font-size: 1.1rem; color: var(--gold); }
+  <style>
+    body {
+      font-family: "Prompt", sans-serif;
+      margin: 0;
+      background: linear-gradient(135deg, #0f172a, #1e293b, #0f172a);
+      color: #fff;
+      text-align: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
 
-  input[type="file"] {
-    margin: 15px 0;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    padding: 10px;
-    border-radius: 10px;
-    color: #fff;
-    width: 90%;
-    max-width: 400px;
-  }
+    h1 {
+      color: #facc15;
+      margin-bottom: 10px;
+      text-shadow: 0 0 10px rgba(250,204,21,0.4);
+    }
 
-  input[type="text"] {
-    width: 90%;
-    max-width: 400px;
-    padding: 10px;
-    border-radius: 25px;
-    border: none;
-    outline: none;
-    margin-bottom: 15px;
-    font-size: 1rem;
-    background: var(--panel);
-    color: #fff;
-    text-align: center;
-  }
+    p { opacity: 0.85; }
 
-  button {
-    border: none;
-    padding: 10px 20px;
-    border-radius: 25px;
-    font-weight: bold;
-    color: #fff;
-    cursor: pointer;
-    margin: 6px;
-    transition: 0.3s;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-  }
+    #uploadInput {
+      margin: 20px 0;
+      padding: 10px;
+      border-radius: 25px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
 
-  button:hover { transform: translateY(-2px); opacity: 0.9; }
+    #uploadInput:hover { background: rgba(255,255,255,0.15); }
 
-  .btn-green { background: linear-gradient(90deg, #06C755, #00B900); }
-  #loginBtn { background: var(--green); }
-  #deleteAllBtn { background: linear-gradient(90deg, #ef4444, #dc2626); }
-  #logoutBtn { background: #475569; }
-  .delete-btn { background: #dc2626; font-size: 0.8rem; padding: 5px 10px; }
+    #status {
+      margin: 10px;
+      color: #facc15;
+      font-weight: 600;
+    }
 
-  #status { margin-top: 10px; color: var(--gold); font-weight: bold; }
+    .progress-container {
+      width: 80%;
+      max-width: 600px;
+      margin: 10px auto 20px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 30px;
+      overflow: hidden;
+      height: 20px;
+    }
 
-  #progressContainer {
-    width: 90%; max-width: 500px; height: 10px;
-    background: var(--panel); border-radius: 10px;
-    margin: 10px auto; overflow: hidden;
-  }
-  #progressBar {
-    height: 100%;
-    background: linear-gradient(90deg, var(--green), #22c55e);
-    width: 0%; transition: width 0.2s;
-  }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #22c55e, #84cc16);
+      border-radius: 30px;
+      transition: width 0.2s ease;
+    }
 
-  .file-list {
-    background: var(--panel);
-    border-radius: 15px;
-    padding: 20px;
-    margin: 25px auto;
-    max-width: 700px;
-    box-shadow: 0 0 20px rgba(0,0,0,0.3);
-    text-align: left;
-  }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 15px;
+      max-width: 1000px;
+      margin: 20px auto;
+    }
 
-  ul { list-style: none; padding: 0; margin: 0; }
+    .card {
+      background: rgba(255,255,255,0.05);
+      border-radius: 15px;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      transition: transform 0.2s ease;
+    }
 
-  /* ✅ ปรับ layout ของรายการไฟล์ให้ชื่อไม่ตกบรรทัด */
-  li {
-    padding: 10px 8px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: nowrap;
-    word-break: normal;
-  }
+    .card:hover { transform: scale(1.03); }
 
-  li .filename {
-    display: inline-block;
-    flex: 1 1 auto;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    vertical-align: middle;
-    color: #38bdf8;
-    cursor: pointer;
-    text-decoration: underline;
-  }
+    .card img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      transition: opacity 0.3s;
+    }
 
-  li .filename:hover { color: var(--gold); }
+    .card img:hover { opacity: 0.9; }
 
-  li > div {
-    flex: 0 0 auto;
-    text-align: right;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 6px;
-  }
+    .card p {
+      font-size: 0.9rem;
+      margin: 8px 0;
+      color: #eee;
+    }
 
-  #count { margin-top: 10px; text-align: right; opacity: 0.7; }
-  #pagination { margin-top: 20px; }
-  #pagination button { background: #3b82f6; font-size: 0.9rem; }
+    .download-btn {
+      background: linear-gradient(90deg, #2563eb, #3b82f6);
+      border: none;
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 25px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      margin-bottom: 10px;
+    }
 
-  .modal {
-    display: none;
-    position: fixed;
-    z-index: 999;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0,0,0,0.95);
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
-  }
-
-  .modal img {
-    max-width: 90%;
-    max-height: 80%;
-    border-radius: 15px;
-    box-shadow: 0 0 20px rgba(250,204,21,0.3);
-  }
-
-  .modal button { background: #dc2626; margin-top: 20px; }
-
-  @media (max-width:600px) {
-    body { padding: 15px; }
-    h1 { font-size: 1.5rem; }
-    li { gap: 8px; }
-    li .filename { max-width: 70%; }
-  }
-</style>
+    .download-btn:hover { background: #1d4ed8; }
+  </style>
 </head>
 <body>
-  <h1>📤 LINE Upload Gallery</h1>
+  <h1>🔍 ค้นหารูปด้วยใบหน้า</h1>
+  <p>อัปโหลดรูปใบหน้าของคุณ เพื่อค้นหารูป</p>
 
-  <div id="loginSection">
-    <button id="loginBtn" onclick="login()">เข้าสู่ระบบด้วย LINE</button>
+  <input type="file" id="uploadInput" accept="image/*">
+  <div id="status">⏳ รออัปโหลดรูปเพื่อเริ่มค้นหา...</div>
+
+  <div class="progress-container">
+    <div class="progress-bar" id="progressBar"></div>
   </div>
 
-  <div id="uploadSection" style="display:none;">
-    <div id="userProfile"></div>
-
-    <input type="file" id="fileInput" multiple accept="image/*"><br>
-    <button class="btn-green" onclick="uploadFilesChecked()">📤 อัปโหลด</button>
-    <button class="btn-green" onclick="listFiles(true)">🔄 รีเฟรช</button>
-    <button id="deleteAllBtn" onclick="deleteAllFiles()">🗑️ ลบรูปทั้งหมด</button>
-    <button id="logoutBtn" onclick="logout()">🚪 ออกจากระบบ</button>
-
-    <div id="status"></div>
-    <div id="progressContainer"><div id="progressBar"></div></div>
-
-    <div class="file-list">
-      <input type="text" id="searchInput" placeholder="🔍 ค้นหาชื่อไฟล์...">
-      <ul id="fileList"></ul>
-      <div id="count"></div>
-    </div>
-
-    <div id="pagination">
-      <button id="prevBtn" onclick="prevPage()" disabled>⬅️ ก่อนหน้า</button>
-      <button id="nextBtn" onclick="nextPage()">ถัดไป ➡️</button>
-    </div>
-  </div>
-
-  <div class="modal" id="imageModal">
-    <img id="modalImg" src="" alt="preview">
-    <button onclick="closeModal()">ปิด</button>
-  </div>
+  <div class="grid" id="resultGrid"></div>
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-const LIFF_ID = "2001781240-k2PJ3Ap2";
 
-let userId = "", userName = "", userPic = "";
-let currentPage = 1;
-const PAGE_SIZE_DISPLAY = 15;
-let totalPages = 1;
-let allFiles = [];
+let allImages = [];
+let modelsLoaded = false;
 
-function sanitizeFileName(name) {
-  const idx = name.lastIndexOf('.');
-  const base = idx === -1 ? name : name.slice(0, idx);
-  const ext = idx === -1 ? '' : name.slice(idx).toLowerCase();
-  const cleaned = base.normalize('NFKD')
-    .replace(/\s+/g, '_').replace(/[\/\\]+/g, '_')
-    .replace(/[^\w.-]/g, '_').replace(/_+/g, '_')
-    .slice(0, 120);
-  return `${cleaned}${ext}`;
+window.onload = async () => {
+  await loadModels();
+  await loadAllImages();
+};
+
+// ✅ โหลดโมเดลจาก CDN ที่มีไฟล์จริง
+async function loadModels() {
+  const MODEL_URL = "https://cdn.jsdelivr.net/gh/vladmandic/face-api/model/";
+  await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+  modelsLoaded = true;
+  document.getElementById("status").innerText = "✅ พร้อมใช้งานแล้ว กรุณาอัปโหลดรูปเพื่อเริ่มค้นหา";
 }
 
-function safeUserId(uid) { return uid.replace(/[^a-zA-Z0-9_-]/g, "_"); }
-
-async function main() {
-  await liff.init({ liffId: LIFF_ID });
-  if (!liff.isLoggedIn()) document.getElementById("loginSection").style.display = "block";
-  else {
-    const profile = await liff.getProfile();
-    userId = safeUserId(profile.userId);
-    userName = profile.displayName;
-    userPic = profile.pictureUrl;
-    showUploadSection();
+// ✅ โหลดรูปทั้งหมดจาก Supabase
+async function loadAllImages() {
+  const { data: folders } = await sb.storage.from(BUCKET).list("", { limit: 100 });
+  for (const folder of folders) {
+    if (!folder.name.startsWith(".")) {
+      const { data: files } = await sb.storage.from(BUCKET).list(folder.name + "/", { limit: 1000 });
+      files?.forEach(f => {
+        if (/\.(jpg|jpeg|png)$/i.test(f.name)) {
+          allImages.push({
+            url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${folder.name}/${f.name}`,
+            name: f.name
+          });
+        }
+      });
+    }
   }
-}
-function login() { liff.login(); }
-async function logout() { await liff.logout(); location.reload(); }
-
-function showUploadSection() {
-  document.getElementById("loginSection").style.display = "none";
-  document.getElementById("uploadSection").style.display = "block";
-  document.getElementById("userProfile").innerHTML = `<img src="${userPic}"><p>${userName}</p>`;
-  listFiles(true);
+  console.log("📸 โหลดรูปทั้งหมดแล้ว:", allImages.length, "ไฟล์");
 }
 
-async function uploadFilesChecked() {
-  const files = document.getElementById("fileInput").files;
+// ✅ ค้นหาด้วยใบหน้า
+document.getElementById("uploadInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!modelsLoaded) return alert("โมเดลยังโหลดไม่เสร็จ กรุณารอสักครู่");
+
   const status = document.getElementById("status");
+  status.innerText = "🔍 กำลังวิเคราะห์ใบหน้า...";
   const progressBar = document.getElementById("progressBar");
-  if (!files.length) return alert("กรุณาเลือกไฟล์");
-  await listFiles(true);
-  status.innerText = "⏳ ตรวจสอบและอัปโหลด...";
+
+  const userImg = await faceapi.bufferToImage(file);
+  const detection = await faceapi
+    .detectSingleFace(userImg)
+    .withFaceLandmarks()
+    .withFaceDescriptor();
+
+  if (!detection) {
+    status.innerText = "❌ ไม่พบใบหน้าในภาพที่อัปโหลด";
+    return;
+  }
+
+  const userDesc = detection.descriptor;
+  const matches = [];
+
+  for (let i = 0; i < allImages.length; i++) {
+    const img = allImages[i];
+    try {
+      const refImg = new Image();
+      refImg.crossOrigin = "anonymous";
+      refImg.src = img.url;
+      await new Promise((res, rej) => {
+        refImg.onload = res;
+        refImg.onerror = rej;
+      });
+
+      const refDetection = await faceapi
+        .detectSingleFace(refImg)
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (!refDetection) continue;
+      const distance = faceapi.euclideanDistance(userDesc, refDetection.descriptor);
+      if (distance < 0.6) {
+        matches.push({ ...img, similarity: (1 - distance).toFixed(2) });
+      }
+    } catch (err) {
+      console.warn("ข้ามรูป:", img.name);
+    }
+
+    progressBar.style.width = `${((i + 1) / allImages.length) * 100}%`;
+    status.innerText = `🔎 ตรวจสอบ ${i + 1}/${allImages.length} ...`;
+  }
+
   progressBar.style.width = "0%";
 
-  let success = 0, skippedTooBig = 0, skippedDuplicate = 0;
-  const total = files.length;
-
-  for (let i = 0; i < total; i++) {
-    const file = files[i];
-    if (file.size > 5 * 1024 * 1024) { skippedTooBig++; continue; }
-
-    const duplicate = allFiles.find(f => f.name === file.name && f.size === file.size);
-    if (duplicate) { skippedDuplicate++; continue; }
-
-    const safeName = sanitizeFileName(file.name);
-    const path = `${userId}/${Date.now()}_${safeName}`;
-    await sb.storage.from(BUCKET).upload(path, file);
-    success++;
-    progressBar.style.width = `${((i + 1) / total) * 100}%`;
+  if (matches.length === 0) {
+    status.innerText = "😢 ไม่พบภาพที่มีใบหน้าคล้ายกัน";
+    document.getElementById("resultGrid").innerHTML = "";
+  } else {
+    status.innerText = `✅ พบ ${matches.length} ภาพที่มีใบหน้าคล้ายกัน`;
+    renderResults(matches);
   }
-  status.innerText = `✅ อัปโหลดสำเร็จ ${success} ไฟล์ (ข้ามซ้ำ ${skippedDuplicate}, ขนาดเกิน ${skippedTooBig})`;
-  progressBar.style.width = "100%";
-  listFiles(true);
+
+  e.target.value = "";
+});
+
+// ✅ แสดงผลลัพธ์
+function renderResults(list) {
+  const grid = document.getElementById("resultGrid");
+  grid.innerHTML = list.map(i => `
+    <div class="card">
+      <img src="${i.url}" alt="${i.name}">
+      <p>ความคล้าย: ${(i.similarity * 100).toFixed(0)}%</p>
+      <button class="download-btn" onclick="downloadImage('${i.url}', '${i.name}')">📥 ดาวน์โหลด</button>
+    </div>
+  `).join("");
 }
 
-async function listFiles(forceReload = false) {
-  const { data } = await sb.storage.from(BUCKET).list(`${userId}/`, { limit: 10000 });
-  allFiles = (data || []).filter(f => f.name !== ".emptyFolderPlaceholder");
-  allFiles.sort((a,b)=> new Date(b.created_at||0) - new Date(a.created_at||0));
-  totalPages = Math.max(1, Math.ceil(allFiles.length / PAGE_SIZE_DISPLAY));
-  if (currentPage > totalPages) currentPage = totalPages;
-  renderPage(currentPage);
-  updatePaginationButtons();
+// ✅ ดาวน์โหลดไฟล์โดยตรง
+function downloadImage(url, filename) {
+  fetch(url)
+    .then(res => res.blob())
+    .then(blob => {
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    })
+    .catch(() => alert("❌ ดาวน์โหลดไม่สำเร็จ"));
 }
-
-function renderPage(page) {
-  const start = (page - 1) * PAGE_SIZE_DISPLAY;
-  const slice = allFiles.slice(start, start + PAGE_SIZE_DISPLAY);
-  renderFileList(slice);
-  document.getElementById('count').innerText = `📦 แสดง ${slice.length} จาก ${allFiles.length} ไฟล์ — หน้า ${page}/${totalPages}`;
-}
-
-function renderFileList(files) {
-  const list = document.getElementById("fileList");
-  if (!files.length) { list.innerHTML = "<li>ไม่มีไฟล์</li>"; return; }
-  list.innerHTML = files.map(f => {
-    const time = new Date(f.created_at || Date.now()).toLocaleString("th-TH", { hour12: false });
-    const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${f.name}`;
-    return `<li>
-      <span class="filename" title="${escapeHtml(f.name)}" onclick="openModal('${imgUrl}')">${f.name}</span>
-      <div>
-        <small style="opacity:0.7;">${time}</small>
-        <button class="delete-btn" onclick="deleteFile('${f.name}')">ลบ</button>
-      </div>
-    </li>`;
-  }).join("");
-}
-
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function updatePaginationButtons() {
-  document.getElementById('prevBtn').disabled = currentPage <= 1;
-  document.getElementById('nextBtn').disabled = currentPage >= totalPages;
-}
-
-function nextPage() { if (currentPage < totalPages) { currentPage++; renderPage(currentPage); updatePaginationButtons(); } }
-function prevPage() { if (currentPage > 1) { currentPage--; renderPage(currentPage); updatePaginationButtons(); } }
-
-async function deleteFile(filename) {
-  if (!confirm(`ต้องการลบไฟล์นี้หรือไม่?\n${filename}`)) return;
-  await sb.storage.from(BUCKET).remove([`${userId}/${filename}`]);
-  listFiles(true);
-}
-
-async function deleteAllFiles() {
-  if (!confirm("⚠️ ต้องการลบรูปทั้งหมดของคุณใช่ไหม?")) return;
-  const paths = allFiles.map(f => `${userId}/${f.name}`);
-  await sb.storage.from(BUCKET).remove(paths);
-  listFiles(true);
-}
-
-function openModal(url) {
-  document.getElementById("modalImg").src = url;
-  document.getElementById("imageModal").style.display = "flex";
-}
-function closeModal() { document.getElementById("imageModal").style.display = "none"; }
-
-main();
 </script>
 </body>
 </html>
