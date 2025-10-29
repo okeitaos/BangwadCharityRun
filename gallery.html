@@ -8,7 +8,7 @@
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- Face Recognition (Browser Build) -->
+  <!-- Face Recognition -->
   <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
   <!-- Font -->
@@ -18,7 +18,7 @@
     body {
       font-family: "Prompt", sans-serif;
       margin: 0;
-      background: linear-gradient(135deg,#0f172a,#1e293b,#0f172a);
+      background: linear-gradient(135deg, #0f172a, #1e293b, #0f172a);
       color: #fff;
       text-align: center;
       min-height: 100vh;
@@ -43,6 +43,7 @@
       cursor: pointer;
       transition: all 0.3s;
     }
+
     #uploadInput:hover {
       background: rgba(255,255,255,0.15);
     }
@@ -51,6 +52,25 @@
       margin: 10px;
       color: #facc15;
       font-weight: 600;
+    }
+
+    /* Progress Bar */
+    .progress-container {
+      width: 80%;
+      max-width: 600px;
+      margin: 10px auto 20px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 30px;
+      overflow: hidden;
+      height: 20px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #22c55e, #84cc16);
+      border-radius: 30px;
+      transition: width 0.2s ease;
     }
 
     .grid {
@@ -132,6 +152,7 @@
       .card img { height: 160px; }
       h1 { font-size: 1.6rem; }
       #uploadInput { width: 90%; }
+      .progress-container { width: 90%; }
     }
   </style>
 </head>
@@ -141,6 +162,10 @@
 
   <input type="file" id="uploadInput" accept="image/*">
   <div id="status">⏳ รออัปโหลดรูปเพื่อเริ่มค้นหา...</div>
+
+  <div class="progress-container">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
 
   <div class="grid" id="resultGrid"></div>
 
@@ -164,7 +189,7 @@ window.onload = async () => {
   await loadAllImages();
 };
 
-// ✅ โหลดโมเดลจาก GitHub (ไม่ 404 แล้ว)
+// ✅ โหลดโมเดลจาก GitHub
 async function loadModels() {
   const MODEL_URL = "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
   await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
@@ -174,7 +199,7 @@ async function loadModels() {
   document.getElementById("status").innerText = "✅ พร้อมใช้งานแล้ว กรุณาอัปโหลดรูปเพื่อเริ่มค้นหา";
 }
 
-// ดึงรูปทั้งหมดจาก Supabase
+// โหลดรูปทั้งหมดจาก Supabase
 async function loadAllImages() {
   const { data: folders } = await sb.storage.from(BUCKET).list("", { limit: 100 });
   for (const folder of folders) {
@@ -190,7 +215,7 @@ async function loadAllImages() {
       });
     }
   }
-  console.log("📸 โหลดรูปทั้งหมด:", allImages.length, "ไฟล์");
+  console.log("📸 โหลดรูปทั้งหมดแล้ว:", allImages.length, "ไฟล์");
 }
 
 // ค้นหาด้วยใบหน้า
@@ -207,20 +232,24 @@ document.getElementById("uploadInput").addEventListener("change", async (e) => {
   const userDesc = await faceapi.computeFaceDescriptor(userImage);
 
   const matches = [];
-  let checked = 0;
-  for (const img of allImages) {
+  const progressBar = document.getElementById("progressBar");
+
+  for (let i = 0; i < allImages.length; i++) {
+    const img = allImages[i];
     try {
       const refImg = await faceapi.fetchImage(img.url);
       const refDesc = await faceapi.computeFaceDescriptor(refImg);
       const distance = faceapi.euclideanDistance(userDesc, refDesc);
-      checked++;
-      document.getElementById("status").innerText = `🔎 ตรวจสอบ ${checked}/${allImages.length} ...`;
       if (distance < 0.55) {
         matches.push({ ...img, similarity: (1 - distance).toFixed(2) });
       }
     } catch (err) {
       console.warn("ข้ามรูป:", img.name);
     }
+
+    const percent = ((i + 1) / allImages.length) * 100;
+    progressBar.style.width = percent + "%";
+    document.getElementById("status").innerText = `🔎 กำลังตรวจสอบ ${i + 1}/${allImages.length} ...`;
   }
 
   if (matches.length === 0) {
@@ -231,10 +260,10 @@ document.getElementById("uploadInput").addEventListener("change", async (e) => {
     renderResults(matches);
   }
 
+  progressBar.style.width = "0%";
   e.target.value = ""; // เคลียร์ input หลังค้นหาเสร็จ
 });
 
-// แสดงผลลัพธ์
 function renderResults(list) {
   const grid = document.getElementById("resultGrid");
   grid.innerHTML = list.map(i => `
@@ -245,11 +274,11 @@ function renderResults(list) {
   `).join("");
 }
 
-// เปิด / ปิดรูป
 function openModal(url) {
   document.getElementById("modalImg").src = url;
   document.getElementById("modal").style.display = "flex";
 }
+
 function closeModal() {
   document.getElementById("modal").style.display = "none";
 }
