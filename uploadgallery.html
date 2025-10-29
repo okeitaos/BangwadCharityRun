@@ -243,6 +243,25 @@ let allFiles = [];
 
 function safeUserId(uid) { return uid.replace(/[^a-zA-Z0-9_-]/g, "_"); }
 
+// ---------- sanitizeFileName ----------
+function sanitizeFileName(name) {
+  // แยกนามสกุล
+  const idx = name.lastIndexOf('.');
+  const base = idx === -1 ? name : name.slice(0, idx);
+  const ext = idx === -1 ? '' : name.slice(idx).toLowerCase();
+
+  const cleaned = base
+    .normalize('NFKD')            // decompose chars
+    .replace(/\s+/g, '_')        // spaces -> _
+    .replace(/[\/\\]+/g, '_')    // slashes -> _
+    .replace(/[^\w.-]/g, '_')    // non-word char -> _
+    .replace(/_+/g, '_')         // reduce multiple underscores
+    .slice(0, 120);              // limit length
+
+  return `${cleaned}${ext}`;
+}
+// ---------- end sanitize ----------
+
 async function main() {
   await liff.init({ liffId: LIFF_ID });
   if (!liff.isLoggedIn()) document.getElementById("loginSection").style.display = "block";
@@ -280,7 +299,9 @@ async function uploadFiles() {
   for (let i = 0; i < total; i++) {
     const file = files[i];
     if (file.size > 5 * 1024 * 1024) { skipped++; continue; }
-    const path = `${userId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+    // ใช้ sanitizeFileName() เพื่อความปลอดภัยของ key
+    const safeName = sanitizeFileName(file.name);
+    const path = `${userId}/${Date.now()}_${safeName}`;
     const { error } = await sb.storage.from(BUCKET).upload(path, file);
     if (!error) success++;
     progressBar.style.width = `${((i + 1) / total) * 100}%`;
@@ -329,10 +350,8 @@ async function uploadFilesChecked() {
   }
 
   // สร้างดรรชนีของไฟล์ปัจจุบันตาม size เพื่อช่วยคัดกรองก่อนดาวน์โหลด
-  // allFiles มาจาก listFiles()
   const existingBySize = {};
   allFiles.forEach(f => {
-    // บาง response มี property size หรือ metadata.size — ถ้าไม่มีจะเป็น undefined
     const size = f.size || (f.metadata && f.metadata.size) || null;
     if (!existingBySize[size]) existingBySize[size] = [];
     existingBySize[size].push(f);
@@ -351,17 +370,15 @@ async function uploadFilesChecked() {
     // 2) ตรวจชื่อ+ขนาด เหมือนไฟล์ที่มีอยู่แล้ว -> ถือเป็น duplicate ทันที (เร็ว)
     const candidateByName = allFiles.find(f => f.name === file.name);
     if (candidateByName) {
-      // ถ้ามีทั้งชื่อและ (ถ้ามี)ขนาดตรงกัน ให้ถือเป็นซ้ำ
       const existingSize = candidateByName.size || (candidateByName.metadata && candidateByName.metadata.size) || null;
       if (existingSize === null || existingSize === file.size) {
-        // ถ้าไม่มีข้อมูล size ใน metadata แต่ชื่อซ้ำ เราเลือกถือว่าเป็น duplicate เพื่อความปลอดภัย
         skippedDuplicate++;
         progressBar.style.width = `${((i + 1) / total) * 100}%`;
         continue;
       }
     }
 
-    // 3) ถ้ามีไฟล์ที่มีขนาดเท่ากันใน allFiles -> ดาวน์โหลดเฉพาะไฟล์เหล่านั้นเพื่อตรวจ hash (ลด traffic)
+    // 3) ถ้ามีไฟล์ที่มีขนาดเท่ากันใน allFiles -> ดาวน์โหลดเฉพาะไฟล์เหล่านั้นเพื่อตรวจ hash
     const possibleMatches = existingBySize[file.size] || [];
 
     let isDuplicate = false;
@@ -398,9 +415,10 @@ async function uploadFilesChecked() {
       continue;
     }
 
-    // 4) ถ้าไม่พบ duplicate จริง จึงอัปโหลด (ใช้พาธ เหมือนฟังก์ชันเดิม)
+    // 4) ถ้าไม่พบ duplicate จริง จึงอัปโหลด (ใช้ sanitizeFileName()
     try {
-      const path = `${userId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+      const safeName = sanitizeFileName(file.name);
+      const path = `${userId}/${Date.now()}_${safeName}`;
       const { error } = await sb.storage.from(BUCKET).upload(path, file);
       if (!error) success++;
       else console.warn('Upload error:', error);
@@ -428,10 +446,18 @@ async function listFiles(forceReload = false) {
     sortBy: { column: "created_at", order: "desc" },
     ...(forceReload && { cacheControl: "no-cache" })
   });
-  if (error) return alert("❌ โหลดไฟล์ไม่สำเร็จ");
+  if (error) {
+    console.error('listFiles error:', error);
+    return alert("❌ โหลดไฟล์ไม่สำเร็จ");
+  }
 
   allFiles = (data || []).filter(f => f.name !== ".emptyFolderPlaceholder");
   renderFileList(allFiles);
+
+  // ปรับสถานะปุ่ม pagination
+  document.getElementById('prevBtn').disabled = currentPage <= 1;
+  // ถ้าจำนวนไฟล์ที่ได้ < PAGE_SIZE แสดงว่าไม่มีหน้าถัดไป
+  document.getElementById('nextBtn').disabled = (allFiles.length < PAGE_SIZE);
 }
 
 document.getElementById("searchInput").addEventListener("input", e => {
@@ -476,39 +502,18 @@ async function deleteAllFiles() {
   listFiles(true);
 }
 
-// --- เพิ่มฟังก์ชันจัดการ Pagination (วางต่อท้าย script เดิม) ---
-
+/* Pagination functions */
 async function nextPage() {
-  // ไปหน้าถัดไป
   currentPage++;
-  // โหลดรายการหน้าปัจจุบัน (forceReload เพื่ออัพเดต)
   await listFiles(true);
-  // เปิดปุ่มย้อนกลับเมื่อไม่ใช่หน้าแรก
-  document.getElementById('prevBtn').disabled = currentPage <= 1;
-  // ปิดปุ่มถัดไปถ้าจำนวนไฟล์ในหน้าน้อยกว่า PAGE_SIZE (แสดงว่าไม่มีหน้าถัดไป)
-  document.getElementById('nextBtn').disabled = (allFiles.length < PAGE_SIZE);
 }
 
 async function prevPage() {
   if (currentPage <= 1) return;
   currentPage--;
   await listFiles(true);
-  document.getElementById('prevBtn').disabled = currentPage <= 1;
-  document.getElementById('nextBtn').disabled = (allFiles.length < PAGE_SIZE);
 }
 
-// เรียกใช้ตอนเริ่มต้น เพื่อเตะสถานะปุ่มให้ถูกต้อง (กรณี listFiles ถูกเรียกก่อน)
-(function initPaginationButtons() {
-  // ถ้าปุ่มไม่มีบนหน้า ไม่ต้องทำอะไร
-  const prev = document.getElementById('prevBtn');
-  const next = document.getElementById('nextBtn');
-  if (!prev || !next) return;
-  // ค่าเริ่มต้น
-  prev.disabled = currentPage <= 1;
-  // next ถูกเปิดไว้จนกว่า listFiles จะโหลดและตั้งค่าอีกครั้ง
-  next.disabled = false;
-})();
-  
 /* Modal */
 function openModal(url) {
   document.getElementById("modalImg").src = url;
