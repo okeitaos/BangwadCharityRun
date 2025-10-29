@@ -3,137 +3,191 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LINE Upload | BCR RUN</title>
+<title>📤 LINE Upload Gallery</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
+  :root {
+    --gold: #facc15;
+    --green: #06C755;
+    --dark: #0f172a;
+    --panel: rgba(255,255,255,0.08);
+    --border: rgba(255,255,255,0.1);
+  }
+
   body {
-    font-family: 'Prompt', sans-serif;
-    background: linear-gradient(135deg,#0f172a,#1e293b,#0f172a);
+    font-family: "Prompt", sans-serif;
+    margin: 0;
+    background: radial-gradient(circle at top, #1e293b, var(--dark));
     color: #fff;
     text-align: center;
-    padding: 20px;
+    padding: 25px;
+    min-height: 100vh;
   }
-  h1 { color: #facc15; margin-bottom: 20px; }
-  button {
-    background: linear-gradient(90deg,#06C755,#00B900);
-    color: #fff;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 25px;
-    font-weight: bold;
-    cursor: pointer;
-    margin: 6px;
-    transition: 0.3s;
+
+  h1 {
+    color: var(--gold);
+    font-size: 2rem;
+    margin-bottom: 15px;
+    text-shadow: 0 0 10px rgba(250,204,21,0.5);
   }
-  button:hover { opacity: 0.9; transform: scale(1.03); }
-  .delete-btn {
-    background: #dc2626;
-    border-radius: 15px;
-    padding: 5px 10px;
-    margin-left: 8px;
-    cursor: pointer;
-    font-size: 0.8rem;
-  }
-  #deleteAllBtn { background: linear-gradient(90deg, #ef4444, #dc2626); }
+
   #userProfile img {
     border-radius: 50%;
     width: 90px;
     height: 90px;
-    margin-top: 10px;
-    border: 3px solid #facc15;
+    border: 3px solid var(--gold);
+    margin-bottom: 10px;
   }
-  #userProfile p { margin-top: 6px; font-weight: bold; }
 
-  .file-list {
-    background: rgba(255,255,255,0.05);
-    margin-top: 20px;
-    padding: 20px;
+  #userProfile p {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--gold);
+  }
+
+  input[type="file"] {
+    margin: 15px 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 10px;
     border-radius: 10px;
-    max-width: 600px;
-    margin: 20px auto;
-    text-align: left;
+    color: #fff;
+    width: 90%;
+    max-width: 400px;
   }
 
   input[type="text"] {
-    width: 80%;
+    width: 90%;
     max-width: 400px;
     padding: 10px;
-    border-radius: 20px;
+    border-radius: 25px;
     border: none;
     outline: none;
     margin-bottom: 15px;
     font-size: 1rem;
+    background: var(--panel);
+    color: #fff;
+    text-align: center;
   }
 
-  ul { list-style: none; padding: 0; margin: 0; }
-  li { 
-    padding: 6px 10px; 
-    border-bottom: 1px solid rgba(255,255,255,0.1); 
-    display: flex; 
-    justify-content: space-between;
-    align-items: center;
-    word-break: break-all;
-  }
-  li span.filename {
-    color: #38bdf8;
+  button {
+    border: none;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-weight: bold;
+    color: #fff;
     cursor: pointer;
-    text-decoration: underline;
+    margin: 6px;
+    transition: 0.3s;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
   }
-  li span.filename:hover { color: #facc15; }
 
-  #status { margin-top: 10px; color: #facc15; font-weight: bold; }
+  button:hover { transform: translateY(-2px); opacity: 0.9; }
+
+  #loginBtn { background: var(--green); }
+  #deleteAllBtn { background: linear-gradient(90deg, #ef4444, #dc2626); }
+  #logoutBtn { background: #475569; }
+  .delete-btn { background: #dc2626; font-size: 0.8rem; padding: 5px 10px; }
+
+  #status {
+    margin-top: 10px;
+    color: var(--gold);
+    font-weight: bold;
+  }
 
   #progressContainer {
     width: 90%;
     max-width: 500px;
     height: 10px;
-    background: rgba(255,255,255,0.2);
+    background: var(--panel);
     border-radius: 10px;
     margin: 10px auto;
     overflow: hidden;
   }
+
   #progressBar {
     height: 100%;
-    background: linear-gradient(90deg, #06C755, #00B900);
+    background: linear-gradient(90deg, var(--green), #22c55e);
     width: 0%;
     transition: width 0.2s;
   }
 
-  #pagination { margin-top: 20px; }
-  #pagination button { background: #3b82f6; margin: 5px; }
+  .file-list {
+    background: var(--panel);
+    border-radius: 15px;
+    padding: 20px;
+    margin: 25px auto;
+    max-width: 700px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    text-align: left;
+  }
 
+  ul { list-style: none; padding: 0; margin: 0; }
+  li {
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    word-break: break-all;
+  }
+
+  li span.filename {
+    color: #38bdf8;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  li span.filename:hover { color: var(--gold); }
+
+  #count {
+    margin-top: 10px;
+    text-align: right;
+    opacity: 0.7;
+  }
+
+  #pagination { margin-top: 20px; }
+  #pagination button {
+    background: #3b82f6;
+    font-size: 0.9rem;
+  }
+
+  /* Modal */
   .modal {
     display: none;
     position: fixed;
     z-index: 999;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    background: rgba(0,0,0,0.9);
+    background: rgba(0,0,0,0.95);
     justify-content: center;
     align-items: center;
     flex-direction: column;
   }
+
   .modal img {
     max-width: 90%;
     max-height: 80%;
-    border-radius: 10px;
-  }
-  .modal button {
-    margin-top: 15px;
-    background: #dc2626;
+    border-radius: 15px;
+    box-shadow: 0 0 20px rgba(250,204,21,0.3);
   }
 
-  @media (max-width:600px){
-    body { padding: 12px; }
-    h1 { font-size: 1.4rem; }
-    button { width: 90%; font-size: 1rem; }
+  .modal button {
+    background: #dc2626;
+    margin-top: 20px;
+  }
+
+  @media (max-width:600px) {
+    body { padding: 15px; }
+    h1 { font-size: 1.5rem; }
     li { flex-direction: column; align-items: flex-start; }
+    button { width: 90%; font-size: 1rem; }
   }
 </style>
 </head>
 <body>
-  <h1>📤 LINE Upload</h1>
+  <h1>📤 LINE Upload Gallery</h1>
 
   <div id="loginSection">
     <button id="loginBtn" onclick="login()">เข้าสู่ระบบด้วย LINE</button>
@@ -141,11 +195,12 @@
 
   <div id="uploadSection" style="display:none;">
     <div id="userProfile"></div>
+
     <input type="file" id="fileInput" multiple accept="image/*"><br>
     <button onclick="uploadFiles()">อัปโหลด</button>
     <button onclick="listFiles(true)">รีเฟรช</button>
     <button id="deleteAllBtn" onclick="deleteAllFiles()">🗑️ ลบรูปทั้งหมด</button>
-    <button style="background:#dc2626" onclick="logout()">🚪 ออกจากระบบ</button>
+    <button id="logoutBtn" onclick="logout()">🚪 ออกจากระบบ</button>
 
     <div id="status"></div>
     <div id="progressContainer"><div id="progressBar"></div></div>
@@ -179,17 +234,12 @@ let currentPage = 1;
 const PAGE_SIZE = 1000;
 let allFiles = [];
 
-/* ✅ userId ให้ปลอดภัย */
-function safeUserId(uid) {
-  return uid.replace(/[^a-zA-Z0-9_-]/g, "_");
-}
+function safeUserId(uid) { return uid.replace(/[^a-zA-Z0-9_-]/g, "_"); }
 
-/* ✅ LINE Auth */
 async function main() {
   await liff.init({ liffId: LIFF_ID });
-  if (!liff.isLoggedIn()) {
-    document.getElementById("loginSection").style.display = "block";
-  } else {
+  if (!liff.isLoggedIn()) document.getElementById("loginSection").style.display = "block";
+  else {
     const profile = await liff.getProfile();
     userId = safeUserId(profile.userId);
     userName = profile.displayName;
@@ -197,7 +247,6 @@ async function main() {
     showUploadSection();
   }
 }
-
 function login() { liff.login(); }
 async function logout() { await liff.logout(); location.reload(); }
 
@@ -205,11 +254,11 @@ function showUploadSection() {
   document.getElementById("loginSection").style.display = "none";
   document.getElementById("uploadSection").style.display = "block";
   document.getElementById("userProfile").innerHTML =
-    `<img src="${userPic}" alt="profile"><p>${userName}</p>`;
+    `<img src="${userPic}"><p>${userName}</p>`;
   listFiles(true);
 }
 
-/* ✅ Upload */
+/* Upload */
 async function uploadFiles() {
   const files = document.getElementById("fileInput").files;
   const status = document.getElementById("status");
@@ -224,7 +273,6 @@ async function uploadFiles() {
   for (let i = 0; i < total; i++) {
     const file = files[i];
     if (file.size > 5 * 1024 * 1024) { skipped++; continue; }
-
     const path = `${userId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
     const { error } = await sb.storage.from(BUCKET).upload(path, file);
     if (!error) success++;
@@ -238,7 +286,7 @@ async function uploadFiles() {
   listFiles(true);
 }
 
-/* ✅ แสดงไฟล์ */
+/* แสดงไฟล์ */
 async function listFiles(forceReload = false) {
   const { data, error } = await sb.storage.from(BUCKET).list(`${userId}/`, {
     limit: PAGE_SIZE,
@@ -252,27 +300,22 @@ async function listFiles(forceReload = false) {
   renderFileList(allFiles);
 }
 
-/* ✅ ค้นหาไฟล์ */
 document.getElementById("searchInput").addEventListener("input", e => {
   const keyword = e.target.value.toLowerCase();
   const filtered = allFiles.filter(f => f.name.toLowerCase().includes(keyword));
   renderFileList(filtered);
 });
 
-/* ✅ แสดงรายการ */
 function renderFileList(files) {
   const list = document.getElementById("fileList");
   const count = document.getElementById("count");
-
   if (files.length === 0) {
     list.innerHTML = "<li>ไม่มีไฟล์</li>";
     count.innerText = "";
     return;
   }
-
   list.innerHTML = files.map(f => {
-    const time = new Date(f.created_at || Date.now())
-      .toLocaleString("th-TH", { hour12: false });
+    const time = new Date(f.created_at || Date.now()).toLocaleString("th-TH", { hour12: false });
     const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${f.name}`;
     return `
       <li>
@@ -283,36 +326,28 @@ function renderFileList(files) {
         </div>
       </li>`;
   }).join("");
-
   count.innerText = `📦 จำนวนไฟล์ที่แสดง: ${files.length}`;
 }
 
-/* ✅ ลบไฟล์ */
 async function deleteFile(filename) {
   if (!confirm(`ต้องการลบไฟล์นี้หรือไม่?\n${filename}`)) return;
   const { error } = await sb.storage.from(BUCKET).remove([`${userId}/${filename}`]);
-  if (error) alert("❌ ลบไฟล์ไม่สำเร็จ");
-  else listFiles(true);
+  if (!error) listFiles(true);
 }
 
-/* ✅ ลบทั้งหมด */
 async function deleteAllFiles() {
   if (!confirm("⚠️ ต้องการลบรูปทั้งหมดของคุณใช่ไหม?")) return;
   const filesToDelete = allFiles.map(f => `${userId}/${f.name}`);
-  if (filesToDelete.length === 0) return alert("ไม่มีไฟล์ให้ลบ");
-  const { error } = await sb.storage.from(BUCKET).remove(filesToDelete);
-  if (error) alert("❌ ลบไฟล์ไม่สำเร็จ");
-  else listFiles(true);
+  await sb.storage.from(BUCKET).remove(filesToDelete);
+  listFiles(true);
 }
 
-/* ✅ Modal */
+/* Modal */
 function openModal(url) {
   document.getElementById("modalImg").src = url;
   document.getElementById("imageModal").style.display = "flex";
 }
-function closeModal() {
-  document.getElementById("imageModal").style.display = "none";
-}
+function closeModal() { document.getElementById("imageModal").style.display = "none"; }
 
 main();
 </script>
