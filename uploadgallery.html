@@ -1,49 +1,50 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LINE Login Upload | BCR RUN</title>
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    body {
-      font-family: 'Prompt', sans-serif;
-      background: linear-gradient(135deg,#0f172a,#1e293b,#0f172a);
-      color: #fff;
-      text-align: center;
-      padding: 20px;
-    }
-    h1 { color: #facc15; }
-    button {
-      background: linear-gradient(90deg,#06C755,#00B900);
-      color: #fff;
-      padding: 12px 24px;
-      border: none;
-      border-radius: 25px;
-      font-size: 1rem;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    button:hover { opacity: 0.9; }
-    #userProfile img {
-      border-radius: 50%;
-      width: 100px;
-      height: 100px;
-      margin-top: 10px;
-    }
-    .file-list {
-      background: rgba(255,255,255,0.05);
-      margin-top: 20px;
-      padding: 20px;
-      border-radius: 10px;
-      max-width: 600px;
-      margin: 20px auto;
-      text-align: left;
-    }
-    ul { list-style: none; padding: 0; }
-    li { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LINE Login Upload | BCR RUN</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  body {
+    font-family: 'Prompt', sans-serif;
+    background: linear-gradient(135deg,#0f172a,#1e293b,#0f172a);
+    color: #fff;
+    text-align: center;
+    padding: 20px;
+  }
+  h1 { color: #facc15; }
+  button {
+    background: linear-gradient(90deg,#06C755,#00B900);
+    color: #fff;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 25px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  button:hover { opacity: 0.9; }
+  #userProfile img {
+    border-radius: 50%;
+    width: 100px;
+    height: 100px;
+    margin-top: 10px;
+  }
+  .file-list {
+    background: rgba(255,255,255,0.05);
+    margin-top: 20px;
+    padding: 20px;
+    border-radius: 10px;
+    max-width: 600px;
+    margin: 20px auto;
+    text-align: left;
+  }
+  ul { list-style: none; padding: 0; }
+  li { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+</style>
 </head>
 <body>
   <h1>📤 Upload with LINE Login</h1>
@@ -62,73 +63,73 @@
     </div>
   </div>
 
-  <script>
-    const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-    const BUCKET = "gallery";
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+<script>
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const BUCKET = "gallery";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); // ✅ แก้ชื่อไม่ให้ชนกัน
 
-    const LIFF_ID = "2001781240-k2PJ3Ap2"; // 👈 เปลี่ยนตรงนี้
+const LIFF_ID = "2001781240-k2PJ3Ap2"; // 👈 ต้องใส่ LIFF ID ของจริงที่ได้จาก LINE Developer
 
-    let userId = "", userName = "", userPic = "";
+let userId = "", userName = "", userPic = "";
 
-    async function main() {
-      await liff.init({ liffId: LIFF_ID });
-      if (!liff.isLoggedIn()) {
-        document.getElementById("loginSection").style.display = "block";
-      } else {
-        const profile = await liff.getProfile();
-        userId = profile.userId;
-        userName = profile.displayName;
-        userPic = profile.pictureUrl;
-        showUploadSection();
-      }
+async function main() {
+  await liff.init({ liffId: LIFF_ID });
+  if (!liff.isLoggedIn()) {
+    document.getElementById("loginSection").style.display = "block";
+  } else {
+    const profile = await liff.getProfile();
+    userId = profile.userId;
+    userName = profile.displayName;
+    userPic = profile.pictureUrl;
+    showUploadSection();
+  }
+}
+
+function login() { liff.login(); }
+
+function showUploadSection() {
+  document.getElementById("loginSection").style.display = "none";
+  document.getElementById("uploadSection").style.display = "block";
+  document.getElementById("userProfile").innerHTML =
+    `<img src="${userPic}" alt="profile"><p>${userName}</p>`;
+}
+
+async function uploadFiles() {
+  const files = document.getElementById("fileInput").files;
+  if (!files.length) return alert("กรุณาเลือกไฟล์");
+
+  let success = 0;
+  for (const file of files) {
+    if (file.size > 5 * 1024 * 1024) {
+      alert(`❌ ${file.name} เกิน 5MB`);
+      continue;
     }
+    const path = `${userId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+    const { error } = await sb.storage.from(BUCKET).upload(path, file);
+    if (!error) success++;
+  }
 
-    function login() { liff.login(); }
+  alert(`✅ อัปโหลดสำเร็จ ${success} ไฟล์`);
+  listFiles();
+}
 
-    function showUploadSection() {
-      document.getElementById("loginSection").style.display = "none";
-      document.getElementById("uploadSection").style.display = "block";
-      document.getElementById("userProfile").innerHTML =
-        `<img src="${userPic}" alt="profile"><p>${userName}</p>`;
-    }
+async function listFiles() {
+  const { data, error } = await sb.storage.from(BUCKET).list(userId + "/", {
+    limit: 1000, sortBy: { column: "created_at", order: "desc" }
+  });
+  if (error) return alert("โหลดไฟล์ไม่สำเร็จ");
 
-    async function uploadFiles() {
-      const files = document.getElementById("fileInput").files;
-      if (!files.length) return alert("กรุณาเลือกไฟล์");
+  const list = document.getElementById("fileList");
+  const count = document.getElementById("count");
+  const files = (data || []).filter(f => f.name !== ".emptyFolderPlaceholder");
+  list.innerHTML = files.length
+    ? files.map(f => `<li>${f.name}</li>`).join("")
+    : "<li>ไม่มีไฟล์</li>";
+  count.innerText = `จำนวนไฟล์ทั้งหมด: ${files.length}`;
+}
 
-      let success = 0;
-      for (const file of files) {
-        if (file.size > 5 * 1024 * 1024) {
-          alert(`❌ ${file.name} เกิน 5MB`);
-          continue;
-        }
-        const path = `${userId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
-        const { error } = await supabase.storage.from(BUCKET).upload(path, file);
-        if (!error) success++;
-      }
-
-      alert(`✅ อัปโหลดสำเร็จ ${success} ไฟล์`);
-      listFiles();
-    }
-
-    async function listFiles() {
-      const { data, error } = await supabase.storage.from(BUCKET).list(userId + "/", {
-        limit: 1000, sortBy: { column: "created_at", order: "desc" }
-      });
-      if (error) return alert("โหลดไฟล์ไม่สำเร็จ");
-
-      const list = document.getElementById("fileList");
-      const count = document.getElementById("count");
-      const files = (data || []).filter(f => f.name !== ".emptyFolderPlaceholder");
-      list.innerHTML = files.length
-        ? files.map(f => `<li>${f.name}</li>`).join("")
-        : "<li>ไม่มีไฟล์</li>";
-      count.innerText = `จำนวนไฟล์ทั้งหมด: ${files.length}`;
-    }
-
-    main();
-  </script>
+main();
+</script>
 </body>
 </html>
