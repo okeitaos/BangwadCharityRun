@@ -10,7 +10,7 @@
       font-family: "Prompt", sans-serif;
       margin: 0;
       padding: 0;
-      background: linear-gradient(180deg, #000, #222, #000);
+      background: linear-gradient(180deg, #000, #1a1a1a, #000);
       color: #fff;
       text-align: center;
       overflow-x: hidden;
@@ -27,7 +27,7 @@
 
     header img {
       width: 120px;
-      height: 120px;
+      height: 140px;
       border-radius: 50%;
       border: 4px solid rgba(255,255,255,0.3);
       margin-bottom: 20px;
@@ -106,17 +106,18 @@
       z-index: 3;
     }
 
-    /* เอฟเฟกต์กลีบดอกไม้ร่วง */
+    /* 🌸 เอฟเฟกต์กลีบดอกไม้ร่วงจริง */
     .petal {
       position: fixed;
       top: -50px;
-      width: 15px;
-      height: 15px;
-      background: radial-gradient(circle, rgba(200,200,200,0.8) 30%, rgba(255,255,255,0.2) 100%);
-      border-radius: 50%;
-      opacity: 0.8;
+      width: 20px;
+      height: 12px;
+      background: linear-gradient(135deg, rgba(230,230,230,0.9), rgba(180,180,180,0.4));
+      border-radius: 50% 70% 70% 50%;
+      opacity: 0.9;
       pointer-events: none;
-      animation: fall linear infinite;
+      transform: rotate(0deg);
+      animation: fall linear infinite, sway ease-in-out infinite;
       z-index: 1;
     }
 
@@ -126,9 +127,14 @@
         opacity: 1;
       }
       100% {
-        transform: translateY(110vh) rotate(360deg);
-        opacity: 0;
+        transform: translateY(110vh) rotate(720deg);
+        opacity: 0.5;
       }
+    }
+
+    @keyframes sway {
+      0%, 100% { transform: translateX(0) rotate(0deg); }
+      50% { transform: translateX(30px) rotate(180deg); }
     }
 
     @media (max-width: 600px) {
@@ -164,27 +170,31 @@
       และจะน้อมนำแนวพระราชดำริมาปฏิบัติเพื่อสืบสานพระราชปณิธานสืบไป
     </p>
 
-    <a href="4laptop100.html" class="btn-back">กลับหน้าเว็บไซต์หลัก</a>
+    <a href="TOP100.html" class="btn-back">กลับหน้าเว็บไซต์หลัก</a>
   </section>
 
   <footer>
     <p>ขอน้อมถวายความอาลัย ด้วยสำนึกในพระมหากรุณาธิคุณอันหาที่สุดมิได้</p>
-    <p>© 2025 — เว็บไซต์จัดทำเพื่อการถวายอาลัย</p>
+    <p>© 2025 — BANGWAD CHARITY RUN</p>
   </footer>
 
   <img src="https://lh5.googleusercontent.com/d/1oe96fQJojyd8m7WXRfYATi3wWZQ9ZOVn" class="ribbon" alt="black ribbon">
 
   <script>
-    // สร้างกลีบดอกไม้ร่วง
-    const petalCount = 20;
+    // 🌸 สร้างกลีบดอกไม้ร่วง
+    const petalCount = 25;
     for (let i = 0; i < petalCount; i++) {
       const petal = document.createElement("div");
       petal.classList.add("petal");
       petal.style.left = Math.random() * 100 + "vw";
-      petal.style.animationDuration = 8 + Math.random() * 5 + "s";
-      petal.style.animationDelay = Math.random() * 5 + "s";
-      petal.style.opacity = 0.4 + Math.random() * 0.6;
-      petal.style.transform = `scale(${0.5 + Math.random()})`;
+      petal.style.animationDuration = 6 + Math.random() * 6 + "s";
+      petal.style.animationDelay = Math.random() * 4 + "s";
+      petal.style.opacity = 0.5 + Math.random() * 0.5;
+      petal.style.width = 14 + Math.random() * 12 + "px";
+      petal.style.height = 8 + Math.random() * 8 + "px";
+      petal.style.background = `linear-gradient(135deg, rgba(240,240,240,${0.8 + Math.random()*0.2}), rgba(180,180,180,${0.3 + Math.random()*0.4}))`;
+      petal.style.borderRadius = "50% 70% 70% 50%";
+      petal.style.transform = `rotate(${Math.random()*360}deg)`;
       document.body.appendChild(petal);
     }
   </script>
