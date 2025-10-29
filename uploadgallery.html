@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>📸 Supabase Gallery | Upload & View</title>
+  <title>📸 Multi Upload Gallery | Supabase</title>
   <script type="module" src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet">
   <style>
@@ -18,7 +18,6 @@
       padding: 0;
       overflow-x: hidden;
     }
-
     @keyframes gradientBG {
       0% { background-position: 0% 50%; }
       50% { background-position: 100% 50%; }
@@ -36,7 +35,7 @@
       border-radius: 15px;
       padding: 25px;
       margin: 20px auto;
-      max-width: 600px;
+      max-width: 700px;
       box-shadow: 0 5px 20px rgba(0,0,0,0.4);
     }
 
@@ -64,6 +63,21 @@
     button:hover {
       transform: translateY(-2px);
       box-shadow: 0 4px 15px rgba(255,255,255,0.3);
+    }
+
+    .progress {
+      width: 100%;
+      background: rgba(255,255,255,0.2);
+      border-radius: 8px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 8px;
+      background: linear-gradient(90deg, #FFD700, #cf142b);
+      width: 0%;
+      transition: width 0.2s;
     }
 
     .gallery-grid {
@@ -94,25 +108,30 @@
       color: #ccc;
       font-size: 0.9rem;
     }
+
+    .status {
+      font-size: 0.9rem;
+      color: #ddd;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
 
-  <h1>📸 Supabase Gallery</h1>
-  <p>อัปโหลดภาพ (ขนาดไม่เกิน 5MB) — เลือกระดับคุณภาพก่อนอัปโหลด</p>
+  <h1>📸 Multi Upload Gallery</h1>
+  <p>อัปโหลดภาพได้สูงสุด 1000 รูป (ไม่เกิน 5MB ต่อภาพ)</p>
 
   <div class="upload-box">
-    <input type="file" id="fileInput" accept="image/*" />
-    
+    <input type="file" id="fileInput" accept="image/*" multiple />
     <label for="qualitySelect">เลือกระดับคุณภาพ:</label>
     <select id="qualitySelect">
       <option value="0.9">💎 ความละเอียดสูง (ชัดสุด)</option>
       <option value="0.75" selected>🖼️ ปกติ (แนะนำ)</option>
       <option value="0.55">📱 ขนาดเล็ก (โหลดเร็วสุด)</option>
     </select>
-
-    <button id="uploadBtn">อัปโหลดภาพ</button>
-    <p id="status"></p>
+    <button id="uploadBtn">อัปโหลดภาพทั้งหมด</button>
+    <p id="status" class="status"></p>
+    <div id="progressContainer"></div>
   </div>
 
   <div id="gallery" class="gallery-grid">⏳ กำลังโหลดภาพ...</div>
@@ -130,6 +149,7 @@ const galleryDiv = document.getElementById("gallery");
 const fileInput = document.getElementById("fileInput");
 const uploadBtn = document.getElementById("uploadBtn");
 const statusText = document.getElementById("status");
+const progressContainer = document.getElementById("progressContainer");
 const qualitySelect = document.getElementById("qualitySelect");
 
 async function loadGallery() {
@@ -139,7 +159,6 @@ async function loadGallery() {
     console.error(error);
     return;
   }
-
   galleryDiv.innerHTML = "";
   data.forEach((file) => {
     const img = document.createElement("img");
@@ -150,28 +169,46 @@ async function loadGallery() {
 }
 
 uploadBtn.addEventListener("click", async () => {
-  const file = fileInput.files[0];
-  if (!file) return alert("กรุณาเลือกไฟล์ก่อน");
+  const files = fileInput.files;
+  if (!files.length) return alert("กรุณาเลือกไฟล์ก่อน");
 
-  if (file.size > 5 * 1024 * 1024) {
-    alert("❌ ขนาดไฟล์เกิน 5MB");
+  const maxFiles = 1000;
+  if (files.length > maxFiles) {
+    alert(`❌ จำกัดอัปโหลดครั้งละไม่เกิน ${maxFiles} รูป`);
     return;
   }
 
   const quality = parseFloat(qualitySelect.value);
-  statusText.innerText = "⏳ กำลังบีบอัดและอัปโหลด...";
+  progressContainer.innerHTML = "";
+  statusText.innerText = `กำลังอัปโหลด ${files.length} รูป...`;
 
-  const compressed = await compressImage(file, 1600, quality);
-  const fileName = `img_${Date.now()}.jpg`;
+  let uploaded = 0;
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (file.size > 5 * 1024 * 1024) {
+      console.warn(`❌ ${file.name} เกิน 5MB — ข้าม`);
+      continue;
+    }
 
-  const { error } = await supabase.storage.from("gallery").upload(fileName, compressed);
-  if (error) {
-    console.error(error);
-    statusText.innerText = "❌ อัปโหลดไม่สำเร็จ";
-  } else {
-    statusText.innerText = "✅ อัปโหลดสำเร็จ!";
-    await loadGallery();
+    const progressBar = document.createElement("div");
+    progressBar.classList.add("progress");
+    progressBar.innerHTML = `<div class="progress-bar" id="bar${i}"></div>`;
+    progressContainer.appendChild(progressBar);
+
+    const compressed = await compressImage(file, 1600, quality);
+    const fileName = `img_${Date.now()}_${i}.jpg`;
+
+    try {
+      await supabase.storage.from("gallery").upload(fileName, compressed);
+      document.getElementById(`bar${i}`).style.width = "100%";
+      uploaded++;
+    } catch (err) {
+      console.error(`Error uploading ${file.name}`, err);
+    }
   }
+
+  statusText.innerText = `✅ อัปโหลดสำเร็จ ${uploaded}/${files.length} รูป`;
+  await loadGallery();
 });
 
 async function compressImage(file, maxWidth = 1600, quality = 0.75) {
