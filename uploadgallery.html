@@ -14,7 +14,7 @@
     text-align: center;
     padding: 20px;
   }
-  h1 { color: #facc15; }
+  h1 { color: #facc15; margin-bottom: 20px; }
   button {
     background: linear-gradient(90deg,#06C755,#00B900);
     color: #fff;
@@ -24,15 +24,18 @@
     font-size: 1rem;
     font-weight: bold;
     cursor: pointer;
-    margin-top: 10px;
+    margin: 6px;
+    transition: 0.3s;
   }
-  button:hover { opacity: 0.9; }
+  button:hover { opacity: 0.9; transform: scale(1.03); }
   #userProfile img {
     border-radius: 50%;
     width: 100px;
     height: 100px;
     margin-top: 10px;
+    border: 3px solid #facc15;
   }
+  #userProfile p { margin-top: 6px; font-weight: bold; }
   .file-list {
     background: rgba(255,255,255,0.05);
     margin-top: 20px;
@@ -42,21 +45,34 @@
     margin: 20px auto;
     text-align: left;
   }
-  ul { list-style: none; padding: 0; }
-  li { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.1); word-break: break-all; }
+  #status { margin-top: 10px; color: #facc15; font-weight: bold; }
+  @media (max-width:600px){
+    body { padding: 12px; }
+    h1 { font-size: 1.4rem; }
+    button { width: 90%; font-size: 1rem; }
+  }
 </style>
 </head>
 <body>
   <h1>📤 Upload with LINE Login</h1>
+
+  <!-- Section: Login -->
   <div id="loginSection">
     <button id="loginBtn" onclick="login()">เข้าสู่ระบบด้วย LINE</button>
   </div>
 
+  <!-- Section: Upload -->
   <div id="uploadSection" style="display:none;">
     <div id="userProfile"></div>
-    <input type="file" id="fileInput" multiple accept="image/*"><br><br>
+    <input type="file" id="fileInput" multiple accept="image/*"><br>
     <button onclick="uploadFiles()">อัปโหลด</button>
     <button onclick="listFiles()">ดูไฟล์ของฉัน</button>
+    <button style="background:#dc2626" onclick="logout()">🚪 ออกจากระบบ</button>
+
+    <div id="status"></div>
+
     <div class="file-list">
       <ul id="fileList"></ul>
       <div id="count"></div>
@@ -67,12 +83,13 @@
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const BUCKET = "gallery";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); // ✅ แก้ชื่อไม่ให้ชนกัน
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const LIFF_ID = "2001781240-k2PJ3Ap2"; // 👈 ต้องใส่ LIFF ID ของจริงที่ได้จาก LINE Developer
+const LIFF_ID = "2001781240-k2PJ3Ap2"; // 👈 ใส่ LIFF ID ที่ได้จาก LINE Developer
 
 let userId = "", userName = "", userPic = "";
 
+/* ✅ เริ่มต้น LIFF */
 async function main() {
   await liff.init({ liffId: LIFF_ID });
   if (!liff.isLoggedIn()) {
@@ -86,8 +103,10 @@ async function main() {
   }
 }
 
+/* ✅ เข้าสู่ระบบ LINE */
 function login() { liff.login(); }
 
+/* ✅ แสดงส่วนอัปโหลด */
 function showUploadSection() {
   document.getElementById("loginSection").style.display = "none";
   document.getElementById("uploadSection").style.display = "block";
@@ -95,14 +114,26 @@ function showUploadSection() {
     `<img src="${userPic}" alt="profile"><p>${userName}</p>`;
 }
 
+/* ✅ ออกจากระบบ LINE */
+async function logout() {
+  if (confirm("ต้องการออกจากระบบใช่ไหม?")) {
+    await liff.logout();
+    location.reload();
+  }
+}
+
+/* ✅ อัปโหลดไฟล์ */
 async function uploadFiles() {
   const files = document.getElementById("fileInput").files;
+  const status = document.getElementById("status");
   if (!files.length) return alert("กรุณาเลือกไฟล์");
 
-  let success = 0;
+  status.innerText = "⏳ กำลังอัปโหลด...";
+  let success = 0, skipped = 0;
+
   for (const file of files) {
-    if (file.size > 5 * 1024 * 1024) {
-      alert(`❌ ${file.name} เกิน 5MB`);
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      skipped++;
       continue;
     }
     const path = `${userId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
@@ -110,15 +141,24 @@ async function uploadFiles() {
     if (!error) success++;
   }
 
-  alert(`✅ อัปโหลดสำเร็จ ${success} ไฟล์`);
+  // ✅ เคลียร์ input หลังอัปโหลดเสร็จ
+  document.getElementById("fileInput").value = "";
+
+  // ✅ แสดงผลลัพธ์
+  status.innerText = `✅ อัปโหลดสำเร็จ ${success} ไฟล์` +
+                     (skipped ? ` (ข้าม ${skipped} ไฟล์ >5MB)` : "");
+
+  // ✅ โหลดรายชื่อใหม่
   listFiles();
 }
 
+/* ✅ แสดงรายชื่อไฟล์ */
 async function listFiles() {
-  const { data, error } = await sb.storage.from(BUCKET).list(userId + "/", {
-    limit: 1000, sortBy: { column: "created_at", order: "desc" }
+  const { data, error } = await sb.storage.from(BUCKET).list(`${userId}/`, {
+    limit: 1000,
+    sortBy: { column: "created_at", order: "desc" }
   });
-  if (error) return alert("โหลดไฟล์ไม่สำเร็จ");
+  if (error) return alert("❌ โหลดไฟล์ไม่สำเร็จ");
 
   const list = document.getElementById("fileList");
   const count = document.getElementById("count");
@@ -126,9 +166,10 @@ async function listFiles() {
   list.innerHTML = files.length
     ? files.map(f => `<li>${f.name}</li>`).join("")
     : "<li>ไม่มีไฟล์</li>";
-  count.innerText = `จำนวนไฟล์ทั้งหมด: ${files.length}`;
+  count.innerText = `📦 จำนวนไฟล์ทั้งหมด: ${files.length}`;
 }
 
+/* ✅ เริ่มทำงาน */
 main();
 </script>
 </body>
