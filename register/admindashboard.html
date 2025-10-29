@@ -11,8 +11,14 @@
   .status-dnf { background-color: #fee2e2; color: #991b1b; }
   .status-finisher { background-color: #dcfce7; color: #065f46; }
   .table-scroll { max-height: 70vh; overflow-y: auto; }
+  #loadingOverlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: flex; justify-content: center; align-items: center;
+    color: white; font-size: 1.5rem; font-weight: 600;
+    z-index: 9999; display: none;
+  }
   @media print {
-    #filterSection, #exportBtn, #printBtn { display: none; }
+    #filterSection, #exportBtn, #printBtn, #loadingOverlay { display: none; }
     body { background: white; }
     .table-scroll { max-height: none; overflow: visible; }
   }
@@ -20,10 +26,13 @@
 </head>
 <body class="bg-gray-100 min-h-screen p-6">
 
+<!-- 🌀 Loading Overlay -->
+<div id="loadingOverlay">⏳ กำลังประมวลผล...</div>
+
 <div class="max-w-7xl mx-auto bg-white shadow-md rounded-lg p-6">
   <h1 class="text-3xl font-bold text-center mb-6">📊 รายงานนักวิ่งที่ออกจากการแข่งขัน</h1>
 
-  <!-- ฟิลเตอร์ -->
+  <!-- 🔍 ฟิลเตอร์ -->
   <div id="filterSection" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
     <div>
       <label class="block text-sm font-semibold mb-1">รุ่นการแข่งขัน</label>
@@ -48,7 +57,7 @@
     </div>
   </div>
 
-  <!-- 🧮 สรุปหลัก -->
+  <!-- 🧮 สรุป -->
   <div id="summarySection" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-center">
     <div class="bg-green-100 p-4 rounded shadow-sm">
       <div class="text-sm text-gray-700">FINISHER</div>
@@ -107,15 +116,21 @@
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
 let allData = [];
+
+const overlay = document.getElementById("loadingOverlay");
+function showLoading(show) {
+  overlay.style.display = show ? "flex" : "none";
+}
 
 async function loadReport() {
   const tbody = document.getElementById("reportBody");
   tbody.innerHTML = `<tr><td colspan="11" class="text-center py-4 text-gray-500">⏳ กำลังโหลด...</td></tr>`;
+  showLoading(true);
 
   const { data, error } = await supabase.from("v_runner_exit_report").select("*").order("exit_time_th", { ascending: false });
 
+  showLoading(false);
   if (error) {
     console.error(error);
     tbody.innerHTML = `<tr><td colspan="11" class="text-center text-red-500 py-4">❌ โหลดข้อมูลไม่สำเร็จ</td></tr>`;
@@ -127,34 +142,65 @@ async function loadReport() {
   renderReport(allData);
 }
 
+// ✅ เมื่อกด “แสดงผล”
+document.getElementById("filterBtn").addEventListener("click", () => {
+  showLoading(true);
+  setTimeout(() => {
+    const type = document.getElementById("filterType").value;
+    const start = document.getElementById("filterStart").value ? new Date(document.getElementById("filterStart").value) : null;
+    const end = document.getElementById("filterEnd").value ? new Date(document.getElementById("filterEnd").value + "T23:59:59") : null;
+
+    let filtered = [...allData];
+    if (type !== "ALL") filtered = filtered.filter(r => (r.race_name_th || "").includes(type));
+    if (start && end) {
+      filtered = filtered.filter(r => {
+        const exitDate = new Date(r.exit_time_th);
+        return exitDate >= start && exitDate <= end;
+      });
+    }
+
+    updateSummary(filtered);
+    renderReport(filtered);
+    showLoading(false);
+  }, 200);
+});
+
+// 🔍 ค้นหา
+document.getElementById("searchInput").addEventListener("input", e => {
+  const q = e.target.value.toLowerCase();
+  showLoading(true);
+  setTimeout(() => {
+    const filtered = allData.filter(r =>
+      (r.runner_name || "").toLowerCase().includes(q) ||
+      (r.bib || "").toString().includes(q) ||
+      (r.tag_id || "").toLowerCase().includes(q)
+    );
+    updateSummary(filtered);
+    renderReport(filtered);
+    showLoading(false);
+  }, 200);
+});
+
 function updateSummary(list) {
-  const countFinisher = list.filter(r => r.exit_status === "FINISHER").length;
-  const countDNF = list.filter(r => r.exit_status === "DNF").length;
-  document.getElementById("countFinisher").textContent = countFinisher;
-  document.getElementById("countDNF").textContent = countDNF;
+  const finisher = list.filter(r => r.exit_status === "FINISHER").length;
+  const dnf = list.filter(r => r.exit_status === "DNF").length;
+  document.getElementById("countFinisher").textContent = finisher;
+  document.getElementById("countDNF").textContent = dnf;
   document.getElementById("countTotal").textContent = list.length;
   document.getElementById("dateRange").textContent = new Date().toLocaleDateString("th-TH");
 
-  // 🔢 แยกตามรุ่น
   const types = ["BCR 50.4", "BCR 69.3", "BCR 100.8"];
   const typeSummaryDiv = document.getElementById("typeSummaryContent");
   typeSummaryDiv.innerHTML = "";
-
   types.forEach(type => {
-    const finisherCount = list.filter(r => (r.race_name_th || "").includes(type) && r.exit_status === "FINISHER").length;
-    const dnfCount = list.filter(r => (r.race_name_th || "").includes(type) && r.exit_status === "DNF").length;
+    const f = list.filter(r => (r.race_name_th || "").includes(type) && r.exit_status === "FINISHER").length;
+    const d = list.filter(r => (r.race_name_th || "").includes(type) && r.exit_status === "DNF").length;
     typeSummaryDiv.innerHTML += `
       <div class="bg-white border rounded-lg p-4 shadow-sm">
         <h3 class="font-semibold text-gray-700 mb-2">${type}</h3>
-        <div class="flex justify-between">
-          <span class="text-green-700 font-medium">FINISHER:</span> <span>${finisherCount}</span>
-        </div>
-        <div class="flex justify-between">
-          <span class="text-red-700 font-medium">DNF:</span> <span>${dnfCount}</span>
-        </div>
-        <div class="flex justify-between mt-1 border-t pt-1">
-          <span class="text-gray-600 text-sm">รวม:</span> <span>${finisherCount + dnfCount}</span>
-        </div>
+        <div class="flex justify-between"><span class="text-green-700">FINISHER:</span><span>${f}</span></div>
+        <div class="flex justify-between"><span class="text-red-700">DNF:</span><span>${d}</span></div>
+        <div class="flex justify-between mt-1 border-t pt-1"><span class="text-gray-600 text-sm">รวม:</span><span>${f+d}</span></div>
       </div>`;
   });
 }
@@ -166,7 +212,6 @@ function renderReport(list) {
     tbody.innerHTML = `<tr><td colspan="11" class="text-center py-4 text-gray-500">ไม่พบนักวิ่งที่ออกจากการแข่งขัน</td></tr>`;
     return;
   }
-
   list.forEach(r => {
     const statusClass = r.exit_status === "DNF" ? "status-dnf" : "status-finisher";
     tbody.innerHTML += `
@@ -185,57 +230,6 @@ function renderReport(list) {
       </tr>`;
   });
 }
-
-// 🔍 ค้นหา
-document.getElementById("searchInput").addEventListener("input", e => {
-  const q = e.target.value.toLowerCase();
-  const filtered = allData.filter(r =>
-    (r.runner_name || "").toLowerCase().includes(q) ||
-    (r.bib || "").toString().includes(q) ||
-    (r.tag_id || "").toLowerCase().includes(q)
-  );
-  updateSummary(filtered);
-  renderReport(filtered);
-});
-
-// ⬇️ ส่งออก CSV พร้อมสรุป
-document.getElementById("exportBtn").addEventListener("click", () => {
-  if (!allData.length) return alert("ไม่มีข้อมูลสำหรับส่งออก");
-
-  const headers = ["BIB","ชื่อ","ประเภท","สถานะ","รอบสุดท้าย","ระยะ(กม.)","เวลารวม","เวลาเฉลี่ย/รอบ","เหตุผล","กรรมการ","เวลาออก"];
-
-  // สรุปบนสุด
-  const finisher = allData.filter(r => r.exit_status === "FINISHER").length;
-  const dnf = allData.filter(r => r.exit_status === "DNF").length;
-  const total = allData.length;
-
-  const typeSummary = ["BCR 50.4","BCR 69.3","BCR 100.8"].map(type => {
-    const fin = allData.filter(r => (r.race_name_th||"").includes(type) && r.exit_status==="FINISHER").length;
-    const d = allData.filter(r => (r.race_name_th||"").includes(type) && r.exit_status==="DNF").length;
-    return `${type}: FINISHER ${fin}, DNF ${d}, รวม ${fin+d}`;
-  }).join("\n");
-
-  const csv = [
-    "รายงานนักวิ่งที่ออกจากการแข่งขัน",
-    `รวม FINISHER: ${finisher}, DNF: ${dnf}, ทั้งหมด: ${total}`,
-    typeSummary,
-    "",
-    headers.join(","),
-    ...allData.map(r => [
-      r.bib, `"${r.runner_name}"`, r.race_name_th, r.exit_status, r.last_lap,
-      r.distance_km, r.total_running_time, r.avg_lap_time,
-      `"${r.exit_reason || ""}"`, `"${r.updated_by_name || ""}"`, r.exit_time_th
-    ].join(","))
-  ].join("\n");
-
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "runner_exit_report.csv";
-  a.click();
-  URL.revokeObjectURL(url);
-});
 
 // 🖨️ พิมพ์รายงาน
 document.getElementById("printBtn").addEventListener("click", () => window.print());
