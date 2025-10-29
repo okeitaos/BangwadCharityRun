@@ -20,10 +20,10 @@
 </head>
 <body class="bg-gray-100 min-h-screen p-6">
 
-<div class="max-w-6xl mx-auto bg-white shadow-md rounded-lg p-6">
+<div class="max-w-7xl mx-auto bg-white shadow-md rounded-lg p-6">
   <h1 class="text-3xl font-bold text-center mb-6">📊 รายงานนักวิ่งที่ออกจากการแข่งขัน</h1>
 
-  <!-- 🔍 ฟิลเตอร์ -->
+  <!-- ฟิลเตอร์ -->
   <div id="filterSection" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
     <div>
       <label class="block text-sm font-semibold mb-1">รุ่นการแข่งขัน</label>
@@ -46,6 +46,32 @@
       <button id="filterBtn" class="bg-blue-600 text-white rounded-md py-2">แสดงผล</button>
       <button id="printBtn" class="bg-gray-700 text-white rounded-md py-2">🖨️ พิมพ์รายงาน</button>
     </div>
+  </div>
+
+  <!-- 🧮 สรุปหลัก -->
+  <div id="summarySection" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-center">
+    <div class="bg-green-100 p-4 rounded shadow-sm">
+      <div class="text-sm text-gray-700">FINISHER</div>
+      <div id="countFinisher" class="text-3xl font-bold text-green-700">0</div>
+    </div>
+    <div class="bg-red-100 p-4 rounded shadow-sm">
+      <div class="text-sm text-gray-700">DNF</div>
+      <div id="countDNF" class="text-3xl font-bold text-red-700">0</div>
+    </div>
+    <div class="bg-yellow-100 p-4 rounded shadow-sm">
+      <div class="text-sm text-gray-700">รวมทั้งหมด</div>
+      <div id="countTotal" class="text-3xl font-bold text-yellow-700">0</div>
+    </div>
+    <div class="bg-blue-100 p-4 rounded shadow-sm">
+      <div class="text-sm text-gray-700">ช่วงข้อมูล</div>
+      <div id="dateRange" class="text-base font-medium text-blue-700">-</div>
+    </div>
+  </div>
+
+  <!-- 🧩 สรุปแยกตามรุ่น -->
+  <div id="summaryByType" class="mb-6 bg-gray-50 border rounded-lg p-4">
+    <h2 class="text-lg font-semibold mb-3">🏁 สรุปแยกตามรุ่นการแข่งขัน</h2>
+    <div id="typeSummaryContent" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
   </div>
 
   <!-- ค้นหา -->
@@ -82,42 +108,68 @@ const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const reportBody = document.getElementById("reportBody");
-const searchInput = document.getElementById("searchInput");
-const exportBtn = document.getElementById("exportBtn");
-const printBtn = document.getElementById("printBtn");
-const filterBtn = document.getElementById("filterBtn");
-
 let allData = [];
 
 async function loadReport() {
-  reportBody.innerHTML = `<tr><td colspan="11" class="text-center py-4 text-gray-500">⏳ กำลังโหลด...</td></tr>`;
+  const tbody = document.getElementById("reportBody");
+  tbody.innerHTML = `<tr><td colspan="11" class="text-center py-4 text-gray-500">⏳ กำลังโหลด...</td></tr>`;
 
-  const { data, error } = await supabase
-    .from("v_runner_exit_report")
-    .select("*")
-    .order("exit_time_th", { ascending: false });
+  const { data, error } = await supabase.from("v_runner_exit_report").select("*").order("exit_time_th", { ascending: false });
 
   if (error) {
     console.error(error);
-    reportBody.innerHTML = `<tr><td colspan="11" class="text-center text-red-500 py-4">❌ โหลดข้อมูลไม่สำเร็จ</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="text-center text-red-500 py-4">❌ โหลดข้อมูลไม่สำเร็จ</td></tr>`;
     return;
   }
 
   allData = data;
-  renderReport(data);
+  updateSummary(allData);
+  renderReport(allData);
+}
+
+function updateSummary(list) {
+  const countFinisher = list.filter(r => r.exit_status === "FINISHER").length;
+  const countDNF = list.filter(r => r.exit_status === "DNF").length;
+  document.getElementById("countFinisher").textContent = countFinisher;
+  document.getElementById("countDNF").textContent = countDNF;
+  document.getElementById("countTotal").textContent = list.length;
+  document.getElementById("dateRange").textContent = new Date().toLocaleDateString("th-TH");
+
+  // 🔢 แยกตามรุ่น
+  const types = ["BCR 50.4", "BCR 69.3", "BCR 100.8"];
+  const typeSummaryDiv = document.getElementById("typeSummaryContent");
+  typeSummaryDiv.innerHTML = "";
+
+  types.forEach(type => {
+    const finisherCount = list.filter(r => (r.race_name_th || "").includes(type) && r.exit_status === "FINISHER").length;
+    const dnfCount = list.filter(r => (r.race_name_th || "").includes(type) && r.exit_status === "DNF").length;
+    typeSummaryDiv.innerHTML += `
+      <div class="bg-white border rounded-lg p-4 shadow-sm">
+        <h3 class="font-semibold text-gray-700 mb-2">${type}</h3>
+        <div class="flex justify-between">
+          <span class="text-green-700 font-medium">FINISHER:</span> <span>${finisherCount}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-red-700 font-medium">DNF:</span> <span>${dnfCount}</span>
+        </div>
+        <div class="flex justify-between mt-1 border-t pt-1">
+          <span class="text-gray-600 text-sm">รวม:</span> <span>${finisherCount + dnfCount}</span>
+        </div>
+      </div>`;
+  });
 }
 
 function renderReport(list) {
-  reportBody.innerHTML = "";
+  const tbody = document.getElementById("reportBody");
+  tbody.innerHTML = "";
   if (!list.length) {
-    reportBody.innerHTML = `<tr><td colspan="11" class="text-center py-4 text-gray-500">ไม่พบนักวิ่งที่ออกจากการแข่งขัน</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="text-center py-4 text-gray-500">ไม่พบนักวิ่งที่ออกจากการแข่งขัน</td></tr>`;
     return;
   }
 
   list.forEach(r => {
     const statusClass = r.exit_status === "DNF" ? "status-dnf" : "status-finisher";
-    reportBody.innerHTML += `
+    tbody.innerHTML += `
       <tr class="border-b hover:bg-gray-50 ${statusClass}">
         <td class="p-2 text-center">${r.bib || "-"}</td>
         <td class="p-2">${r.runner_name}</td>
@@ -134,48 +186,48 @@ function renderReport(list) {
   });
 }
 
-// 🎯 ฟิลเตอร์ก่อนแสดงผล
-filterBtn.addEventListener("click", () => {
-  const type = document.getElementById("filterType").value;
-  const start = document.getElementById("filterStart").value ? new Date(document.getElementById("filterStart").value) : null;
-  const end = document.getElementById("filterEnd").value ? new Date(document.getElementById("filterEnd").value + "T23:59:59") : null;
-
-  let filtered = [...allData];
-
-  if (type !== "ALL") {
-    filtered = filtered.filter(r => (r.race_type || "").includes(type));
-  }
-
-  if (start && end) {
-    filtered = filtered.filter(r => {
-      const exitDate = new Date(r.exit_time_th);
-      return exitDate >= start && exitDate <= end;
-    });
-  }
-
-  renderReport(filtered);
-});
-
 // 🔍 ค้นหา
-searchInput.addEventListener("input", e => {
+document.getElementById("searchInput").addEventListener("input", e => {
   const q = e.target.value.toLowerCase();
   const filtered = allData.filter(r =>
     (r.runner_name || "").toLowerCase().includes(q) ||
     (r.bib || "").toString().includes(q) ||
     (r.tag_id || "").toLowerCase().includes(q)
   );
+  updateSummary(filtered);
   renderReport(filtered);
 });
 
-// ⬇️ ส่งออก CSV
-exportBtn.addEventListener("click", () => {
+// ⬇️ ส่งออก CSV พร้อมสรุป
+document.getElementById("exportBtn").addEventListener("click", () => {
   if (!allData.length) return alert("ไม่มีข้อมูลสำหรับส่งออก");
+
   const headers = ["BIB","ชื่อ","ประเภท","สถานะ","รอบสุดท้าย","ระยะ(กม.)","เวลารวม","เวลาเฉลี่ย/รอบ","เหตุผล","กรรมการ","เวลาออก"];
-  const csv = [headers.join(","), ...allData.map(r =>
-    [r.bib, `"${r.runner_name}"`, r.race_name_th, r.exit_status, r.last_lap,
-    r.distance_km, r.total_running_time, r.avg_lap_time,
-    `"${r.exit_reason || ""}"`, `"${r.updated_by_name || ""}"`, r.exit_time_th].join(",")
-  )].join("\n");
+
+  // สรุปบนสุด
+  const finisher = allData.filter(r => r.exit_status === "FINISHER").length;
+  const dnf = allData.filter(r => r.exit_status === "DNF").length;
+  const total = allData.length;
+
+  const typeSummary = ["BCR 50.4","BCR 69.3","BCR 100.8"].map(type => {
+    const fin = allData.filter(r => (r.race_name_th||"").includes(type) && r.exit_status==="FINISHER").length;
+    const d = allData.filter(r => (r.race_name_th||"").includes(type) && r.exit_status==="DNF").length;
+    return `${type}: FINISHER ${fin}, DNF ${d}, รวม ${fin+d}`;
+  }).join("\n");
+
+  const csv = [
+    "รายงานนักวิ่งที่ออกจากการแข่งขัน",
+    `รวม FINISHER: ${finisher}, DNF: ${dnf}, ทั้งหมด: ${total}`,
+    typeSummary,
+    "",
+    headers.join(","),
+    ...allData.map(r => [
+      r.bib, `"${r.runner_name}"`, r.race_name_th, r.exit_status, r.last_lap,
+      r.distance_km, r.total_running_time, r.avg_lap_time,
+      `"${r.exit_reason || ""}"`, `"${r.updated_by_name || ""}"`, r.exit_time_th
+    ].join(","))
+  ].join("\n");
+
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -186,7 +238,7 @@ exportBtn.addEventListener("click", () => {
 });
 
 // 🖨️ พิมพ์รายงาน
-printBtn.addEventListener("click", () => window.print());
+document.getElementById("printBtn").addEventListener("click", () => window.print());
 
 // โหลดข้อมูลเริ่มต้น
 loadReport();
