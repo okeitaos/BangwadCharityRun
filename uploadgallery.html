@@ -131,7 +131,7 @@
     <div id="userProfile"></div>
     <input type="file" id="fileInput" multiple accept="image/*"><br>
     <button onclick="uploadFiles()">อัปโหลด</button>
-    <button onclick="listFiles()">ดูไฟล์ของฉัน</button>
+    <button onclick="listFiles(true)">ดูไฟล์ของฉัน</button>
     <button id="deleteAllBtn" onclick="deleteAllFiles()">🗑️ ลบรูปทั้งหมด</button>
     <button style="background:#dc2626" onclick="logout()">🚪 ออกจากระบบ</button>
 
@@ -155,9 +155,14 @@ const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-const LIFF_ID = "2001781240-k2PJ3Ap2"; // 🔹 ใส่ LIFF ID ของคุณจริง
+const LIFF_ID = "2001781240-k2PJ3Ap2";
 
 let userId = "", userName = "", userPic = "";
+
+/* ✅ แปลง userId ให้ปลอดภัย */
+function safeUserId(uid) {
+  return uid.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
 
 /* ✅ เริ่มต้น LIFF */
 async function main() {
@@ -166,7 +171,7 @@ async function main() {
     document.getElementById("loginSection").style.display = "block";
   } else {
     const profile = await liff.getProfile();
-    userId = profile.userId;
+    userId = safeUserId(profile.userId);
     userName = profile.displayName;
     userPic = profile.pictureUrl;
     showUploadSection();
@@ -192,7 +197,7 @@ function showUploadSection() {
     `<img src="${userPic}" alt="profile"><p>${userName}</p>`;
 }
 
-/* ✅ Upload Files พร้อม Progress */
+/* ✅ Upload Files */
 async function uploadFiles() {
   const files = document.getElementById("fileInput").files;
   const status = document.getElementById("status");
@@ -219,14 +224,15 @@ async function uploadFiles() {
   status.innerText = `✅ อัปโหลดสำเร็จ ${success} ไฟล์` +
                      (skipped ? ` (ข้าม ${skipped} ไฟล์ >5MB)` : "");
   progressBar.style.width = "100%";
-  listFiles();
+  listFiles(true);
 }
 
 /* ✅ แสดงรายการไฟล์ */
-async function listFiles() {
+async function listFiles(forceReload = false) {
   const { data, error } = await sb.storage.from(BUCKET).list(`${userId}/`, {
     limit: 1000,
-    sortBy: { column: "created_at", order: "desc" }
+    sortBy: { column: "created_at", order: "desc" },
+    ...(forceReload && { cacheControl: "no-cache" })
   });
   if (error) return alert("❌ โหลดไฟล์ไม่สำเร็จ");
 
@@ -257,23 +263,23 @@ async function listFiles() {
   count.innerText = `📦 จำนวนไฟล์ทั้งหมด: ${files.length}`;
 }
 
-/* ✅ ลบไฟล์ทีละรูป */
+/* ✅ ลบไฟล์ทีละไฟล์ */
 async function deleteFile(filename) {
   if (!confirm(`ต้องการลบไฟล์นี้หรือไม่?\n${filename}`)) return;
   const { error } = await sb.storage.from(BUCKET).remove([`${userId}/${filename}`]);
   if (error) alert("❌ ลบไฟล์ไม่สำเร็จ");
   else {
     alert("🗑️ ลบไฟล์สำเร็จ");
-    listFiles();
+    listFiles(true);
   }
 }
 
-/* ✅ ลบไฟล์ทั้งหมด */
+/* ✅ ลบทั้งหมด */
 async function deleteAllFiles() {
   if (!confirm("⚠️ ต้องการลบรูปทั้งหมดของคุณใช่ไหม?")) return;
 
-  const { data, error } = await sb.storage.from(BUCKET).list(`${userId}/`);
-  if (error || !data.length) {
+  const { data, error } = await sb.storage.from(BUCKET).list(`${userId}/`, { cacheControl: "no-cache" });
+  if (error || !data || data.length === 0) {
     alert("❌ ไม่มีไฟล์ให้ลบ");
     return;
   }
@@ -283,21 +289,18 @@ async function deleteAllFiles() {
     .map(f => `${userId}/${f.name}`);
 
   const { error: delError } = await sb.storage.from(BUCKET).remove(filesToDelete);
-
   if (delError) alert("❌ ลบทั้งหมดไม่สำเร็จ");
   else {
     alert("🗑️ ลบรูปทั้งหมดสำเร็จ!");
-    listFiles();
+    listFiles(true);
   }
 }
 
-/* ✅ เปิดภาพใน Modal */
+/* ✅ เปิด / ปิด Modal */
 function openModal(url) {
   document.getElementById("modalImg").src = url;
   document.getElementById("imageModal").style.display = "flex";
 }
-
-/* ✅ ปิดภาพ */
 function closeModal() {
   document.getElementById("imageModal").style.display = "none";
 }
