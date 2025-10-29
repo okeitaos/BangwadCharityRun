@@ -97,7 +97,6 @@
       width: 100%;
       height: 200px;
       object-fit: cover;
-      cursor: pointer;
       transition: opacity 0.3s;
     }
 
@@ -127,43 +126,6 @@
       background: #1d4ed8;
     }
 
-    /* Modal */
-    .modal {
-      display: none;
-      position: fixed;
-      z-index: 999;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.9);
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      padding: 10px;
-    }
-
-    .modal img {
-      max-width: 90%;
-      max-height: 80%;
-      border-radius: 15px;
-      box-shadow: 0 0 20px rgba(255,255,255,0.3);
-    }
-
-    .modal button {
-      margin-top: 15px;
-      background: #dc2626;
-      color: #fff;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 25px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background 0.3s;
-    }
-
-    .modal button:hover {
-      background: #b91c1c;
-    }
-
     @media (max-width: 600px) {
       .card img { height: 160px; }
       h1 { font-size: 1.6rem; }
@@ -185,11 +147,6 @@
 
   <div class="grid" id="resultGrid"></div>
 
-  <div class="modal" id="modal">
-    <img id="modalImg">
-    <button onclick="closeModal()">ปิด</button>
-  </div>
-
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 🔑 ใส่ anon key ของคุณ
@@ -199,13 +156,12 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let allImages = [];
 let modelsLoaded = false;
 
-// โหลดเมื่อหน้าเว็บพร้อม
 window.onload = async () => {
   await loadModels();
   await loadAllImages();
 };
 
-// ✅ โหลดโมเดลจาก GitHub
+// โหลดโมเดลจาก GitHub
 async function loadModels() {
   const MODEL_URL = "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
   await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
@@ -265,7 +221,7 @@ document.getElementById("uploadInput").addEventListener("change", async (e) => {
 
     const percent = ((i + 1) / allImages.length) * 100;
     progressBar.style.width = percent + "%";
-    document.getElementById("status").innerText = `🔎 กำลังตรวจสอบ ${i + 1}/${allImages.length} ...`;
+    document.getElementById("status").innerText = `🔎 ตรวจสอบ ${i + 1}/${allImages.length} ...`;
   }
 
   if (matches.length === 0) {
@@ -277,37 +233,33 @@ document.getElementById("uploadInput").addEventListener("change", async (e) => {
   }
 
   progressBar.style.width = "0%";
-  e.target.value = ""; // เคลียร์ input หลังค้นหาเสร็จ
+  e.target.value = "";
 });
 
+// แสดงผลลัพธ์ + ปุ่มดาวน์โหลด
 function renderResults(list) {
   const grid = document.getElementById("resultGrid");
   grid.innerHTML = list.map(i => `
     <div class="card">
-      <img src="${i.url}" alt="${i.name}" onclick="openModal('${i.url}')">
+      <img src="${i.url}" alt="${i.name}">
       <p>ความคล้าย: ${(i.similarity * 100).toFixed(0)}%</p>
       <button class="download-btn" onclick="downloadImage('${i.url}', '${i.name}')">📥 ดาวน์โหลด</button>
     </div>
   `).join("");
 }
 
-function openModal(url) {
-  document.getElementById("modalImg").src = url;
-  document.getElementById("modal").style.display = "flex";
-}
-
-function closeModal() {
-  document.getElementById("modal").style.display = "none";
-}
-
-// ✅ ฟังก์ชันดาวน์โหลดภาพ
+// ✅ ดาวน์โหลดไฟล์โดยตรง (มือถือ / Desktop)
 function downloadImage(url, filename) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  fetch(url)
+    .then(res => res.blob())
+    .then(blob => {
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    })
+    .catch(err => alert("❌ ดาวน์โหลดไม่สำเร็จ"));
 }
 </script>
 </body>
