@@ -211,10 +211,16 @@ function isValidThaiId(id){
   const check = (11 - (sum % 11)) % 10;
   return check === parseInt(id.charAt(12),10);
 }
-function isPassportFormat(val){
-  // passport: allow alphanumeric 6-15, must include at least one letter
-  return /^(?=.*[A-Za-z])[A-Za-z0-9]{6,15}$/.test(val);
+// function isPassportFormat(val){
+//   // passport: allow alphanumeric 6-15, must include at least one letter
+//   return /^(?=.*[A-Za-z])[A-Za-z0-9]{6,15}$/.test(val);
+// }
+  function isPassportFormat(val){
+  // ห้ามเลข 13 หลักติดกัน (กันกรณีผู้ใช้ใส่เลขบัตรผิด)
+  if(/^\d{13}$/.test(val)) return false;
+  return /^[A-Za-z0-9]{6,15}$/.test(val);
 }
+
 
 /* detect type by value */
 function detectIdTypeByValue(val){
