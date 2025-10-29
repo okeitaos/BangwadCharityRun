@@ -8,7 +8,7 @@
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- Face Recognition Library (Browser Build) -->
+  <!-- Face Recognition (Browser Build) -->
   <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
   <!-- Font -->
@@ -25,13 +25,13 @@
       padding: 20px;
     }
 
-    h1 { 
-      color: #facc15; 
-      margin-bottom: 10px; 
-      text-shadow: 0 0 10px rgba(250,204,21,0.4); 
+    h1 {
+      color: #facc15;
+      margin-bottom: 10px;
+      text-shadow: 0 0 10px rgba(250,204,21,0.4);
     }
 
-    p { opacity: 0.8; }
+    p { opacity: 0.85; }
 
     #uploadInput {
       margin: 20px 0;
@@ -41,11 +41,16 @@
       border: 1px solid rgba(255,255,255,0.2);
       color: #fff;
       cursor: pointer;
+      transition: all 0.3s;
+    }
+    #uploadInput:hover {
+      background: rgba(255,255,255,0.15);
     }
 
     #status {
       margin: 10px;
       color: #facc15;
+      font-weight: 600;
     }
 
     .grid {
@@ -125,7 +130,7 @@
 
     @media (max-width: 600px) {
       .card img { height: 160px; }
-      h1 { font-size: 1.5rem; }
+      h1 { font-size: 1.6rem; }
       #uploadInput { width: 90%; }
     }
   </style>
@@ -146,7 +151,7 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // ใส่ anon key ของคุณ
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 🔑 ใส่ anon key ของคุณ
 const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -159,9 +164,9 @@ window.onload = async () => {
   await loadAllImages();
 };
 
-// โหลดโมเดล face-api
+// ✅ โหลดโมเดลจาก GitHub (ไม่ 404 แล้ว)
 async function loadModels() {
-  const MODEL_URL = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights";
+  const MODEL_URL = "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
   await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
   await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
   await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
@@ -169,7 +174,7 @@ async function loadModels() {
   document.getElementById("status").innerText = "✅ พร้อมใช้งานแล้ว กรุณาอัปโหลดรูปเพื่อเริ่มค้นหา";
 }
 
-// โหลดรูปจาก Supabase ทั้งหมด
+// ดึงรูปทั้งหมดจาก Supabase
 async function loadAllImages() {
   const { data: folders } = await sb.storage.from(BUCKET).list("", { limit: 100 });
   for (const folder of folders) {
@@ -185,10 +190,10 @@ async function loadAllImages() {
       });
     }
   }
-  console.log("📸 โหลดรูปทั้งหมดแล้ว:", allImages.length, "ไฟล์");
+  console.log("📸 โหลดรูปทั้งหมด:", allImages.length, "ไฟล์");
 }
 
-// เมื่อผู้ใช้อัปโหลดรูป
+// ค้นหาด้วยใบหน้า
 document.getElementById("uploadInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -202,12 +207,15 @@ document.getElementById("uploadInput").addEventListener("change", async (e) => {
   const userDesc = await faceapi.computeFaceDescriptor(userImage);
 
   const matches = [];
+  let checked = 0;
   for (const img of allImages) {
     try {
       const refImg = await faceapi.fetchImage(img.url);
       const refDesc = await faceapi.computeFaceDescriptor(refImg);
       const distance = faceapi.euclideanDistance(userDesc, refDesc);
-      if (distance < 0.55) { // ปรับระดับความคล้าย
+      checked++;
+      document.getElementById("status").innerText = `🔎 ตรวจสอบ ${checked}/${allImages.length} ...`;
+      if (distance < 0.55) {
         matches.push({ ...img, similarity: (1 - distance).toFixed(2) });
       }
     } catch (err) {
@@ -226,6 +234,7 @@ document.getElementById("uploadInput").addEventListener("change", async (e) => {
   e.target.value = ""; // เคลียร์ input หลังค้นหาเสร็จ
 });
 
+// แสดงผลลัพธ์
 function renderResults(list) {
   const grid = document.getElementById("resultGrid");
   grid.innerHTML = list.map(i => `
@@ -236,11 +245,11 @@ function renderResults(list) {
   `).join("");
 }
 
+// เปิด / ปิดรูป
 function openModal(url) {
   document.getElementById("modalImg").src = url;
   document.getElementById("modal").style.display = "flex";
 }
-
 function closeModal() {
   document.getElementById("modal").style.display = "none";
 }
