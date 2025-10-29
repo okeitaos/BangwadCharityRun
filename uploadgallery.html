@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>📸 ระบบอัปโหลดภาพ Supabase</title>
+  <title>📸 ระบบอัปโหลดภาพ Supabase Gallery</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
   <style>
     body {
       font-family: 'Prompt', sans-serif;
@@ -21,27 +22,34 @@
       50% { background-position: 100% 50%; }
       100% { background-position: 0% 50%; }
     }
-    h1 { color: #FFD700; text-shadow: 1px 1px 5px #000; }
-    input[type=file] {
+    h1 {
+      color: #FFD700;
+      text-shadow: 2px 2px 8px rgba(0,0,0,0.6);
+    }
+    input[type=file], select {
       margin-top: 20px;
       padding: 10px;
-      background: #fff;
       border-radius: 8px;
+      border: none;
+      background: #fff;
       color: #000;
       cursor: pointer;
     }
     button {
       background: linear-gradient(90deg, #cf142b, #FFD700, #00247d);
       border: none;
-      padding: 10px 20px;
-      margin-top: 20px;
+      padding: 12px 28px;
+      margin-top: 25px;
       border-radius: 8px;
       color: #fff;
       font-weight: bold;
       cursor: pointer;
-      transition: 0.3s;
+      transition: transform 0.3s, box-shadow 0.3s;
     }
-    button:hover { transform: scale(1.05); }
+    button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 5px 20px rgba(255,255,255,0.3);
+    }
     .gallery {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -54,42 +62,57 @@
       object-fit: cover;
       border-radius: 15px;
       box-shadow: 0 5px 15px rgba(255,255,255,0.3);
-      transition: 0.3s;
+      transition: transform 0.3s, box-shadow 0.3s;
     }
     .gallery img:hover {
       transform: scale(1.05);
-      box-shadow: 0 10px 25px rgba(255,255,255,0.5);
+      box-shadow: 0 10px 25px rgba(255,255,255,0.6);
     }
   </style>
 </head>
 <body>
-  <h1>📸 ระบบอัปโหลดภาพไปยัง Supabase Storage</h1>
+  <h1>📸 อัปโหลดภาพไปยัง Supabase Storage</h1>
+
   <input type="file" id="fileInput" accept="image/*" multiple />
+  <br />
+  <label for="qualitySelect">🔧 เลือกคุณภาพการบีบอัด:</label>
+  <select id="qualitySelect">
+    <option value="1">100% (คมชัดสูงสุด)</option>
+    <option value="0.9">90%</option>
+    <option value="0.8" selected>80% (แนะนำ)</option>
+    <option value="0.7">70%</option>
+    <option value="0.6">60%</option>
+    <option value="0.5">50%</option>
+    <option value="0.4">40% (บีบมากสุด)</option>
+  </select>
   <br />
   <button onclick="uploadImages()">อัปโหลดภาพ</button>
 
   <div class="gallery" id="gallery"></div>
 
   <script>
-    // 🔑 ตั้งค่าของคุณเอง
+    // 🔑 Supabase Project Config
     const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const bucketName = "gallery"; // ต้องสร้างใน Supabase ก่อน
+    const { createClient } = supabase;
+    const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // ✅ โหลดภาพจาก Storage มาโชว์
+    const bucketName = "gallery"; // ต้องมี bucket ชื่อนี้ใน Supabase
+
+    // ✅ โหลดภาพทั้งหมดจาก Supabase
     async function loadGallery() {
       const galleryDiv = document.getElementById("gallery");
       galleryDiv.innerHTML = "<p>⏳ กำลังโหลดภาพ...</p>";
 
-      const { data, error } = await supabase.storage.from(bucketName).list("", {
+      const { data, error } = await client.storage.from(bucketName).list("", {
         limit: 1000,
         sortBy: { column: "created_at", order: "desc" },
       });
+
       if (error) {
+        console.error("❌ load error:", error.message);
         galleryDiv.innerHTML = "<p>❌ โหลดภาพไม่สำเร็จ</p>";
-        console.error(error);
         return;
       }
 
@@ -101,7 +124,7 @@
       }
     }
 
-    // ✅ ฟังก์ชันบีบอัดรูป
+    // ✅ ฟังก์ชันบีบอัดรูปก่อนอัปโหลด
     function compressImage(file, maxSizeMB = 5, quality = 0.8) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -110,10 +133,12 @@
           img.onload = () => {
             const canvas = document.createElement("canvas");
             const ctx = canvas.getContext("2d");
+
             const scale = Math.min(1, Math.sqrt((maxSizeMB * 1024 * 1024) / file.size));
             canvas.width = img.width * scale;
             canvas.height = img.height * scale;
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
             canvas.toBlob(
               (blob) => {
                 if (!blob) reject(new Error("Compression failed"));
@@ -129,10 +154,11 @@
       });
     }
 
-    // ✅ อัปโหลดภาพ
+    // ✅ อัปโหลดภาพทั้งหมด
     async function uploadImages() {
       const input = document.getElementById("fileInput");
       const files = input.files;
+      const quality = parseFloat(document.getElementById("qualitySelect").value);
 
       if (!files.length) return alert("กรุณาเลือกภาพก่อนอัปโหลด!");
       if (files.length > 1000) return alert("อัปโหลดได้สูงสุดครั้งละ 1000 รูป");
@@ -141,26 +167,23 @@
         const file = files[i];
         console.log(`📤 Uploading: ${file.name}`);
 
-        // บีบอัดก่อนอัปโหลด
-        const compressed = await compressImage(file, 5, 0.8);
+        const compressed = await compressImage(file, 5, quality);
+
         if (compressed.size > 5 * 1024 * 1024) {
-          alert(`❌ ${file.name} มีขนาดเกิน 5MB หลังบีบอัด`);
+          alert(`❌ ${file.name} เกิน 5MB หลังบีบอัด`);
           continue;
         }
 
         const fileName = `img_${Date.now()}_${i}.jpg`;
 
-        const { error } = await supabase.storage
+        const { error } = await client.storage
           .from(bucketName)
           .upload(fileName, compressed, {
             contentType: "image/jpeg",
           });
 
-        if (error) {
-          console.error("❌ Upload error:", error.message);
-        } else {
-          console.log(`✅ Uploaded: ${fileName}`);
-        }
+        if (error) console.error("❌ Upload error:", error.message);
+        else console.log(`✅ Uploaded: ${fileName}`);
       }
 
       alert("✅ อัปโหลดสำเร็จ!");
