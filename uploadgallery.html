@@ -85,38 +85,22 @@
 
   button:hover { transform: translateY(-2px); opacity: 0.9; }
 
-  /* ✅ ปุ่มหลักสีเขียว LINE */
-  .btn-green {
-    background: linear-gradient(90deg, #06C755, #00B900);
-  }
-
-  /* ปุ่มอื่นๆ */
+  .btn-green { background: linear-gradient(90deg, #06C755, #00B900); }
   #loginBtn { background: var(--green); }
   #deleteAllBtn { background: linear-gradient(90deg, #ef4444, #dc2626); }
   #logoutBtn { background: #475569; }
   .delete-btn { background: #dc2626; font-size: 0.8rem; padding: 5px 10px; }
 
-  #status {
-    margin-top: 10px;
-    color: var(--gold);
-    font-weight: bold;
-  }
-
+  #status { margin-top: 10px; color: var(--gold); font-weight: bold; }
   #progressContainer {
-    width: 90%;
-    max-width: 500px;
-    height: 10px;
-    background: var(--panel);
-    border-radius: 10px;
-    margin: 10px auto;
-    overflow: hidden;
+    width: 90%; max-width: 500px; height: 10px;
+    background: var(--panel); border-radius: 10px;
+    margin: 10px auto; overflow: hidden;
   }
-
   #progressBar {
     height: 100%;
     background: linear-gradient(90deg, var(--green), #22c55e);
-    width: 0%;
-    transition: width 0.2s;
+    width: 0%; transition: width 0.2s;
   }
 
   .file-list {
@@ -133,60 +117,32 @@
   li {
     padding: 10px 8px;
     border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    display: flex; justify-content: space-between; align-items: center;
     word-break: break-all;
   }
-
-  li span.filename {
-    color: #38bdf8;
-    cursor: pointer;
-    text-decoration: underline;
-  }
-
+  li span.filename { color: #38bdf8; cursor: pointer; text-decoration: underline; }
   li span.filename:hover { color: var(--gold); }
 
-  #count {
-    margin-top: 10px;
-    text-align: right;
-    opacity: 0.7;
-  }
-
+  #count { margin-top: 10px; text-align: right; opacity: 0.7; }
   #pagination { margin-top: 20px; }
-  #pagination button {
-    background: #3b82f6;
-    font-size: 0.9rem;
-  }
+  #pagination button { background: #3b82f6; font-size: 0.9rem; }
 
-  /* Modal */
   .modal {
-    display: none;
-    position: fixed;
-    z-index: 999;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    display: none; position: fixed; z-index: 999;
+    top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.95);
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
+    justify-content: center; align-items: center; flex-direction: column;
   }
 
   .modal img {
-    max-width: 90%;
-    max-height: 80%;
-    border-radius: 15px;
-    box-shadow: 0 0 20px rgba(250,204,21,0.3);
+    max-width: 90%; max-height: 80%;
+    border-radius: 15px; box-shadow: 0 0 20px rgba(250,204,21,0.3);
   }
 
-  .modal button {
-    background: #dc2626;
-    margin-top: 20px;
-  }
+  .modal button { background: #dc2626; margin-top: 20px; }
 
   @media (max-width:600px) {
-    body { padding: 15px; }
-    h1 { font-size: 1.5rem; }
+    body { padding: 15px; } h1 { font-size: 1.5rem; }
     li { flex-direction: column; align-items: flex-start; }
     button { width: 90%; font-size: 1rem; }
   }
@@ -203,7 +159,6 @@
     <div id="userProfile"></div>
 
     <input type="file" id="fileInput" multiple accept="image/*"><br>
-    <!-- เรียกฟังก์ชันใหม่ที่เพิ่มเข้ามา (ฟังก์ชันเดิม uploadFiles() ไม่ถูกแก้ไข) -->
     <button class="btn-green" onclick="uploadFilesChecked()">📤 อัปโหลด</button>
     <button class="btn-green" onclick="listFiles(true)">🔄 รีเฟรช</button>
     <button id="deleteAllBtn" onclick="deleteAllFiles()">🗑️ ลบรูปทั้งหมด</button>
@@ -238,29 +193,25 @@ const LIFF_ID = "2001781240-k2PJ3Ap2";
 
 let userId = "", userName = "", userPic = "";
 let currentPage = 1;
-const PAGE_SIZE = 1000;
+const PAGE_SIZE_DISPLAY = 20;
+let totalPages = 1;
 let allFiles = [];
 
-function safeUserId(uid) { return uid.replace(/[^a-zA-Z0-9_-]/g, "_"); }
-
-// ---------- sanitizeFileName ----------
+// ป้องกัน key invalid
 function sanitizeFileName(name) {
-  // แยกนามสกุล
   const idx = name.lastIndexOf('.');
   const base = idx === -1 ? name : name.slice(0, idx);
   const ext = idx === -1 ? '' : name.slice(idx).toLowerCase();
-
-  const cleaned = base
-    .normalize('NFKD')            // decompose chars
-    .replace(/\s+/g, '_')        // spaces -> _
-    .replace(/[\/\\]+/g, '_')    // slashes -> _
-    .replace(/[^\w.-]/g, '_')    // non-word char -> _
-    .replace(/_+/g, '_')         // reduce multiple underscores
-    .slice(0, 120);              // limit length
-
+  const cleaned = base.normalize('NFKD')
+    .replace(/\s+/g, '_')
+    .replace(/[\/\\]+/g, '_')
+    .replace(/[^\w.-]/g, '_')
+    .replace(/_+/g, '_')
+    .slice(0, 120);
   return `${cleaned}${ext}`;
 }
-// ---------- end sanitize ----------
+
+function safeUserId(uid) { return uid.replace(/[^a-zA-Z0-9_-]/g, "_"); }
 
 async function main() {
   await liff.init({ liffId: LIFF_ID });
@@ -273,83 +224,47 @@ async function main() {
     showUploadSection();
   }
 }
+
 function login() { liff.login(); }
 async function logout() { await liff.logout(); location.reload(); }
 
 function showUploadSection() {
   document.getElementById("loginSection").style.display = "none";
   document.getElementById("uploadSection").style.display = "block";
-  document.getElementById("userProfile").innerHTML =
-    `<img src="${userPic}"><p>${userName}</p>`;
+  document.getElementById("userProfile").innerHTML = `<img src="${userPic}"><p>${userName}</p>`;
   listFiles(true);
 }
 
-/* Upload (เดิม) */
-async function uploadFiles() {
-  const files = document.getElementById("fileInput").files;
-  const status = document.getElementById("status");
-  const progressBar = document.getElementById("progressBar");
-  if (!files.length) return alert("กรุณาเลือกไฟล์");
+// ============ Upload ============
 
-  status.innerText = "⏳ กำลังอัปโหลด...";
-  progressBar.style.width = "0%";
-  let success = 0, skipped = 0;
-  const total = files.length;
-
-  for (let i = 0; i < total; i++) {
-    const file = files[i];
-    if (file.size > 5 * 1024 * 1024) { skipped++; continue; }
-    // ใช้ sanitizeFileName() เพื่อความปลอดภัยของ key
-    const safeName = sanitizeFileName(file.name);
-    const path = `${userId}/${Date.now()}_${safeName}`;
-    const { error } = await sb.storage.from(BUCKET).upload(path, file);
-    if (!error) success++;
-    progressBar.style.width = `${((i + 1) / total) * 100}%`;
-  }
-
-  document.getElementById("fileInput").value = "";
-  status.innerText = `✅ อัปโหลดสำเร็จ ${success} ไฟล์` +
-                     (skipped ? ` (ข้าม ${skipped} ไฟล์ >5MB)` : "");
-  progressBar.style.width = "100%";
-  listFiles(true);
-}
-
-/* ฟังก์ชันใหม่: uploadFilesChecked() — เพิ่มการตรวจสอบไฟล์ซ้ำก่อนอัปโหลด */
 async function uploadFilesChecked() {
   const files = document.getElementById("fileInput").files;
   const status = document.getElementById("status");
   const progressBar = document.getElementById("progressBar");
   if (!files.length) return alert("กรุณาเลือกไฟล์");
 
-  // ให้แน่ใจว่ามีรายการไฟล์ล่าสุด
   await listFiles(true);
-
   status.innerText = "⏳ ตรวจสอบและอัปโหลด...";
   progressBar.style.width = "0%";
 
   let success = 0, skippedTooBig = 0, skippedDuplicate = 0;
   const total = files.length;
 
-  // helper: แปลง ArrayBuffer -> hex string (SHA-256)
   async function hashArrayBuffer(buffer) {
     const hash = await crypto.subtle.digest('SHA-256', buffer);
     return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
-  // helper: คำนวณ hash ของ File
   async function hashFile(file) {
     const ab = await file.arrayBuffer();
     return await hashArrayBuffer(ab);
   }
 
-  // helper: ดาวน์โหลดไฟล์จาก Supabase (ถ้าจำเป็น) แล้วคืนค่าบล็อบ
   async function downloadExistingFile(path) {
-    const { data, error } = await sb.storage.from(BUCKET).download(path);
-    if (error) throw error;
-    return data; // Blob
+    const { data } = await sb.storage.from(BUCKET).download(path);
+    return data;
   }
 
-  // สร้างดรรชนีของไฟล์ปัจจุบันตาม size เพื่อช่วยคัดกรองก่อนดาวน์โหลด
   const existingBySize = {};
   allFiles.forEach(f => {
     const size = f.size || (f.metadata && f.metadata.size) || null;
@@ -359,162 +274,112 @@ async function uploadFilesChecked() {
 
   for (let i = 0; i < total; i++) {
     const file = files[i];
+    if (file.size > 5 * 1024 * 1024) { skippedTooBig++; continue; }
 
-    // 1) ข้ามถ้าขนาดเกิน
-    if (file.size > 5 * 1024 * 1024) {
-      skippedTooBig++;
-      progressBar.style.width = `${((i + 1) / total) * 100}%`;
-      continue;
-    }
-
-    // 2) ตรวจชื่อ+ขนาด เหมือนไฟล์ที่มีอยู่แล้ว -> ถือเป็น duplicate ทันที (เร็ว)
     const candidateByName = allFiles.find(f => f.name === file.name);
     if (candidateByName) {
-      const existingSize = candidateByName.size || (candidateByName.metadata && candidateByName.metadata.size) || null;
+      const existingSize = candidateByName.size || (candidateByName.metadata && candidateByName.metadata.size);
       if (existingSize === null || existingSize === file.size) {
         skippedDuplicate++;
-        progressBar.style.width = `${((i + 1) / total) * 100}%`;
         continue;
       }
     }
 
-    // 3) ถ้ามีไฟล์ที่มีขนาดเท่ากันใน allFiles -> ดาวน์โหลดเฉพาะไฟล์เหล่านั้นเพื่อตรวจ hash
-    const possibleMatches = existingBySize[file.size] || [];
-
     let isDuplicate = false;
+    const possibleMatches = existingBySize[file.size] || [];
     if (possibleMatches.length > 0) {
-      // คำนวณ hash ของไฟล์ที่อัปโหลด
-      let fileHash;
-      try {
-        fileHash = await hashFile(file);
-      } catch (e) {
-        console.warn('ไม่สามารถคำนวณ hash ของไฟล์:', file.name, e);
-      }
-
-      if (fileHash) {
-        for (const existing of possibleMatches) {
-          try {
-            const existingPath = `${userId}/${existing.name}`;
-            const blob = await downloadExistingFile(existingPath);
-            const ab = await blob.arrayBuffer();
-            const existingHash = await hashArrayBuffer(ab);
-            if (existingHash === fileHash) {
-              isDuplicate = true;
-              break;
-            }
-          } catch (e) {
-            console.warn('ไม่สามารถดาวน์โหลดไฟล์เพื่อตรวจสอบ hash:', existing.name, e);
-          }
-        }
+      const fileHash = await hashFile(file);
+      for (const existing of possibleMatches) {
+        try {
+          const existingPath = `${userId}/${existing.name}`;
+          const blob = await downloadExistingFile(existingPath);
+          const ab = await blob.arrayBuffer();
+          const existingHash = await hashArrayBuffer(ab);
+          if (existingHash === fileHash) { isDuplicate = true; break; }
+        } catch {}
       }
     }
 
-    if (isDuplicate) {
-      skippedDuplicate++;
-      progressBar.style.width = `${((i + 1) / total) * 100}%`;
-      continue;
-    }
+    if (isDuplicate) { skippedDuplicate++; continue; }
 
-    // 4) ถ้าไม่พบ duplicate จริง จึงอัปโหลด (ใช้ sanitizeFileName()
-    try {
-      const safeName = sanitizeFileName(file.name);
-      const path = `${userId}/${Date.now()}_${safeName}`;
-      const { error } = await sb.storage.from(BUCKET).upload(path, file);
-      if (!error) success++;
-      else console.warn('Upload error:', error);
-    } catch (e) {
-      console.warn('Upload failed:', e);
-    }
-
+    const safeName = sanitizeFileName(file.name);
+    const path = `${userId}/${Date.now()}_${safeName}`;
+    const { error } = await sb.storage.from(BUCKET).upload(path, file);
+    if (!error) success++;
     progressBar.style.width = `${((i + 1) / total) * 100}%`;
   }
 
-  document.getElementById("fileInput").value = "";
-  status.innerText = `✅ อัปโหลดสำเร็จ ${success} ไฟล์` +
-                     (skippedTooBig ? ` (ข้าม ${skippedTooBig} ไฟล์ >5MB)` : "") +
-                     (skippedDuplicate ? ` (ข้าม ${skippedDuplicate} ไฟล์ ซ้ำ)` : "");
+  status.innerText = `✅ อัปโหลดสำเร็จ ${success} ไฟล์ (ข้ามซ้ำ ${skippedDuplicate}, ขนาดเกิน ${skippedTooBig})`;
   progressBar.style.width = "100%";
-  // โหลดรายการใหม่เพื่ออัปเดตหน้า
   listFiles(true);
 }
 
-/* แสดงไฟล์ */
+// ============ File List + Pagination ============
+
 async function listFiles(forceReload = false) {
   const { data, error } = await sb.storage.from(BUCKET).list(`${userId}/`, {
-    limit: PAGE_SIZE,
-    offset: (currentPage - 1) * PAGE_SIZE,
-    sortBy: { column: "created_at", order: "desc" },
+    limit: 10000,
     ...(forceReload && { cacheControl: "no-cache" })
   });
-  if (error) {
-    console.error('listFiles error:', error);
-    return alert("❌ โหลดไฟล์ไม่สำเร็จ");
-  }
-
+  if (error) return alert("❌ โหลดไฟล์ไม่สำเร็จ");
   allFiles = (data || []).filter(f => f.name !== ".emptyFolderPlaceholder");
-  renderFileList(allFiles);
-
-  // ปรับสถานะปุ่ม pagination
-  document.getElementById('prevBtn').disabled = currentPage <= 1;
-  // ถ้าจำนวนไฟล์ที่ได้ < PAGE_SIZE แสดงว่าไม่มีหน้าถัดไป
-  document.getElementById('nextBtn').disabled = (allFiles.length < PAGE_SIZE);
+  allFiles.sort((a,b)=> new Date(b.created_at||0) - new Date(a.created_at||0));
+  totalPages = Math.max(1, Math.ceil(allFiles.length / PAGE_SIZE_DISPLAY));
+  if (currentPage > totalPages) currentPage = totalPages;
+  renderPage(currentPage);
+  updatePaginationButtons();
 }
 
-document.getElementById("searchInput").addEventListener("input", e => {
-  const keyword = e.target.value.toLowerCase();
-  const filtered = allFiles.filter(f => f.name.toLowerCase().includes(keyword));
-  renderFileList(filtered);
-});
+function renderPage(page) {
+  const start = (page - 1) * PAGE_SIZE_DISPLAY;
+  const slice = allFiles.slice(start, start + PAGE_SIZE_DISPLAY);
+  renderFileList(slice);
+  const countEl = document.getElementById('count');
+  countEl.innerText = `📦 แสดง ${slice.length} จาก ${allFiles.length} ไฟล์ — หน้า ${page}/${totalPages}`;
+  updatePaginationButtons();
+}
 
 function renderFileList(files) {
   const list = document.getElementById("fileList");
-  const count = document.getElementById("count");
-  if (files.length === 0) {
-    list.innerHTML = "<li>ไม่มีไฟล์</li>";
-    count.innerText = "";
-    return;
-  }
+  if (!files.length) { list.innerHTML = "<li>ไม่มีไฟล์</li>"; return; }
   list.innerHTML = files.map(f => {
     const time = new Date(f.created_at || Date.now()).toLocaleString("th-TH", { hour12: false });
     const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${f.name}`;
-    return `
-      <li>
-        <span class="filename" onclick="openModal('${imgUrl}')">${f.name}</span>
-        <div>
-          <small style="opacity:0.7;">${time}</small>
-          <button class="delete-btn" onclick="deleteFile('${f.name}')">ลบ</button>
-        </div>
-      </li>`;
+    return `<li><span class="filename" onclick="openModal('${imgUrl}')">${f.name}</span>
+      <div><small style="opacity:0.7;">${time}</small>
+      <button class="delete-btn" onclick="deleteFile('${f.name}')">ลบ</button></div></li>`;
   }).join("");
-  count.innerText = `📦 จำนวนไฟล์ที่แสดง: ${files.length}`;
 }
+
+function updatePaginationButtons() {
+  const prev = document.getElementById('prevBtn');
+  const next = document.getElementById('nextBtn');
+  prev.disabled = currentPage <= 1;
+  next.disabled = currentPage >= totalPages;
+}
+
+function nextPage() {
+  if (currentPage < totalPages) { currentPage++; renderPage(currentPage); }
+}
+function prevPage() {
+  if (currentPage > 1) { currentPage--; renderPage(currentPage); }
+}
+
+// ============ Delete & Modal ============
 
 async function deleteFile(filename) {
   if (!confirm(`ต้องการลบไฟล์นี้หรือไม่?\n${filename}`)) return;
-  const { error } = await sb.storage.from(BUCKET).remove([`${userId}/${filename}`]);
-  if (!error) listFiles(true);
+  await sb.storage.from(BUCKET).remove([`${userId}/${filename}`]);
+  listFiles(true);
 }
 
 async function deleteAllFiles() {
   if (!confirm("⚠️ ต้องการลบรูปทั้งหมดของคุณใช่ไหม?")) return;
-  const filesToDelete = allFiles.map(f => `${userId}/${f.name}`);
-  await sb.storage.from(BUCKET).remove(filesToDelete);
+  const paths = allFiles.map(f => `${userId}/${f.name}`);
+  await sb.storage.from(BUCKET).remove(paths);
   listFiles(true);
 }
 
-/* Pagination functions */
-async function nextPage() {
-  currentPage++;
-  await listFiles(true);
-}
-
-async function prevPage() {
-  if (currentPage <= 1) return;
-  currentPage--;
-  await listFiles(true);
-}
-
-/* Modal */
 function openModal(url) {
   document.getElementById("modalImg").src = url;
   document.getElementById("imageModal").style.display = "flex";
