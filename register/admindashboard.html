@@ -33,11 +33,18 @@
 <div id="filterSection" class="max-w-6xl mx-auto bg-white p-4 rounded-lg shadow mb-4">
   <div class="flex flex-wrap gap-3 items-center">
     <select id="filterType" class="border p-2 rounded">
-      <option value="ALL">ทั้งหมด</option>
+      <option value="ALL">ทุกประเภท</option>
       <option value="BCR 50.4">BCR 50.4</option>
       <option value="BCR 69.3">BCR 69.3</option>
       <option value="BCR 100.8">BCR 100.8</option>
     </select>
+
+    <select id="filterStatus" class="border p-2 rounded">
+      <option value="ALL">ทุกสถานะ</option>
+      <option value="FINISHER">FINISHER</option>
+      <option value="DNF">DNF</option>
+    </select>
+
     <input id="filterStart" type="date" class="border p-2 rounded" />
     <input id="filterEnd" type="date" class="border p-2 rounded" />
     <button id="filterBtn" class="bg-blue-600 text-white px-4 py-2 rounded">กรองข้อมูล</button>
@@ -101,6 +108,7 @@
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 let allData = [];
 let filteredData = [];
 
@@ -108,10 +116,7 @@ const overlay = document.getElementById("loadingOverlay");
 function showLoading(show) { overlay.style.display = show ? "flex" : "none"; }
 
 async function loadReport() {
-  const tbody = document.getElementById("reportBody");
-  tbody.innerHTML = `<tr><td colspan="11" class="text-center py-4 text-gray-500">⏳ กำลังโหลด...</td></tr>`;
   showLoading(true);
-
   const { data, error } = await supabase.from("v_runner_exit_report").select("*").order("exit_time_th", { ascending: false });
   showLoading(false);
 
@@ -128,12 +133,23 @@ document.getElementById("filterBtn").addEventListener("click", () => {
   showLoading(true);
   setTimeout(() => {
     const type = document.getElementById("filterType").value;
+    const status = document.getElementById("filterStatus").value;
     const start = document.getElementById("filterStart").value ? new Date(document.getElementById("filterStart").value) : null;
     const end = document.getElementById("filterEnd").value ? new Date(document.getElementById("filterEnd").value + "T23:59:59") : null;
 
     filteredData = [...allData];
+
+    // ✅ กรองรุ่น
     if (type !== "ALL") filteredData = filteredData.filter((r) => getRaceType(r).includes(type.toUpperCase()));
-    if (start && end) filteredData = filteredData.filter((r) => new Date(r.exit_time_th) >= start && new Date(r.exit_time_th) <= end);
+
+    // ✅ กรองสถานะ
+    if (status !== "ALL") filteredData = filteredData.filter((r) => r.exit_status === status);
+
+    // ✅ กรองช่วงวัน
+    if (start && end) filteredData = filteredData.filter((r) => {
+      const date = new Date(r.exit_time_th);
+      return date >= start && date <= end;
+    });
 
     updateSummary(filteredData);
     renderReport(filteredData);
@@ -141,6 +157,7 @@ document.getElementById("filterBtn").addEventListener("click", () => {
   }, 200);
 });
 
+// 🔍 ค้นหา
 document.getElementById("searchInput").addEventListener("input", (e) => {
   const q = e.target.value.toLowerCase();
   filteredData = allData.filter((r) =>
@@ -152,6 +169,7 @@ document.getElementById("searchInput").addEventListener("input", (e) => {
   renderReport(filteredData);
 });
 
+// 🧮 สรุปยอดรวม
 function updateSummary(list) {
   const finisher = list.filter((r) => r.exit_status === "FINISHER").length;
   const dnf = list.filter((r) => r.exit_status === "DNF").length;
@@ -165,16 +183,18 @@ function updateSummary(list) {
   types.forEach((t) => {
     const f = list.filter((r) => getRaceType(r).includes(t.toUpperCase()) && r.exit_status === "FINISHER").length;
     const d = list.filter((r) => getRaceType(r).includes(t.toUpperCase()) && r.exit_status === "DNF").length;
+    const percent = (d + f) ? ((d / (d + f)) * 100).toFixed(1) : 0;
     div.innerHTML += `
       <div class="bg-white border rounded-lg p-3 shadow-sm">
         <div class="font-semibold">${t}</div>
         <div class="flex justify-between text-sm text-green-700"><span>FINISHER:</span><span>${f}</span></div>
-        <div class="flex justify-between text-sm text-red-700"><span>DNF:</span><span>${d}</span></div>
+        <div class="flex justify-between text-sm text-red-700"><span>DNF:</span><span>${d} (${percent}% DNF)</span></div>
         <div class="flex justify-between text-sm border-t mt-1 pt-1"><span>รวม:</span><span>${f + d}</span></div>
       </div>`;
   });
 }
 
+// 📋 ตาราง
 function renderReport(list) {
   const tbody = document.getElementById("reportBody");
   tbody.innerHTML = "";
@@ -203,7 +223,7 @@ function renderReport(list) {
 
 document.getElementById("printBtn").addEventListener("click", () => window.print());
 
-// 📊 ดาวน์โหลด Excel
+// 📊 Excel Export
 document.getElementById("excelBtn").addEventListener("click", () => {
   const list = filteredData.length ? filteredData : allData;
   if (!list.length) return alert("❌ ไม่มีข้อมูลให้ดาวน์โหลด");
@@ -211,15 +231,15 @@ document.getElementById("excelBtn").addEventListener("click", () => {
   const rows = list.map((r) => ({
     BIB: r.bib || "-",
     ชื่อ: r.runner_name || "-",
-    รุ่นการแข่งขัน: r.race_type || "-",
+    รุ่น: r.race_type || "-",
     สถานะ: r.exit_status || "-",
-    รอบที่: r.last_lap || "-",
+    รอบ: r.last_lap || "-",
     ระยะทาง: r.distance_km || "-",
-    เวลารวมทั้งหมด: r.total_running_time || "-",
-    เวลาเฉลี่ยต่อรอบ: r.avg_lap_time || "-",
+    เวลารวม: r.total_running_time || "-",
+    เวลาเฉลี่ย: r.avg_lap_time || "-",
     เหตุผล: r.exit_reason || "-",
     กรรมการ: r.updated_by_name || "-",
-    เวลาออกจากการแข่งขัน: r.exit_time_th ? new Date(r.exit_time_th).toLocaleString("th-TH") : "-"
+    เวลาออก: r.exit_time_th ? new Date(r.exit_time_th).toLocaleString("th-TH") : "-"
   }));
 
   const ws = XLSX.utils.json_to_sheet(rows);
