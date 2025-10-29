@@ -111,19 +111,23 @@
   }
 
   ul { list-style: none; padding: 0; margin: 0; }
+
+  /* ✅ ปรับ layout ของรายการไฟล์ให้ชื่อไม่ตกบรรทัด */
   li {
     padding: 10px 8px;
     border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    word-break: break-all;
+    gap: 12px;
+    flex-wrap: nowrap;
+    word-break: normal;
   }
 
-  /* ✅ แสดงชื่อไฟล์บรรทัดเดียว + ... ต่อท้าย */
   li .filename {
     display: inline-block;
-    max-width: 60%;
+    flex: 1 1 auto;
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -132,7 +136,17 @@
     cursor: pointer;
     text-decoration: underline;
   }
+
   li .filename:hover { color: var(--gold); }
+
+  li > div {
+    flex: 0 0 auto;
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
 
   #count { margin-top: 10px; text-align: right; opacity: 0.7; }
   #pagination { margin-top: 20px; }
@@ -162,9 +176,8 @@
   @media (max-width:600px) {
     body { padding: 15px; }
     h1 { font-size: 1.5rem; }
-    li { flex-direction: column; align-items: flex-start; }
+    li { gap: 8px; }
     li .filename { max-width: 70%; }
-    button { width: 90%; font-size: 1rem; }
   }
 </style>
 </head>
@@ -206,7 +219,7 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
 const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const LIFF_ID = "2001781240-k2PJ3Ap2";
