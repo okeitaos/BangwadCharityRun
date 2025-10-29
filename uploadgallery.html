@@ -35,9 +35,7 @@
     cursor: pointer;
     font-size: 0.8rem;
   }
-  #deleteAllBtn {
-    background: linear-gradient(90deg, #ef4444, #dc2626);
-  }
+  #deleteAllBtn { background: linear-gradient(90deg, #ef4444, #dc2626); }
   #userProfile img {
     border-radius: 50%;
     width: 90px;
@@ -46,6 +44,7 @@
     border: 3px solid #facc15;
   }
   #userProfile p { margin-top: 6px; font-weight: bold; }
+
   .file-list {
     background: rgba(255,255,255,0.05);
     margin-top: 20px;
@@ -55,6 +54,18 @@
     margin: 20px auto;
     text-align: left;
   }
+
+  input[type="text"] {
+    width: 80%;
+    max-width: 400px;
+    padding: 10px;
+    border-radius: 20px;
+    border: none;
+    outline: none;
+    margin-bottom: 15px;
+    font-size: 1rem;
+  }
+
   ul { list-style: none; padding: 0; margin: 0; }
   li { 
     padding: 6px 10px; 
@@ -70,7 +81,9 @@
     text-decoration: underline;
   }
   li span.filename:hover { color: #facc15; }
+
   #status { margin-top: 10px; color: #facc15; font-weight: bold; }
+
   #progressContainer {
     width: 90%;
     max-width: 500px;
@@ -86,15 +99,10 @@
     width: 0%;
     transition: width 0.2s;
   }
-  #pagination {
-    margin-top: 20px;
-  }
-  #pagination button {
-    background: #3b82f6;
-    margin: 5px;
-  }
 
-  /* Modal */
+  #pagination { margin-top: 20px; }
+  #pagination button { background: #3b82f6; margin: 5px; }
+
   .modal {
     display: none;
     position: fixed;
@@ -143,6 +151,7 @@
     <div id="progressContainer"><div id="progressBar"></div></div>
 
     <div class="file-list">
+      <input type="text" id="searchInput" placeholder="🔍 ค้นหาชื่อไฟล์...">
       <ul id="fileList"></ul>
       <div id="count"></div>
     </div>
@@ -168,13 +177,14 @@ const LIFF_ID = "2001781240-k2PJ3Ap2";
 let userId = "", userName = "", userPic = "";
 let currentPage = 1;
 const PAGE_SIZE = 1000;
+let allFiles = [];
 
-/* ✅ ทำให้ userId ปลอดภัย */
+/* ✅ userId ให้ปลอดภัย */
 function safeUserId(uid) {
   return uid.replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
-/* ✅ เริ่มต้นระบบ LINE */
+/* ✅ LINE Auth */
 async function main() {
   await liff.init({ liffId: LIFF_ID });
   if (!liff.isLoggedIn()) {
@@ -228,27 +238,36 @@ async function uploadFiles() {
   listFiles(true);
 }
 
-/* ✅ Pagination */
+/* ✅ แสดงไฟล์ */
 async function listFiles(forceReload = false) {
-  const from = (currentPage - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
-
   const { data, error } = await sb.storage.from(BUCKET).list(`${userId}/`, {
     limit: PAGE_SIZE,
-    offset: from,
+    offset: (currentPage - 1) * PAGE_SIZE,
     sortBy: { column: "created_at", order: "desc" },
     ...(forceReload && { cacheControl: "no-cache" })
   });
-
   if (error) return alert("❌ โหลดไฟล์ไม่สำเร็จ");
 
+  allFiles = (data || []).filter(f => f.name !== ".emptyFolderPlaceholder");
+  renderFileList(allFiles);
+}
+
+/* ✅ ค้นหาไฟล์ */
+document.getElementById("searchInput").addEventListener("input", e => {
+  const keyword = e.target.value.toLowerCase();
+  const filtered = allFiles.filter(f => f.name.toLowerCase().includes(keyword));
+  renderFileList(filtered);
+});
+
+/* ✅ แสดงรายการ */
+function renderFileList(files) {
   const list = document.getElementById("fileList");
   const count = document.getElementById("count");
-  const files = (data || []).filter(f => f.name !== ".emptyFolderPlaceholder");
 
-  if (files.length === 0 && currentPage > 1) {
-    currentPage--;
-    return listFiles(true);
+  if (files.length === 0) {
+    list.innerHTML = "<li>ไม่มีไฟล์</li>";
+    count.innerText = "";
+    return;
   }
 
   list.innerHTML = files.map(f => {
@@ -265,15 +284,8 @@ async function listFiles(forceReload = false) {
       </li>`;
   }).join("");
 
-  count.innerText = `📦 แสดงหน้าที่ ${currentPage}, จำนวน ${files.length} ไฟล์`;
-
-  document.getElementById("prevBtn").disabled = currentPage === 1;
-  document.getElementById("nextBtn").disabled = files.length < PAGE_SIZE;
+  count.innerText = `📦 จำนวนไฟล์ที่แสดง: ${files.length}`;
 }
-
-/* ✅ ถัดไป / ก่อนหน้า */
-function nextPage() { currentPage++; listFiles(true); }
-function prevPage() { if (currentPage > 1) currentPage--; listFiles(true); }
 
 /* ✅ ลบไฟล์ */
 async function deleteFile(filename) {
@@ -286,15 +298,11 @@ async function deleteFile(filename) {
 /* ✅ ลบทั้งหมด */
 async function deleteAllFiles() {
   if (!confirm("⚠️ ต้องการลบรูปทั้งหมดของคุณใช่ไหม?")) return;
-  const { data } = await sb.storage.from(BUCKET).list(`${userId}/`);
-  if (!data || !data.length) return alert("ไม่มีไฟล์ให้ลบ");
-
-  const filesToDelete = data
-    .filter(f => f.name !== ".emptyFolderPlaceholder")
-    .map(f => `${userId}/${f.name}`);
-  await sb.storage.from(BUCKET).remove(filesToDelete);
-  alert("🗑️ ลบรูปทั้งหมดสำเร็จ!");
-  listFiles(true);
+  const filesToDelete = allFiles.map(f => `${userId}/${f.name}`);
+  if (filesToDelete.length === 0) return alert("ไม่มีไฟล์ให้ลบ");
+  const { error } = await sb.storage.from(BUCKET).remove(filesToDelete);
+  if (error) alert("❌ ลบไฟล์ไม่สำเร็จ");
+  else listFiles(true);
 }
 
 /* ✅ Modal */
