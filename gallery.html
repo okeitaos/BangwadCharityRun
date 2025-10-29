@@ -4,8 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🔍 ค้นหารูปด้วยใบหน้า | BCR RUN GALLERY</title>
+
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+
+  <!-- Face Recognition Library (Browser Build) -->
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+  <!-- Font -->
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet">
 
   <style>
@@ -18,7 +24,13 @@
       min-height: 100vh;
       padding: 20px;
     }
-    h1 { color: #facc15; margin-bottom: 10px; text-shadow: 0 0 10px rgba(250,204,21,0.4); }
+
+    h1 { 
+      color: #facc15; 
+      margin-bottom: 10px; 
+      text-shadow: 0 0 10px rgba(250,204,21,0.4); 
+    }
+
     p { opacity: 0.8; }
 
     #uploadInput {
@@ -49,20 +61,32 @@
       border-radius: 15px;
       overflow: hidden;
       box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      transition: transform 0.2s ease;
+    }
+
+    .card:hover {
+      transform: scale(1.03);
     }
 
     .card img {
       width: 100%;
       height: 200px;
       object-fit: cover;
+      cursor: pointer;
+      transition: opacity 0.3s;
+    }
+
+    .card img:hover {
+      opacity: 0.9;
     }
 
     .card p {
       font-size: 0.9rem;
-      margin: 5px 0 10px;
+      margin: 8px 0 10px;
       color: #eee;
     }
 
+    /* Modal */
     .modal {
       display: none;
       position: fixed;
@@ -73,12 +97,16 @@
       justify-content: center;
       align-items: center;
       flex-direction: column;
+      padding: 10px;
     }
+
     .modal img {
       max-width: 90%;
       max-height: 80%;
       border-radius: 15px;
+      box-shadow: 0 0 20px rgba(255,255,255,0.3);
     }
+
     .modal button {
       margin-top: 15px;
       background: #dc2626;
@@ -88,8 +116,18 @@
       border-radius: 25px;
       font-weight: bold;
       cursor: pointer;
+      transition: background 0.3s;
     }
 
+    .modal button:hover {
+      background: #b91c1c;
+    }
+
+    @media (max-width: 600px) {
+      .card img { height: 160px; }
+      h1 { font-size: 1.5rem; }
+      #uploadInput { width: 90%; }
+    }
   </style>
 </head>
 <body>
@@ -97,7 +135,7 @@
   <p>อัปโหลดรูปใบหน้าของคุณ เพื่อค้นหารูปใน Gallery ที่มีใบหน้าคล้ายกัน</p>
 
   <input type="file" id="uploadInput" accept="image/*">
-  <div id="status">⏳ รออัปโหลดรูปเพื่อเริ่มค้นหา</div>
+  <div id="status">⏳ รออัปโหลดรูปเพื่อเริ่มค้นหา...</div>
 
   <div class="grid" id="resultGrid"></div>
 
@@ -108,25 +146,30 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // ใส่ anon key ของคุณ
 const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let allImages = [];
 let modelsLoaded = false;
 
-// โหลดโมเดล face-api.js
+// โหลดเมื่อหน้าเว็บพร้อม
+window.onload = async () => {
+  await loadModels();
+  await loadAllImages();
+};
+
+// โหลดโมเดล face-api
 async function loadModels() {
-  const MODEL_URL = "https://cdn.jsdelivr.net/npm/face-api.js/models";
+  const MODEL_URL = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights";
   await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
   await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
   await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
   modelsLoaded = true;
-  document.getElementById("status").innerText = "✅ พร้อมใช้งานแล้ว อัปโหลดรูปเพื่อเริ่มค้นหา";
+  document.getElementById("status").innerText = "✅ พร้อมใช้งานแล้ว กรุณาอัปโหลดรูปเพื่อเริ่มค้นหา";
 }
-loadModels();
 
-// ดึงภาพทั้งหมดจาก Supabase
+// โหลดรูปจาก Supabase ทั้งหมด
 async function loadAllImages() {
   const { data: folders } = await sb.storage.from(BUCKET).list("", { limit: 100 });
   for (const folder of folders) {
@@ -142,10 +185,8 @@ async function loadAllImages() {
       });
     }
   }
-  console.log("Loaded", allImages.length, "images");
+  console.log("📸 โหลดรูปทั้งหมดแล้ว:", allImages.length, "ไฟล์");
 }
-
-loadAllImages();
 
 // เมื่อผู้ใช้อัปโหลดรูป
 document.getElementById("uploadInput").addEventListener("change", async (e) => {
@@ -162,11 +203,15 @@ document.getElementById("uploadInput").addEventListener("change", async (e) => {
 
   const matches = [];
   for (const img of allImages) {
-    const refImg = await faceapi.fetchImage(img.url);
-    const refDesc = await faceapi.computeFaceDescriptor(refImg);
-    const distance = faceapi.euclideanDistance(userDesc, refDesc);
-    if (distance < 0.5) { // ค่า 0.4-0.6 คือระดับที่ถือว่าคล้าย
-      matches.push({ ...img, similarity: (1 - distance).toFixed(2) });
+    try {
+      const refImg = await faceapi.fetchImage(img.url);
+      const refDesc = await faceapi.computeFaceDescriptor(refImg);
+      const distance = faceapi.euclideanDistance(userDesc, refDesc);
+      if (distance < 0.55) { // ปรับระดับความคล้าย
+        matches.push({ ...img, similarity: (1 - distance).toFixed(2) });
+      }
+    } catch (err) {
+      console.warn("ข้ามรูป:", img.name);
     }
   }
 
@@ -177,6 +222,8 @@ document.getElementById("uploadInput").addEventListener("change", async (e) => {
     document.getElementById("status").innerText = `✅ พบ ${matches.length} ภาพที่มีใบหน้าคล้ายกัน`;
     renderResults(matches);
   }
+
+  e.target.value = ""; // เคลียร์ input หลังค้นหาเสร็จ
 });
 
 function renderResults(list) {
@@ -193,6 +240,7 @@ function openModal(url) {
   document.getElementById("modalImg").src = url;
   document.getElementById("modal").style.display = "flex";
 }
+
 function closeModal() {
   document.getElementById("modal").style.display = "none";
 }
