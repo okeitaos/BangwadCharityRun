@@ -203,7 +203,8 @@
     <div id="userProfile"></div>
 
     <input type="file" id="fileInput" multiple accept="image/*"><br>
-    <button class="btn-green" onclick="uploadFiles()">📤 อัปโหลด</button>
+    <!-- เรียกฟังก์ชันใหม่ที่เพิ่มเข้ามา (ฟังก์ชันเดิม uploadFiles() ไม่ถูกแก้ไข) -->
+    <button class="btn-green" onclick="uploadFilesChecked()">📤 อัปโหลด</button>
     <button class="btn-green" onclick="listFiles(true)">🔄 รีเฟรช</button>
     <button id="deleteAllBtn" onclick="deleteAllFiles()">🗑️ ลบรูปทั้งหมด</button>
     <button id="logoutBtn" onclick="logout()">🚪 ออกจากระบบ</button>
@@ -264,7 +265,7 @@ function showUploadSection() {
   listFiles(true);
 }
 
-/* Upload */
+/* Upload (เดิม) */
 async function uploadFiles() {
   const files = document.getElementById("fileInput").files;
   const status = document.getElementById("status");
@@ -289,6 +290,133 @@ async function uploadFiles() {
   status.innerText = `✅ อัปโหลดสำเร็จ ${success} ไฟล์` +
                      (skipped ? ` (ข้าม ${skipped} ไฟล์ >5MB)` : "");
   progressBar.style.width = "100%";
+  listFiles(true);
+}
+
+/* ฟังก์ชันใหม่: uploadFilesChecked() — เพิ่มการตรวจสอบไฟล์ซ้ำก่อนอัปโหลด */
+async function uploadFilesChecked() {
+  const files = document.getElementById("fileInput").files;
+  const status = document.getElementById("status");
+  const progressBar = document.getElementById("progressBar");
+  if (!files.length) return alert("กรุณาเลือกไฟล์");
+
+  // ให้แน่ใจว่ามีรายการไฟล์ล่าสุด
+  await listFiles(true);
+
+  status.innerText = "⏳ ตรวจสอบและอัปโหลด...";
+  progressBar.style.width = "0%";
+
+  let success = 0, skippedTooBig = 0, skippedDuplicate = 0;
+  const total = files.length;
+
+  // helper: แปลง ArrayBuffer -> hex string (SHA-256)
+  async function hashArrayBuffer(buffer) {
+    const hash = await crypto.subtle.digest('SHA-256', buffer);
+    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // helper: คำนวณ hash ของ File
+  async function hashFile(file) {
+    const ab = await file.arrayBuffer();
+    return await hashArrayBuffer(ab);
+  }
+
+  // helper: ดาวน์โหลดไฟล์จาก Supabase (ถ้าจำเป็น) แล้วคืนค่าบล็อบ
+  async function downloadExistingFile(path) {
+    const { data, error } = await sb.storage.from(BUCKET).download(path);
+    if (error) throw error;
+    return data; // Blob
+  }
+
+  // สร้างดรรชนีของไฟล์ปัจจุบันตาม size เพื่อช่วยคัดกรองก่อนดาวน์โหลด
+  // allFiles มาจาก listFiles()
+  const existingBySize = {};
+  allFiles.forEach(f => {
+    // บาง response มี property size หรือ metadata.size — ถ้าไม่มีจะเป็น undefined
+    const size = f.size || (f.metadata && f.metadata.size) || null;
+    if (!existingBySize[size]) existingBySize[size] = [];
+    existingBySize[size].push(f);
+  });
+
+  for (let i = 0; i < total; i++) {
+    const file = files[i];
+
+    // 1) ข้ามถ้าขนาดเกิน
+    if (file.size > 5 * 1024 * 1024) {
+      skippedTooBig++;
+      progressBar.style.width = `${((i + 1) / total) * 100}%`;
+      continue;
+    }
+
+    // 2) ตรวจชื่อ+ขนาด เหมือนไฟล์ที่มีอยู่แล้ว -> ถือเป็น duplicate ทันที (เร็ว)
+    const candidateByName = allFiles.find(f => f.name === file.name);
+    if (candidateByName) {
+      // ถ้ามีทั้งชื่อและ (ถ้ามี)ขนาดตรงกัน ให้ถือเป็นซ้ำ
+      const existingSize = candidateByName.size || (candidateByName.metadata && candidateByName.metadata.size) || null;
+      if (existingSize === null || existingSize === file.size) {
+        // ถ้าไม่มีข้อมูล size ใน metadata แต่ชื่อซ้ำ เราเลือกถือว่าเป็น duplicate เพื่อความปลอดภัย
+        skippedDuplicate++;
+        progressBar.style.width = `${((i + 1) / total) * 100}%`;
+        continue;
+      }
+    }
+
+    // 3) ถ้ามีไฟล์ที่มีขนาดเท่ากันใน allFiles -> ดาวน์โหลดเฉพาะไฟล์เหล่านั้นเพื่อตรวจ hash (ลด traffic)
+    const possibleMatches = existingBySize[file.size] || [];
+
+    let isDuplicate = false;
+    if (possibleMatches.length > 0) {
+      // คำนวณ hash ของไฟล์ที่อัปโหลด
+      let fileHash;
+      try {
+        fileHash = await hashFile(file);
+      } catch (e) {
+        console.warn('ไม่สามารถคำนวณ hash ของไฟล์:', file.name, e);
+      }
+
+      if (fileHash) {
+        for (const existing of possibleMatches) {
+          try {
+            const existingPath = `${userId}/${existing.name}`;
+            const blob = await downloadExistingFile(existingPath);
+            const ab = await blob.arrayBuffer();
+            const existingHash = await hashArrayBuffer(ab);
+            if (existingHash === fileHash) {
+              isDuplicate = true;
+              break;
+            }
+          } catch (e) {
+            console.warn('ไม่สามารถดาวน์โหลดไฟล์เพื่อตรวจสอบ hash:', existing.name, e);
+          }
+        }
+      }
+    }
+
+    if (isDuplicate) {
+      skippedDuplicate++;
+      progressBar.style.width = `${((i + 1) / total) * 100}%`;
+      continue;
+    }
+
+    // 4) ถ้าไม่พบ duplicate จริง จึงอัปโหลด (ใช้พาธ เหมือนฟังก์ชันเดิม)
+    try {
+      const path = `${userId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+      const { error } = await sb.storage.from(BUCKET).upload(path, file);
+      if (!error) success++;
+      else console.warn('Upload error:', error);
+    } catch (e) {
+      console.warn('Upload failed:', e);
+    }
+
+    progressBar.style.width = `${((i + 1) / total) * 100}%`;
+  }
+
+  document.getElementById("fileInput").value = "";
+  status.innerText = `✅ อัปโหลดสำเร็จ ${success} ไฟล์` +
+                     (skippedTooBig ? ` (ข้าม ${skippedTooBig} ไฟล์ >5MB)` : "") +
+                     (skippedDuplicate ? ` (ข้าม ${skippedDuplicate} ไฟล์ ซ้ำ)` : "");
+  progressBar.style.width = "100%";
+  // โหลดรายการใหม่เพื่ออัปเดตหน้า
   listFiles(true);
 }
 
