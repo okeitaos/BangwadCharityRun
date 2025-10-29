@@ -36,6 +36,9 @@
     cursor: pointer;
     font-size: 0.8rem;
   }
+  #deleteAllBtn {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+  }
   #userProfile img {
     border-radius: 50%;
     width: 100px;
@@ -57,11 +60,17 @@
   li { 
     padding: 6px 10px; 
     border-bottom: 1px solid rgba(255,255,255,0.1); 
-    word-break: break-all;
     display: flex; 
     justify-content: space-between;
     align-items: center;
+    word-break: break-all;
   }
+  li span.filename {
+    color: #38bdf8;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  li span.filename:hover { color: #facc15; }
   #status { margin-top: 10px; color: #facc15; font-weight: bold; }
   #progressContainer {
     width: 90%;
@@ -78,6 +87,29 @@
     width: 0%;
     transition: width 0.2s;
   }
+
+  /* Modal */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 999;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.9);
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+  }
+  .modal img {
+    max-width: 90%;
+    max-height: 80%;
+    border-radius: 10px;
+  }
+  .modal button {
+    margin-top: 15px;
+    background: #dc2626;
+  }
+
   @media (max-width:600px){
     body { padding: 12px; }
     h1 { font-size: 1.4rem; }
@@ -100,6 +132,7 @@
     <input type="file" id="fileInput" multiple accept="image/*"><br>
     <button onclick="uploadFiles()">อัปโหลด</button>
     <button onclick="listFiles()">ดูไฟล์ของฉัน</button>
+    <button id="deleteAllBtn" onclick="deleteAllFiles()">🗑️ ลบรูปทั้งหมด</button>
     <button style="background:#dc2626" onclick="logout()">🚪 ออกจากระบบ</button>
 
     <div id="status"></div>
@@ -111,12 +144,18 @@
     </div>
   </div>
 
+  <!-- Modal ดูภาพ -->
+  <div class="modal" id="imageModal">
+    <img id="modalImg" src="" alt="preview">
+    <button onclick="closeModal()">ปิด</button>
+  </div>
+
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-const LIFF_ID = "2001781240-k2PJ3Ap2"; // 🔹 ใส่ LIFF ID จริงของคุณ
+const LIFF_ID = "2001781240-k2PJ3Ap2"; // 🔹 ใส่ LIFF ID ของคุณจริง
 
 let userId = "", userName = "", userPic = "";
 
@@ -172,12 +211,11 @@ async function uploadFiles() {
 
     const path = `${userId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
     const { error } = await sb.storage.from(BUCKET).upload(path, file);
-
     if (!error) success++;
     progressBar.style.width = `${((i + 1) / total) * 100}%`;
   }
 
-  document.getElementById("fileInput").value = ""; // clear input
+  document.getElementById("fileInput").value = "";
   status.innerText = `✅ อัปโหลดสำเร็จ ${success} ไฟล์` +
                      (skipped ? ` (ข้าม ${skipped} ไฟล์ >5MB)` : "");
   progressBar.style.width = "100%";
@@ -202,13 +240,13 @@ async function listFiles() {
     return;
   }
 
-  const now = new Date();
   list.innerHTML = files.map(f => {
-    const date = new Date(f.created_at || now);
-    const time = date.toLocaleString("th-TH", { hour12: false });
+    const time = new Date(f.created_at || Date.now())
+      .toLocaleString("th-TH", { hour12: false });
+    const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${f.name}`;
     return `
       <li>
-        <span>${f.name}</span>
+        <span class="filename" onclick="openModal('${imgUrl}')">${f.name}</span>
         <div>
           <small style="opacity:0.7;">${time}</small>
           <button class="delete-btn" onclick="deleteFile('${f.name}')">ลบ</button>
@@ -219,7 +257,7 @@ async function listFiles() {
   count.innerText = `📦 จำนวนไฟล์ทั้งหมด: ${files.length}`;
 }
 
-/* ✅ ลบไฟล์ */
+/* ✅ ลบไฟล์ทีละรูป */
 async function deleteFile(filename) {
   if (!confirm(`ต้องการลบไฟล์นี้หรือไม่?\n${filename}`)) return;
   const { error } = await sb.storage.from(BUCKET).remove([`${userId}/${filename}`]);
@@ -228,6 +266,40 @@ async function deleteFile(filename) {
     alert("🗑️ ลบไฟล์สำเร็จ");
     listFiles();
   }
+}
+
+/* ✅ ลบไฟล์ทั้งหมด */
+async function deleteAllFiles() {
+  if (!confirm("⚠️ ต้องการลบรูปทั้งหมดของคุณใช่ไหม?")) return;
+
+  const { data, error } = await sb.storage.from(BUCKET).list(`${userId}/`);
+  if (error || !data.length) {
+    alert("❌ ไม่มีไฟล์ให้ลบ");
+    return;
+  }
+
+  const filesToDelete = data
+    .filter(f => f.name !== ".emptyFolderPlaceholder")
+    .map(f => `${userId}/${f.name}`);
+
+  const { error: delError } = await sb.storage.from(BUCKET).remove(filesToDelete);
+
+  if (delError) alert("❌ ลบทั้งหมดไม่สำเร็จ");
+  else {
+    alert("🗑️ ลบรูปทั้งหมดสำเร็จ!");
+    listFiles();
+  }
+}
+
+/* ✅ เปิดภาพใน Modal */
+function openModal(url) {
+  document.getElementById("modalImg").src = url;
+  document.getElementById("imageModal").style.display = "flex";
+}
+
+/* ✅ ปิดภาพ */
+function closeModal() {
+  document.getElementById("imageModal").style.display = "none";
 }
 
 /* ✅ เริ่มทำงาน */
