@@ -107,8 +107,24 @@
 
     .card p {
       font-size: 0.9rem;
-      margin: 8px 0 10px;
+      margin: 8px 0;
       color: #eee;
+    }
+
+    .download-btn {
+      background: linear-gradient(90deg, #2563eb, #3b82f6);
+      border: none;
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 25px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      margin-bottom: 10px;
+    }
+
+    .download-btn:hover {
+      background: #1d4ed8;
     }
 
     /* Modal */
@@ -270,6 +286,7 @@ function renderResults(list) {
     <div class="card">
       <img src="${i.url}" alt="${i.name}" onclick="openModal('${i.url}')">
       <p>ความคล้าย: ${(i.similarity * 100).toFixed(0)}%</p>
+      <button class="download-btn" onclick="downloadImage('${i.url}', '${i.name}')">📥 ดาวน์โหลด</button>
     </div>
   `).join("");
 }
@@ -281,6 +298,16 @@ function openModal(url) {
 
 function closeModal() {
   document.getElementById("modal").style.display = "none";
+}
+
+// ✅ ฟังก์ชันดาวน์โหลดภาพ
+function downloadImage(url, filename) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 </script>
 </body>
