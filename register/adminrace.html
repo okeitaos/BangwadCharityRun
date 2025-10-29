@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>🏁 ระบบกรรมการสนาม (Turbo Load + Action Buttons)</title>
+<title>🏁 ระบบกรรมการสนาม (Auto Reason + Turbo Load)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
@@ -20,7 +20,7 @@
 <body class="bg-gray-100 p-6">
 
 <div class="max-w-5xl mx-auto bg-white rounded-lg shadow p-6">
-  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Turbo Load Edition)</h1>
+  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Auto Reason + Turbo Load)</h1>
 
   <!-- 🔐 Login -->
   <div id="login-section">
@@ -145,7 +145,6 @@ async function loadRunners(query = "") {
     `;
     runnerList.appendChild(div);
 
-    // โหลดข้อมูลรอบแบบเบา
     supabase.from("record").select("lap").eq("runner_id", r.id).then(({data})=>{
       const laps = data?.map(x=>x.lap)||[];
       const maxLap = laps.length ? Math.max(...laps) : 0;
@@ -162,9 +161,9 @@ async function loadRunners(query = "") {
       const btnArea = document.getElementById(`btn-${r.id}`);
       if (r.status === "RUNNING") {
         if (maxLap >= finisherRequired) {
-          btnArea.innerHTML = `<button class="bg-red-600 text-white px-3 py-1 rounded text-sm" onclick="confirmChange('${r.id}','FINISHER','${r.name}')">FINISHER</button>`;
+          btnArea.innerHTML = `<button class="bg-red-600 text-white px-3 py-1 rounded text-sm" onclick="confirmChange('${r.id}','FINISHER','${r.name}',${maxLap},'${r.type}')">FINISHER</button>`;
         } else {
-          btnArea.innerHTML = `<button class="bg-yellow-500 text-white px-3 py-1 rounded text-sm" onclick="confirmChange('${r.id}','DNF','${r.name}')">DNF</button>`;
+          btnArea.innerHTML = `<button class="bg-yellow-500 text-white px-3 py-1 rounded text-sm" onclick="confirmChange('${r.id}','DNF','${r.name}',${maxLap},'${r.type}')">DNF</button>`;
         }
       } else {
         btnArea.innerHTML = `<span class="text-gray-400 text-sm">🚫 ออกจากการแข่งขันแล้ว</span>`;
@@ -176,15 +175,21 @@ async function loadRunners(query = "") {
     "อัปเดตล่าสุด: " + new Date().toLocaleTimeString("th-TH");
 }
 
-// ============================ UPDATE STATUS ============================
-async function confirmChange(runnerId, status, name) {
+// ============================ UPDATE STATUS + AUTO REASON ============================
+async function confirmChange(runnerId, status, name, lap, type) {
   const confirm1 = confirm(`⚠️ ยืนยันเปลี่ยนสถานะของ "${name}" เป็น ${status}?`);
   if (!confirm1) return;
   const confirm2 = confirm("❗ การเปลี่ยนสถานะนี้เป็นถาวร นักวิ่งจะออกจากการแข่งขันทันที!\n\nต้องการดำเนินการต่อหรือไม่?");
   if (!confirm2) return;
 
-  const reason = prompt(status === "DNF" ? "เหตุผล DNF:" : "หมายเหตุ FINISHER:", "ครบระยะ / บาดเจ็บ / อื่นๆ");
-  if (!reason) return;
+  let finisherRequired = 0, dnfStart = 0, reason = "";
+  if (type.includes("50.4")) { finisherRequired = 8; dnfStart = 4; }
+  else if (type.includes("69.3")) { finisherRequired = 11; dnfStart = 6; }
+  else if (type.includes("100.8")) { finisherRequired = 16; dnfStart = 8; }
+
+  if (lap >= finisherRequired) reason = "🏁 รับเสื้อ Finisher";
+  else if (lap < dnfStart) reason = "🚫 ไม่ได้รับเสื้อ";
+  else reason = "⚠️ รับเสื้อ DNF";
 
   await supabase.from("runner").update({ status }).eq("id", runnerId);
   await supabase.from("dnf_log").insert({ runner_id: runnerId, status, reason, updated_by: currentUser.id });
