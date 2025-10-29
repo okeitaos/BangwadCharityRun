@@ -3,170 +3,126 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📤 LINE Upload Gallery</title>
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<title>🏃‍♂️ BCR RUN GALLERY | รวมภาพนักวิ่งทุกคน</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet">
 <style>
   :root {
     --gold: #facc15;
-    --green: #06C755;
     --dark: #0f172a;
     --panel: rgba(255,255,255,0.08);
     --border: rgba(255,255,255,0.1);
+    --green: #06C755;
   }
 
   body {
     font-family: "Prompt", sans-serif;
     margin: 0;
-    background: radial-gradient(circle at top, #1e293b, var(--dark));
+    background: linear-gradient(135deg,#0f172a,#1e293b,#0f172a);
     color: #fff;
     text-align: center;
-    padding: 25px;
     min-height: 100vh;
+    padding: 20px;
   }
 
   h1 {
     color: var(--gold);
-    font-size: 2rem;
-    margin-bottom: 15px;
+    font-size: 1.8rem;
+    margin-bottom: 5px;
     text-shadow: 0 0 10px rgba(250,204,21,0.5);
   }
-
-  #userProfile img {
-    border-radius: 50%;
-    width: 90px;
-    height: 90px;
-    border: 3px solid var(--gold);
-    margin-bottom: 10px;
+  p.subtitle {
+    opacity: 0.8;
+    margin-bottom: 20px;
   }
 
-  #userProfile p {
-    font-weight: 600;
-    font-size: 1.1rem;
-    color: var(--gold);
-  }
-
-  input[type="file"] {
-    margin: 15px 0;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    padding: 10px;
-    border-radius: 10px;
-    color: #fff;
+  #searchInput {
     width: 90%;
-    max-width: 400px;
-  }
-
-  input[type="text"] {
-    width: 90%;
-    max-width: 400px;
+    max-width: 420px;
     padding: 10px;
     border-radius: 25px;
     border: none;
     outline: none;
-    margin-bottom: 15px;
+    margin: 10px 0 25px 0;
     font-size: 1rem;
     background: var(--panel);
     color: #fff;
     text-align: center;
   }
 
-  button {
-    border: none;
-    padding: 10px 20px;
-    border-radius: 25px;
-    font-weight: bold;
-    color: #fff;
-    cursor: pointer;
-    margin: 6px;
-    transition: 0.3s;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+    max-width: 1200px;
+    margin: auto;
   }
 
-  button:hover { transform: translateY(-2px); opacity: 0.9; }
-
-  /* ✅ ปุ่มหลักสีเขียว LINE */
-  .btn-green {
-    background: linear-gradient(90deg, #06C755, #00B900);
-  }
-
-  /* ปุ่มอื่นๆ */
-  #loginBtn { background: var(--green); }
-  #deleteAllBtn { background: linear-gradient(90deg, #ef4444, #dc2626); }
-  #logoutBtn { background: #475569; }
-  .delete-btn { background: #dc2626; font-size: 0.8rem; padding: 5px 10px; }
-
-  #status {
-    margin-top: 10px;
-    color: var(--gold);
-    font-weight: bold;
-  }
-
-  #progressContainer {
-    width: 90%;
-    max-width: 500px;
-    height: 10px;
-    background: var(--panel);
-    border-radius: 10px;
-    margin: 10px auto;
-    overflow: hidden;
-  }
-
-  #progressBar {
-    height: 100%;
-    background: linear-gradient(90deg, var(--green), #22c55e);
-    width: 0%;
-    transition: width 0.2s;
-  }
-
-  .file-list {
-    background: var(--panel);
+  .card {
+    background: rgba(255,255,255,0.05);
     border-radius: 15px;
-    padding: 20px;
-    margin: 25px auto;
-    max-width: 700px;
-    box-shadow: 0 0 20px rgba(0,0,0,0.3);
-    text-align: left;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    transition: transform 0.2s;
   }
 
-  ul { list-style: none; padding: 0; margin: 0; }
-  li {
-    padding: 10px 8px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  .card:hover { transform: translateY(-5px); }
+
+  .card img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    cursor: pointer;
+  }
+
+  .card p {
+    margin: 8px;
+    font-size: 0.9rem;
+    color: #f1f1f1;
     word-break: break-all;
   }
 
-  li span.filename {
-    color: #38bdf8;
+  .download-btn {
+    display: inline-block;
+    background: linear-gradient(90deg, #06C755, #00B900);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: bold;
+    padding: 6px 14px;
+    border-radius: 20px;
+    text-decoration: none;
+    margin-bottom: 10px;
+    transition: transform 0.2s;
+  }
+
+  .download-btn:hover { transform: scale(1.05); }
+
+  #status {
+    margin: 15px 0;
+    font-size: 1rem;
+    color: var(--gold);
+  }
+
+  #loadMoreBtn {
+    background: linear-gradient(90deg, #3b82f6, #2563eb);
+    color: #fff;
+    border: none;
+    padding: 10px 25px;
+    border-radius: 25px;
+    margin: 20px auto;
+    font-weight: bold;
     cursor: pointer;
-    text-decoration: underline;
+    transition: transform 0.2s;
   }
+  #loadMoreBtn:hover { transform: translateY(-2px); }
 
-  li span.filename:hover { color: var(--gold); }
-
-  #count {
-    margin-top: 10px;
-    text-align: right;
-    opacity: 0.7;
-  }
-
-  #pagination { margin-top: 20px; }
-  #pagination button {
-    background: #3b82f6;
-    font-size: 0.9rem;
-  }
-
-  /* Modal */
   .modal {
     display: none;
     position: fixed;
     z-index: 999;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    background: rgba(0,0,0,0.95);
+    background: rgba(0,0,0,0.9);
     justify-content: center;
     align-items: center;
     flex-direction: column;
@@ -176,52 +132,33 @@
     max-width: 90%;
     max-height: 80%;
     border-radius: 15px;
-    box-shadow: 0 0 20px rgba(250,204,21,0.3);
   }
 
   .modal button {
+    margin-top: 15px;
     background: #dc2626;
-    margin-top: 20px;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-weight: bold;
+    cursor: pointer;
   }
 
   @media (max-width:600px) {
-    body { padding: 15px; }
-    h1 { font-size: 1.5rem; }
-    li { flex-direction: column; align-items: flex-start; }
-    button { width: 90%; font-size: 1rem; }
+    h1 { font-size: 1.4rem; }
+    .card img { height: 160px; }
   }
 </style>
 </head>
 <body>
-  <h1>📤 LINE Upload Gallery</h1>
 
-  <div id="loginSection">
-    <button id="loginBtn" onclick="login()">เข้าสู่ระบบด้วย LINE</button>
-  </div>
-
-  <div id="uploadSection" style="display:none;">
-    <div id="userProfile"></div>
-
-    <input type="file" id="fileInput" multiple accept="image/*"><br>
-    <button class="btn-green" onclick="uploadFiles()">📤 อัปโหลด</button>
-    <button class="btn-green" onclick="listFiles(true)">🔄 รีเฟรช</button>
-    <button id="deleteAllBtn" onclick="deleteAllFiles()">🗑️ ลบรูปทั้งหมด</button>
-    <button id="logoutBtn" onclick="logout()">🚪 ออกจากระบบ</button>
-
-    <div id="status"></div>
-    <div id="progressContainer"><div id="progressBar"></div></div>
-
-    <div class="file-list">
-      <input type="text" id="searchInput" placeholder="🔍 ค้นหาชื่อไฟล์...">
-      <ul id="fileList"></ul>
-      <div id="count"></div>
-    </div>
-
-    <div id="pagination">
-      <button id="prevBtn" onclick="prevPage()" disabled>⬅️ ก่อนหน้า</button>
-      <button id="nextBtn" onclick="nextPage()">ถัดไป ➡️</button>
-    </div>
-  </div>
+  <h1>📸 รวมภาพนักวิ่งทั้งหมด</h1>
+  <p class="subtitle">ชมภาพกิจกรรมและดาวน์โหลดได้เลย</p>
+  <input type="text" id="searchInput" placeholder="🔍 ค้นหาชื่อไฟล์...">
+  <div id="status">⏳ กำลังโหลดภาพ...</div>
+  <div class="grid" id="galleryGrid"></div>
+  <button id="loadMoreBtn" style="display:none;" onclick="loadMore()">โหลดเพิ่ม ⬇️</button>
 
   <div class="modal" id="imageModal">
     <img id="modalImg" src="" alt="preview">
@@ -233,129 +170,86 @@ const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-const LIFF_ID = "2001781240-k2PJ3Ap2";
 
-let userId = "", userName = "", userPic = "";
-let currentPage = 1;
+let allImages = [];
+let page = 0;
 const PAGE_SIZE = 1000;
-let allFiles = [];
+let folders = [];
+let isLoading = false;
 
-function safeUserId(uid) { return uid.replace(/[^a-zA-Z0-9_-]/g, "_"); }
-
-async function main() {
-  await liff.init({ liffId: LIFF_ID });
-  if (!liff.isLoggedIn()) document.getElementById("loginSection").style.display = "block";
-  else {
-    const profile = await liff.getProfile();
-    userId = safeUserId(profile.userId);
-    userName = profile.displayName;
-    userPic = profile.pictureUrl;
-    showUploadSection();
-  }
-}
-function login() { liff.login(); }
-async function logout() { await liff.logout(); location.reload(); }
-
-function showUploadSection() {
-  document.getElementById("loginSection").style.display = "none";
-  document.getElementById("uploadSection").style.display = "block";
-  document.getElementById("userProfile").innerHTML =
-    `<img src="${userPic}"><p>${userName}</p>`;
-  listFiles(true);
+async function listFolders() {
+  const { data, error } = await sb.storage.from(BUCKET).list('', { limit: 100 });
+  if (error) { console.error(error); return []; }
+  return data.filter(f => f.name && !f.name.startsWith('.')).map(f => f.name);
 }
 
-/* Upload */
-async function uploadFiles() {
-  const files = document.getElementById("fileInput").files;
-  const status = document.getElementById("status");
-  const progressBar = document.getElementById("progressBar");
-  if (!files.length) return alert("กรุณาเลือกไฟล์");
+async function loadAllImages() {
+  if (isLoading) return;
+  isLoading = true;
+  document.getElementById("status").innerText = "⏳ กำลังโหลด...";
+  
+  if (folders.length === 0) folders = await listFolders();
 
-  status.innerText = "⏳ กำลังอัปโหลด...";
-  progressBar.style.width = "0%";
-  let success = 0, skipped = 0;
-  const total = files.length;
+  const startIndex = page * PAGE_SIZE;
+  const imagesThisBatch = [];
 
-  for (let i = 0; i < total; i++) {
-    const file = files[i];
-    if (file.size > 5 * 1024 * 1024) { skipped++; continue; }
-    const path = `${userId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
-    const { error } = await sb.storage.from(BUCKET).upload(path, file);
-    if (!error) success++;
-    progressBar.style.width = `${((i + 1) / total) * 100}%`;
+  for (const folder of folders) {
+    const { data, error } = await sb.storage.from(BUCKET).list(`${folder}/`, {
+      limit: PAGE_SIZE, offset: startIndex
+    });
+    if (error || !data) continue;
+    for (const file of data) {
+      if (/\.(jpg|jpeg|png)$/i.test(file.name)) {
+        imagesThisBatch.push({
+          name: file.name,
+          folder,
+          url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${folder}/${file.name}`
+        });
+      }
+    }
   }
 
-  document.getElementById("fileInput").value = "";
-  status.innerText = `✅ อัปโหลดสำเร็จ ${success} ไฟล์` +
-                     (skipped ? ` (ข้าม ${skipped} ไฟล์ >5MB)` : "");
-  progressBar.style.width = "100%";
-  listFiles(true);
+  if (imagesThisBatch.length === 0) {
+    document.getElementById("status").innerText = "✅ โหลดครบทั้งหมดแล้ว";
+    document.getElementById("loadMoreBtn").style.display = "none";
+    return;
+  }
+
+  allImages = allImages.concat(imagesThisBatch);
+  renderGallery(allImages);
+  document.getElementById("status").innerText = `📸 แสดง ${allImages.length} ภาพ`;
+  document.getElementById("loadMoreBtn").style.display = "inline-block";
+  page++;
+  isLoading = false;
 }
 
-/* แสดงไฟล์ */
-async function listFiles(forceReload = false) {
-  const { data, error } = await sb.storage.from(BUCKET).list(`${userId}/`, {
-    limit: PAGE_SIZE,
-    offset: (currentPage - 1) * PAGE_SIZE,
-    sortBy: { column: "created_at", order: "desc" },
-    ...(forceReload && { cacheControl: "no-cache" })
-  });
-  if (error) return alert("❌ โหลดไฟล์ไม่สำเร็จ");
-
-  allFiles = (data || []).filter(f => f.name !== ".emptyFolderPlaceholder");
-  renderFileList(allFiles);
+function renderGallery(images) {
+  const grid = document.getElementById("galleryGrid");
+  grid.innerHTML = images.map(img => `
+    <div class="card">
+      <img src="${img.url}" alt="${img.name}" onclick="openModal('${img.url}')">
+      <p>${img.name}</p>
+      <a href="${img.url}" download class="download-btn">⬇️ ดาวน์โหลด</a>
+    </div>
+  `).join("");
 }
 
 document.getElementById("searchInput").addEventListener("input", e => {
   const keyword = e.target.value.toLowerCase();
-  const filtered = allFiles.filter(f => f.name.toLowerCase().includes(keyword));
-  renderFileList(filtered);
+  const filtered = allImages.filter(img => img.name.toLowerCase().includes(keyword));
+  renderGallery(filtered);
+  document.getElementById("status").innerText = `🔎 พบ ${filtered.length} จาก ${allImages.length}`;
 });
 
-function renderFileList(files) {
-  const list = document.getElementById("fileList");
-  const count = document.getElementById("count");
-  if (files.length === 0) {
-    list.innerHTML = "<li>ไม่มีไฟล์</li>";
-    count.innerText = "";
-    return;
-  }
-  list.innerHTML = files.map(f => {
-    const time = new Date(f.created_at || Date.now()).toLocaleString("th-TH", { hour12: false });
-    const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${f.name}`;
-    return `
-      <li>
-        <span class="filename" onclick="openModal('${imgUrl}')">${f.name}</span>
-        <div>
-          <small style="opacity:0.7;">${time}</small>
-          <button class="delete-btn" onclick="deleteFile('${f.name}')">ลบ</button>
-        </div>
-      </li>`;
-  }).join("");
-  count.innerText = `📦 จำนวนไฟล์ที่แสดง: ${files.length}`;
-}
-
-async function deleteFile(filename) {
-  if (!confirm(`ต้องการลบไฟล์นี้หรือไม่?\n${filename}`)) return;
-  const { error } = await sb.storage.from(BUCKET).remove([`${userId}/${filename}`]);
-  if (!error) listFiles(true);
-}
-
-async function deleteAllFiles() {
-  if (!confirm("⚠️ ต้องการลบรูปทั้งหมดของคุณใช่ไหม?")) return;
-  const filesToDelete = allFiles.map(f => `${userId}/${f.name}`);
-  await sb.storage.from(BUCKET).remove(filesToDelete);
-  listFiles(true);
-}
-
-/* Modal */
 function openModal(url) {
   document.getElementById("modalImg").src = url;
   document.getElementById("imageModal").style.display = "flex";
 }
 function closeModal() { document.getElementById("imageModal").style.display = "none"; }
+function loadMore() { loadAllImages(); }
 
-main();
+loadAllImages();
 </script>
+
 </body>
 </html>
