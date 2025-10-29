@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🏁 รายงานนักวิ่งที่ออกจากการแข่งขัน</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<style>
+  body { font-family: 'Prompt', sans-serif; }
+  .status-dnf { background-color: #fee2e2; color: #991b1b; }
+  .status-finisher { background-color: #dcfce7; color: #065f46; }
+  .table-scroll { max-height: 75vh; overflow-y: auto; }
+</style>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+
+<div class="max-w-6xl mx-auto bg-white shadow-md rounded-lg p-6">
+  <h1 class="text-3xl font-bold text-center mb-6">📊 รายงานนักวิ่งที่ออกจากการแข่งขัน</h1>
+
+  <!-- ค้นหา -->
+  <div class="flex flex-wrap justify-between mb-4 gap-2">
+    <input id="searchInput" type="text" placeholder="🔍 ค้นหาชื่อ, BIB, หรือ Tag ID..." class="border rounded-md p-2 flex-grow max-w-md">
+    <button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded">⬇️ ส่งออก Excel</button>
+  </div>
+
+  <!-- ตาราง -->
+  <div class="overflow-x-auto table-scroll border rounded-lg">
+    <table class="min-w-full text-sm border-collapse">
+      <thead class="bg-gray-200 sticky top-0">
+        <tr>
+          <th class="p-2 border">BIB</th>
+          <th class="p-2 border">ชื่อ</th>
+          <th class="p-2 border">ประเภท</th>
+          <th class="p-2 border">สถานะ</th>
+          <th class="p-2 border">รอบสุดท้าย</th>
+          <th class="p-2 border">ระยะ (กม.)</th>
+          <th class="p-2 border">เวลารวม</th>
+          <th class="p-2 border">เวลาเฉลี่ย/รอบ</th>
+          <th class="p-2 border">เหตุผล</th>
+          <th class="p-2 border">กรรมการ</th>
+          <th class="p-2 border">เวลาออก</th>
+        </tr>
+      </thead>
+      <tbody id="reportBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const searchInput = document.getElementById("searchInput");
+const reportBody = document.getElementById("reportBody");
+const exportBtn = document.getElementById("exportBtn");
+
+let allData = [];
+
+async function loadReport() {
+  reportBody.innerHTML = `<tr><td colspan="11" class="text-center py-4 text-gray-500">⏳ กำลังโหลด...</td></tr>`;
+
+  const { data, error } = await supabase.from("v_runner_exit_report").select("*").order("exit_time_th", { ascending: false });
+  if (error) {
+    console.error(error);
+    reportBody.innerHTML = `<tr><td colspan="11" class="text-center text-red-500 py-4">❌ โหลดข้อมูลไม่สำเร็จ</td></tr>`;
+    return;
+  }
+
+  allData = data;
+  renderReport(data);
+}
+
+function renderReport(list) {
+  reportBody.innerHTML = "";
+  if (!list.length) {
+    reportBody.innerHTML = `<tr><td colspan="11" class="text-center py-4 text-gray-500">ไม่พบนักวิ่งที่ออกจากการแข่งขัน</td></tr>`;
+    return;
+  }
+
+  list.forEach(r => {
+    const statusClass = r.exit_status === "DNF" ? "status-dnf" : "status-finisher";
+    reportBody.innerHTML += `
+      <tr class="border-b hover:bg-gray-50 ${statusClass}">
+        <td class="p-2 text-center">${r.bib || "-"}</td>
+        <td class="p-2">${r.runner_name}</td>
+        <td class="p-2 text-center">${r.race_name_th}</td>
+        <td class="p-2 text-center font-semibold">${r.exit_status}</td>
+        <td class="p-2 text-center">${r.last_lap}</td>
+        <td class="p-2 text-center">${r.distance_km}</td>
+        <td class="p-2 text-center">${r.total_running_time || "-"}</td>
+        <td class="p-2 text-center">${r.avg_lap_time || "-"}</td>
+        <td class="p-2">${r.exit_reason || "-"}</td>
+        <td class="p-2 text-center">${r.updated_by_name || "-"}</td>
+        <td class="p-2 text-center">${r.exit_time_th ? new Date(r.exit_time_th).toLocaleString("th-TH") : "-"}</td>
+      </tr>
+    `;
+  });
+}
+
+// 🔍 ค้นหาชื่อ / BIB / Tag ID
+searchInput.addEventListener("input", e => {
+  const q = e.target.value.toLowerCase();
+  const filtered = allData.filter(r =>
+    (r.runner_name || "").toLowerCase().includes(q) ||
+    (r.bib || "").toString().includes(q) ||
+    (r.tag_id || "").toLowerCase().includes(q)
+  );
+  renderReport(filtered);
+});
+
+// ⬇️ ส่งออก Excel (CSV)
+exportBtn.addEventListener("click", () => {
+  if (!allData.length) return alert("ไม่มีข้อมูลสำหรับส่งออก");
+  const headers = [
+    "BIB","ชื่อ","ประเภท","สถานะ","รอบสุดท้าย","ระยะ(กม.)",
+    "เวลารวม","เวลาเฉลี่ย/รอบ","เหตุผล","กรรมการ","เวลาออก"
+  ];
+  const csv = [
+    headers.join(","),
+    ...allData.map(r => [
+      r.bib, `"${r.runner_name}"`, r.race_name_th, r.exit_status, r.last_lap,
+      r.distance_km, r.total_running_time, r.avg_lap_time,
+      `"${r.exit_reason || ""}"`, `"${r.updated_by_name || ""}"`, r.exit_time_th
+    ].join(","))
+  ].join("\n");
+
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "runner_exit_report.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// โหลดข้อมูล
+loadReport();
+
+// อัปเดตเรียลไทม์เมื่อมีการเปลี่ยนสถานะ
+supabase.channel("dnf_log_changes")
+  .on("postgres_changes", { event: "*", schema: "public", table: "dnf_log" }, loadReport)
+  .subscribe();
+</script>
+</body>
+</html>
