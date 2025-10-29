@@ -7,60 +7,64 @@
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --gold: #FFD700;
-      --blue: #00247d;
-      --red: #cf142b;
-      --white: #ffffff;
-      --dark: #111;
+      --silver: #c0c0c0;
+      --gray-light: #e5e5e5;
+      --gray-dark: #1e1e1e;
+      --white: #f9f9f9;
+      --black: #000;
+      --accent: #a1a1a1;
     }
 
     body {
       font-family: "Prompt", "Poppins", sans-serif;
       margin: 0;
       padding: 0;
-      background: #f5f5f5;
-      color: var(--dark);
+      background: linear-gradient(160deg, #111 0%, #333 50%, #111 100%);
+      color: var(--white);
       overflow-x: hidden;
     }
 
     header {
-      background: linear-gradient(120deg, var(--blue), var(--red));
+      background: linear-gradient(180deg, #000, #333);
       color: var(--white);
       text-align: center;
       padding: 70px 20px;
       border-bottom-left-radius: 40px;
       border-bottom-right-radius: 40px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.6);
       position: relative;
     }
 
     header h1 {
-      font-size: 2.8rem;
+      font-size: 2.6rem;
       margin: 0;
-      font-weight: 700;
+      font-weight: 600;
       letter-spacing: 1px;
+      color: var(--silver);
+      text-shadow: 0 0 8px rgba(255,255,255,0.2);
     }
 
     header p {
-      font-size: 1.2rem;
-      opacity: 0.9;
+      font-size: 1.1rem;
+      color: #ddd;
+      margin-top: 8px;
     }
 
     .lang-switch {
       position: absolute;
       top: 15px;
       right: 25px;
-      background: rgba(255,255,255,0.2);
-      border: none;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.3);
       color: #fff;
       font-weight: bold;
       border-radius: 25px;
-      padding: 5px 15px;
+      padding: 6px 15px;
       cursor: pointer;
       transition: background 0.3s;
     }
-
     .lang-switch:hover {
-      background: rgba(255,255,255,0.4);
+      background: rgba(255,255,255,0.3);
     }
 
     section {
@@ -71,21 +75,22 @@
     }
 
     h2 {
-      font-size: 1.8rem;
-      color: var(--blue);
+      font-size: 1.6rem;
+      color: var(--silver);
       margin-bottom: 20px;
       position: relative;
       display: inline-block;
+      letter-spacing: 0.5px;
     }
 
     h2::after {
       content: "";
       position: absolute;
-      width: 60%;
-      height: 3px;
+      width: 50%;
+      height: 2px;
       bottom: -10px;
-      left: 20%;
-      background: linear-gradient(90deg, var(--red), var(--gold), var(--blue));
+      left: 25%;
+      background: linear-gradient(90deg, #555, #888, #555);
       border-radius: 2px;
     }
 
@@ -97,43 +102,45 @@
     }
 
     .race-card {
-      background: #fff;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.15);
       border-radius: 20px;
       padding: 25px 15px;
-      box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
       transition: transform 0.3s, box-shadow 0.3s;
     }
 
     .race-card:hover {
-      transform: translateY(-6px);
-      box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+      transform: translateY(-5px);
+      box-shadow: 0 8px 20px rgba(255,255,255,0.1);
     }
 
     .race-card h3 {
-      color: var(--blue);
+      color: var(--white);
       margin-bottom: 10px;
     }
 
     .race-card p {
       font-weight: 600;
-      color: var(--red);
+      color: var(--silver);
     }
 
     .register-btn {
       display: inline-block;
-      background: linear-gradient(90deg, var(--red), var(--gold), var(--blue));
+      background: linear-gradient(90deg, #666, #999, #666);
       color: #fff;
       font-weight: bold;
       padding: 14px 35px;
       border-radius: 30px;
       text-decoration: none;
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       transition: transform 0.3s, box-shadow 0.3s;
+      border: 1px solid rgba(255,255,255,0.2);
     }
 
     .register-btn:hover {
       transform: translateY(-3px);
-      box-shadow: 0 5px 20px rgba(207,20,43,0.4);
+      box-shadow: 0 4px 15px rgba(255,255,255,0.2);
     }
 
     .gallery-grid {
@@ -149,11 +156,13 @@
       object-fit: cover;
       cursor: pointer;
       transition: transform 0.3s, box-shadow 0.3s;
+      filter: grayscale(90%);
     }
 
     .gallery-grid img:hover {
       transform: scale(1.05);
-      box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+      filter: grayscale(0%);
+      box-shadow: 0 6px 15px rgba(255,255,255,0.2);
     }
 
     iframe {
@@ -162,27 +171,27 @@
       border: none;
       border-radius: 15px;
       margin-top: 20px;
+      box-shadow: 0 0 15px rgba(255,255,255,0.1);
+      filter: grayscale(100%);
     }
 
     footer {
-      background: linear-gradient(120deg, var(--blue), var(--red));
-      color: var(--white);
+      background: #111;
+      color: #bbb;
       text-align: center;
       padding: 25px;
       font-size: 0.95rem;
       margin-top: 50px;
-      border-top-left-radius: 20px;
-      border-top-right-radius: 20px;
+      border-top: 1px solid #333;
     }
 
-    /* Modal */
     .modal {
       display: none;
       position: fixed;
       z-index: 999;
       left: 0; top: 0;
       width: 100%; height: 100%;
-      background: rgba(0,0,0,0.9);
+      background: rgba(0,0,0,0.95);
       justify-content: center;
       align-items: center;
     }
@@ -191,6 +200,7 @@
       max-width: 90%;
       max-height: 80%;
       border-radius: 10px;
+      box-shadow: 0 0 20px rgba(255,255,255,0.1);
     }
 
     .modal span {
@@ -211,8 +221,8 @@
 <body>
   <header>
     <button class="lang-switch" onclick="toggleLang()">EN / TH</button>
-    <h1 id="title">🏅 4LAPTOP100 2025 🏅</h1>
-    <p id="subtitle">มาร่วมเป็นหนึ่งในร้อยอันดับแรกของปี!</p>
+    <h1 id="title">🕊️ 4LAPTOP100 2025 🕊️</h1>
+    <p id="subtitle">ขอน้อมรำลึกด้วยความอาลัย</p>
   </header>
 
   <section>
@@ -223,17 +233,12 @@
   <section>
     <h2 id="location-title">📍 สถานที่จัดงาน</h2>
     <p id="location-detail">เขื่อนบางวาด จังหวัดภูเก็ต</p>
-    <!-- <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d15714.90404660764!2d98.333558!3d7.891251!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3050210dcaffffff%3A0x21fbc3f24b143f8b!2z4Lio4Li44LiX4LiZ4Liy4LmB4Lih4Lir4Li04LiH4LiB4Lix4LiV4Lij4LmM4LiXIOC5geC4guC4suC4mQ!5e0!3m2!1sth!2sth!4v1735500000000!5m2!1sth!2sth"></iframe> -->
     <iframe 
-  src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d15714.5!2d98.3396!3d7.8890!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3050210dcaffffff%3A0x21fbc3f24b143f8b!2z7IOI4Lij4Liy4Lih4Lia4Lix4Lii4Liy4LiV4LmA4LiB4Li14LmI4LiB4Liy4Lii4LmI4LiB4Lix4LiV4Lij4LmM4LiX!5e0!3m2!1sth!2sth!4v1735509999999!5m2!1sth!2sth" 
-  width="100%" 
-  height="400" 
-  style="border:3px solid #cf142b; border-radius:10px;"
-  allowfullscreen="" 
-  loading="lazy" 
-  referrerpolicy="no-referrer-when-downgrade">
-</iframe>
- 
+      src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d15714.5!2d98.3396!3d7.8890!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3050210dcaffffff%3A0x21fbc3f24b143f8b!2z7IOI4Lij4Liy4Lih4Lia4Lix4Lii4Liy4LiV4LmA4LiB4Li14LmI4LiB4Liy4Lii4LmI4LiB4Lix4LiV4Lij4LmM4LiX!5e0!3m2!1sth!2sth!4v1735509999999!5m2!1sth!2sth" 
+      allowfullscreen=""
+      loading="lazy"
+      referrerpolicy="no-referrer-when-downgrade">
+    </iframe>
   </section>
 
   <section>
@@ -259,10 +264,9 @@
   </section>
 
   <footer>
-    <p id="footer-text">© 2025 4LAPTOP100 </p>
+    <p id="footer-text">© 2025 4LAPTOP100 | น้อมรำลึกด้วยความอาลัย</p>
   </footer>
 
-  <!-- Modal -->
   <div class="modal" id="modal">
     <span onclick="closeModal()">&times;</span>
     <img id="modalImg">
@@ -281,14 +285,13 @@
     });
     function closeModal() { modal.style.display = 'none'; }
 
-    // ภาษา
     let lang = 'th';
     function toggleLang() {
       lang = lang === 'th' ? 'en' : 'th';
       const text = {
         th: {
-          title: "🏅 TOP100 RUN 2025 🏅",
-          subtitle: "มาร่วมเป็นหนึ่งในร้อยอันดับแรกของปี!",
+          title: "🕊️ 4LAPTOP100 2025 🕊️",
+          subtitle: "ขอน้อมรำลึกด้วยความอาลัย",
           dateTitle: "📅 วันจัดการแข่งขัน",
           dateDetail: "21 ธันวาคม 2025",
           locationTitle: "📍 สถานที่จัดงาน",
@@ -299,8 +302,8 @@
           registerBtn: "สมัครเลย",
         },
         en: {
-          title: "🏅 TOP100 RUN 2025 🏅",
-          subtitle: "Be one of the top 100 finishers of the year!",
+          title: "🕊️ 4LAPTOP100 2025 🕊️",
+          subtitle: "In Remembrance and Deep Condolences",
           dateTitle: "📅 Race Date",
           dateDetail: "December 21, 2025",
           locationTitle: "📍 Location",
@@ -322,7 +325,6 @@
       document.getElementById("gallery-title").innerText = t.galleryTitle;
       document.getElementById("register-title").innerText = t.registerTitle;
       document.getElementById("register-btn").innerText = t.registerBtn;
-      document.getElementById("footer-text").innerText = t.footer;
     }
   </script>
 </body>
