@@ -121,6 +121,7 @@ let allData = [];
 const overlay = document.getElementById("loadingOverlay");
 function showLoading(show) { overlay.style.display = show ? "flex" : "none"; }
 
+// โหลดข้อมูลจาก view v_runner_exit_report
 async function loadReport() {
   const tbody = document.getElementById("reportBody");
   tbody.innerHTML = `<tr><td colspan="11" class="text-center py-4 text-gray-500">⏳ กำลังโหลด...</td></tr>`;
@@ -138,20 +139,14 @@ async function loadReport() {
     return;
   }
 
-  allData = data;
+  allData = data || [];
   updateSummary(allData);
   renderReport(allData);
 }
 
-// ✅ ฟังก์ชันช่วยอ่านชื่อรุ่นให้ตรงทุกแบบ
-function getRaceName(row) {
-  return (
-    row.race_name_th ||
-    row.type ||
-    row.category ||
-    row.race_name ||
-    ""
-  ).toUpperCase();
+// ✅ ใช้ race_type เป็นหลัก
+function getRaceType(r) {
+  return (r.race_type || "").toUpperCase();
 }
 
 // ✅ กรองตามรุ่น
@@ -168,12 +163,12 @@ document.getElementById("filterBtn").addEventListener("click", () => {
 
     let filtered = [...allData];
 
-    // 🔍 กรองรุ่น (รองรับทุกชื่อคอลัมน์)
+    // 🔍 กรองรุ่นตาม race_type
     if (type !== "ALL") {
-      filtered = filtered.filter((r) => getRaceName(r).includes(type.toUpperCase()));
+      filtered = filtered.filter((r) => getRaceType(r).includes(type.toUpperCase()));
     }
 
-    // 📅 กรองตามวัน
+    // 📅 กรองช่วงวัน
     if (start && end) {
       filtered = filtered.filter((r) => {
         const exitDate = new Date(r.exit_time_th);
@@ -187,7 +182,7 @@ document.getElementById("filterBtn").addEventListener("click", () => {
   }, 200);
 });
 
-// 🔍 ค้นหา
+// 🔍 ค้นหาชื่อ, bib, tag_id
 document.getElementById("searchInput").addEventListener("input", (e) => {
   const q = e.target.value.toLowerCase();
   showLoading(true);
@@ -204,7 +199,7 @@ document.getElementById("searchInput").addEventListener("input", (e) => {
   }, 200);
 });
 
-// 🧮 สรุป
+// 🧮 สรุปยอดรวม
 function updateSummary(list) {
   const finisher = list.filter((r) => r.exit_status === "FINISHER").length;
   const dnf = list.filter((r) => r.exit_status === "DNF").length;
@@ -213,13 +208,14 @@ function updateSummary(list) {
   document.getElementById("countTotal").textContent = list.length;
   document.getElementById("dateRange").textContent = new Date().toLocaleDateString("th-TH");
 
+  // 🧩 สรุปแยกตามรุ่น
   const types = ["BCR 50.4", "BCR 69.3", "BCR 100.8"];
   const typeSummaryDiv = document.getElementById("typeSummaryContent");
   typeSummaryDiv.innerHTML = "";
 
   types.forEach((type) => {
-    const f = list.filter((r) => getRaceName(r).includes(type.toUpperCase()) && r.exit_status === "FINISHER").length;
-    const d = list.filter((r) => getRaceName(r).includes(type.toUpperCase()) && r.exit_status === "DNF").length;
+    const f = list.filter((r) => getRaceType(r).includes(type.toUpperCase()) && r.exit_status === "FINISHER").length;
+    const d = list.filter((r) => getRaceType(r).includes(type.toUpperCase()) && r.exit_status === "DNF").length;
     typeSummaryDiv.innerHTML += `
       <div class="bg-white border rounded-lg p-4 shadow-sm">
         <h3 class="font-semibold text-gray-700 mb-2">${type}</h3>
@@ -230,7 +226,7 @@ function updateSummary(list) {
   });
 }
 
-// 🧾 แสดงผลในตาราง
+// 🧾 แสดงในตาราง
 function renderReport(list) {
   const tbody = document.getElementById("reportBody");
   tbody.innerHTML = "";
@@ -238,16 +234,17 @@ function renderReport(list) {
     tbody.innerHTML = `<tr><td colspan="11" class="text-center py-4 text-gray-500">ไม่พบนักวิ่งที่ออกจากการแข่งขัน</td></tr>`;
     return;
   }
+
   list.forEach((r) => {
     const statusClass = r.exit_status === "DNF" ? "status-dnf" : "status-finisher";
     tbody.innerHTML += `
       <tr class="border-b hover:bg-gray-50 ${statusClass}">
         <td class="p-2 text-center">${r.bib || "-"}</td>
         <td class="p-2">${r.runner_name}</td>
-        <td class="p-2 text-center">${getRaceName(r)}</td>
+        <td class="p-2 text-center">${r.race_type}</td>
         <td class="p-2 text-center font-semibold">${r.exit_status}</td>
-        <td class="p-2 text-center">${r.last_lap}</td>
-        <td class="p-2 text-center">${r.distance_km}</td>
+        <td class="p-2 text-center">${r.last_lap || "-"}</td>
+        <td class="p-2 text-center">${r.distance_km || "-"}</td>
         <td class="p-2 text-center">${r.total_running_time || "-"}</td>
         <td class="p-2 text-center">${r.avg_lap_time || "-"}</td>
         <td class="p-2">${r.exit_reason || "-"}</td>
@@ -263,6 +260,7 @@ document.getElementById("printBtn").addEventListener("click", () => window.print
 // โหลดข้อมูลเริ่มต้น
 loadReport();
 </script>
+
 
 </body>
 </html>
