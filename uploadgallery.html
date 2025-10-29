@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>📸 Supabase Gallery V5</title>
+<title>📸 Supabase Gallery V6</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   body {
@@ -21,10 +21,8 @@
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
   }
-  h1 {
-    color: #FFD700;
-    text-shadow: 2px 2px 8px rgba(0,0,0,0.6);
-  }
+  h1 { color: #FFD700; text-shadow: 2px 2px 8px rgba(0,0,0,0.6); }
+
   input[type=file], select {
     margin-top: 20px;
     padding: 10px;
@@ -34,6 +32,7 @@
     color: #000;
     cursor: pointer;
   }
+
   button {
     background: linear-gradient(90deg, #cf142b, #FFD700, #00247d);
     border: none;
@@ -45,9 +44,12 @@
     cursor: pointer;
     transition: transform 0.3s, box-shadow 0.3s;
   }
-  button:hover { transform: scale(1.05); box-shadow: 0 5px 20px rgba(255,255,255,0.3); }
+  button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 5px 20px rgba(255,255,255,0.3);
+  }
 
-  /* Gallery */
+  /* GALLERY GRID */
   .gallery {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -96,6 +98,7 @@
   }
   .delete-btn:hover { background: rgba(255,0,0,1); }
 
+  /* PROGRESS BAR */
   .progress-container {
     margin-top: 10px;
     width: 90%;
@@ -117,45 +120,93 @@
     transition: width 0.2s ease;
   }
 
-  /* Modal (ดูภาพเต็ม) */
+  /* MODAL (ภาพเต็มจอ) */
   .modal {
     display: none;
     position: fixed;
-    z-index: 1000;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    inset: 0;
     background: rgba(0,0,0,0.9);
+    z-index: 1000;
     justify-content: center;
     align-items: center;
     flex-direction: column;
-    padding: 20px;
+    padding: 10px;
   }
+
+  .modal.active { display: flex; }
+
   .modal img {
     max-width: 95%;
     max-height: 80vh;
     border-radius: 10px;
-    box-shadow: 0 4px 25px rgba(255,255,255,0.2);
+    box-shadow: 0 4px 25px rgba(255,255,255,0.3);
+    object-fit: contain;
   }
-  .modal .filename {
+
+  .modal .info {
     color: #fefefe;
-    margin-top: 10px;
-    font-size: 1rem;
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
     word-break: break-all;
   }
-  .modal span {
-    position: absolute;
-    top: 20px;
-    right: 30px;
-    font-size: 40px;
-    color: #fff;
-    cursor: pointer;
-  }
-  .modal span:hover { color: #FFD700; }
 
+  .modal .filename {
+    font-size: 1rem;
+    text-align: center;
+  }
+
+  .download-btn {
+    background: linear-gradient(90deg, #FFD700, #f59e0b);
+    color: #000;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .download-btn:hover { background: #FFD700; }
+
+  .close-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0,0,0,0.6);
+    border: 2px solid #fff;
+    border-radius: 50%;
+    color: #fff;
+    width: 40px;
+    height: 40px;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1100;
+    transition: background 0.3s;
+  }
+  .close-btn:hover { background: #cf142b; }
+
+  @media (max-width: 600px) {
+    .modal img {
+      max-width: 100%;
+      max-height: 70vh;
+    }
+    .close-btn {
+      top: 10px;
+      right: 10px;
+      width: 35px;
+      height: 35px;
+      font-size: 22px;
+    }
+  }
 </style>
 </head>
 <body>
-  <h1>📸 Supabase Gallery (V5)</h1>
+  <h1>📸 Supabase Gallery (V6)</h1>
 
   <input type="file" id="fileInput" accept="image/*" multiple />
   <br />
@@ -176,173 +227,125 @@
 
   <div class="gallery" id="gallery"></div>
 
-  <!-- 🔍 Modal แสดงภาพเต็ม -->
-  <div class="modal" id="previewModal">
-    <span onclick="closeModal()">&times;</span>
+  <!-- 🔍 Modal -->
+  <div class="modal" id="previewModal" onclick="tapToClose(event)">
+    <button class="close-btn" onclick="closeModal(event)">×</button>
     <img id="modalImg" src="">
-    <div class="filename" id="modalFilename"></div>
+    <div class="info">
+      <div class="filename" id="modalFilename"></div>
+      <button id="downloadBtn" class="download-btn">📥 ดาวน์โหลดภาพ</button>
+    </div>
   </div>
 
 <script>
-  const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-  const { createClient } = supabase;
-  const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const bucketName = "gallery";
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const { createClient } = supabase;
+const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const bucketName = "gallery";
 
-  async function loadGallery() {
-    const galleryDiv = document.getElementById("gallery");
-    galleryDiv.innerHTML = "<p>⏳ กำลังโหลด...</p>";
+async function loadGallery() {
+  const galleryDiv = document.getElementById("gallery");
+  galleryDiv.innerHTML = "<p>⏳ กำลังโหลด...</p>";
+  const { data, error } = await client.storage.from(bucketName).list("", { limit: 1000, sortBy: { column: "created_at", order: "desc" }});
+  if (error) return galleryDiv.innerHTML = "<p>❌ โหลดภาพไม่สำเร็จ</p>";
+  galleryDiv.innerHTML = data.length ? "" : "<p>ไม่มีภาพในคลัง</p>";
 
-    const { data, error } = await client.storage.from(bucketName).list("", {
-      limit: 1000,
-      sortBy: { column: "created_at", order: "desc" },
-    });
+  data.forEach((file) => {
+    const card = document.createElement("div");
+    card.classList.add("image-card");
+    const img = document.createElement("img");
+    img.src = `${SUPABASE_URL}/storage/v1/object/public/${bucketName}/${encodeURIComponent(file.name)}?t=${Date.now()}`;
+    img.onclick = () => openModal(img.src, file.name);
+    const delBtn = document.createElement("button");
+    delBtn.classList.add("delete-btn");
+    delBtn.textContent = "🗑️";
+    delBtn.onclick = () => deleteImage(file.name, card);
+    const label = document.createElement("div");
+    label.classList.add("file-name");
+    label.textContent = file.name;
+    card.append(img, delBtn, label);
+    galleryDiv.appendChild(card);
+  });
+}
 
-    if (error) {
-      galleryDiv.innerHTML = "<p>❌ โหลดภาพไม่สำเร็จ</p>";
-      return;
-    }
+async function deleteImage(fileName, cardElement) {
+  if (!confirm(`คุณต้องการลบภาพนี้หรือไม่?\n${fileName}`)) return;
+  const { error } = await client.storage.from(bucketName).remove([fileName]);
+  if (error) alert("❌ ลบไม่สำเร็จ: " + error.message);
+  else { cardElement.remove(); setTimeout(loadGallery, 1000); alert("✅ ลบสำเร็จ!"); }
+}
 
-    galleryDiv.innerHTML = "";
-    if (!data || data.length === 0) {
-      galleryDiv.innerHTML = "<p>ไม่มีภาพในคลัง</p>";
-      return;
-    }
-
-    data.forEach((file) => {
-      const card = document.createElement("div");
-      card.classList.add("image-card");
-
-      const img = document.createElement("img");
-      img.src = `${SUPABASE_URL}/storage/v1/object/public/${bucketName}/${encodeURIComponent(file.name)}?t=${Date.now()}`;
-      img.onclick = () => openModal(img.src, file.name);
-      img.onerror = () => card.remove();
-
-      const fileLabel = document.createElement("div");
-      fileLabel.classList.add("file-name");
-      fileLabel.textContent = file.name;
-
-      const delBtn = document.createElement("button");
-      delBtn.classList.add("delete-btn");
-      delBtn.textContent = "🗑️";
-      delBtn.onclick = () => deleteImage(file.name, card);
-
-      card.appendChild(img);
-      card.appendChild(delBtn);
-      card.appendChild(fileLabel);
-      galleryDiv.appendChild(card);
-    });
-  }
-
-  async function deleteImage(fileName, cardElement) {
-    if (!confirm(`คุณต้องการลบภาพนี้หรือไม่?\n${fileName}`)) return;
-    const { error } = await client.storage.from(bucketName).remove([fileName]);
-    if (error) alert("❌ ลบไม่สำเร็จ: " + error.message);
-    else {
-      cardElement.remove();
-      setTimeout(loadGallery, 1000);
-      alert("✅ ลบสำเร็จ!");
-    }
-  }
-
-  function compressImage(file, maxSizeMB = 5, quality = 0.8) {
-    return new Promise((resolve, reject) => {
-      if (file.size > maxSizeMB * 1024 * 1024)
-        return reject(new Error(`❌ ${file.name} มีขนาดเกิน 5MB`));
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d");
-          const scale = Math.min(1, Math.sqrt((maxSizeMB * 1024 * 1024) / file.size));
-          canvas.width = img.width * scale;
-          canvas.height = img.height * scale;
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          canvas.toBlob((blob) => {
-            if (!blob) reject(new Error("Compression failed"));
-            resolve(blob);
-          }, "image/jpeg", quality);
-        };
-        img.src = event.target.result;
+function compressImage(file, maxSizeMB = 5, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    if (file.size > maxSizeMB * 1024 * 1024)
+      return reject(new Error(`❌ ${file.name} มีขนาดเกิน 5MB`));
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const scale = Math.min(1, Math.sqrt((maxSizeMB * 1024 * 1024) / file.size));
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Compression failed")), "image/jpeg", quality);
       };
-      reader.readAsDataURL(file);
-    });
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadImages() {
+  const input = document.getElementById("fileInput");
+  const files = input.files;
+  const quality = parseFloat(document.getElementById("qualitySelect").value);
+  const bar = document.getElementById("progressBar");
+  const container = document.getElementById("progressContainer");
+
+  if (!files.length) return alert("กรุณาเลือกภาพก่อนอัปโหลด!");
+  if (files.length > 1000) return alert("อัปโหลดได้สูงสุด 1000 รูป");
+
+  container.style.display = "block"; bar.style.width = "0%"; bar.innerText = "0%";
+  let success = 0;
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    if (f.size > 5 * 1024 * 1024) { alert(`❌ ${f.name} เกิน 5MB`); continue; }
+    try {
+      const compressed = await compressImage(f, 5, quality);
+      if (compressed.size > 5 * 1024 * 1024) { alert(`❌ ${f.name} ยังเกิน 5MB`); continue; }
+      const fileName = `img_${Date.now()}_${i}.jpg`;
+      const { error } = await client.storage.from(bucketName).upload(fileName, compressed, { contentType: "image/jpeg" });
+      if (error) { alert(`❌ ${f.name} อัปโหลดไม่สำเร็จ`); continue; }
+      success++;
+      const p = ((i + 1) / files.length) * 100; bar.style.width = `${p.toFixed(0)}%`; bar.innerText = `${p.toFixed(0)}%`;
+    } catch (err) { alert(err.message); }
   }
+  if (success) { bar.style.width = "100%"; bar.innerText = "✅ เสร็จสิ้น"; alert(`✅ อัปโหลดสำเร็จ ${success} ภาพ`); loadGallery(); }
+  else { bar.style.width = "0%"; bar.innerText = "0%"; alert("⚠️ ไม่มีไฟล์ถูกอัปโหลด"); }
+}
 
-  async function uploadImages() {
-    const input = document.getElementById("fileInput");
-    const files = input.files;
-    const quality = parseFloat(document.getElementById("qualitySelect").value);
-    const progressContainer = document.getElementById("progressContainer");
-    const progressBar = document.getElementById("progressBar");
+/* MODAL FUNCTIONS */
+function openModal(src, filename) {
+  const modal = document.getElementById("previewModal");
+  const modalImg = document.getElementById("modalImg");
+  const modalFile = document.getElementById("modalFilename");
+  const downloadBtn = document.getElementById("downloadBtn");
+  modalImg.src = src; modalFile.innerText = filename;
+  downloadBtn.onclick = () => window.open(src, "_blank");
+  modal.classList.add("active");
+}
+function closeModal(e) {
+  e.stopPropagation();
+  document.getElementById("previewModal").classList.remove("active");
+}
+function tapToClose(e) {
+  if (e.target.id === "previewModal") closeModal(e);
+}
 
-    if (!files.length) return alert("กรุณาเลือกภาพก่อนอัปโหลด!");
-    if (files.length > 1000) return alert("อัปโหลดได้สูงสุดครั้งละ 1000 รูป");
-
-    progressContainer.style.display = "block";
-    progressBar.style.width = "0%";
-    progressBar.innerText = "0%";
-
-    let successCount = 0;
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (file.size > 5 * 1024 * 1024) {
-        alert(`❌ ${file.name} มีขนาดเกิน 5MB`);
-        continue;
-      }
-
-      try {
-        const compressed = await compressImage(file, 5, quality);
-        if (compressed.size > 5 * 1024 * 1024) {
-          alert(`❌ ${file.name} หลังบีบอัดยังเกิน 5MB`);
-          continue;
-        }
-
-        const fileName = `img_${Date.now()}_${i}.jpg`;
-        const { error } = await client.storage.from(bucketName).upload(fileName, compressed, { contentType: "image/jpeg" });
-
-        if (error) {
-          alert(`❌ ${file.name} อัปโหลดไม่สำเร็จ`);
-          continue;
-        }
-
-        successCount++;
-        const progress = ((i + 1) / files.length) * 100;
-        progressBar.style.width = `${progress.toFixed(0)}%`;
-        progressBar.innerText = `${progress.toFixed(0)}%`;
-      } catch (err) {
-        alert(err.message);
-      }
-    }
-
-    if (successCount > 0) {
-      progressBar.style.width = "100%";
-      progressBar.innerText = "✅ เสร็จสิ้น";
-      alert(`✅ อัปโหลดสำเร็จ ${successCount} ภาพ`);
-      loadGallery();
-    } else {
-      progressBar.style.width = "0%";
-      progressBar.innerText = "0%";
-      alert("⚠️ ไม่มีไฟล์ใดถูกอัปโหลด");
-    }
-  }
-
-  // 🔍 Modal ฟังก์ชันเปิด/ปิด
-  function openModal(src, filename) {
-    const modal = document.getElementById("previewModal");
-    document.getElementById("modalImg").src = src;
-    document.getElementById("modalFilename").innerText = filename;
-    modal.style.display = "flex";
-  }
-  function closeModal() {
-    document.getElementById("previewModal").style.display = "none";
-  }
-
-  loadGallery();
+loadGallery();
 </script>
 </body>
 </html>
