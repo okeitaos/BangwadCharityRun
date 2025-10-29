@@ -1,351 +1,134 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>📸 Supabase Gallery V6</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<style>
-  body {
-    font-family: 'Prompt', sans-serif;
-    background: linear-gradient(-45deg, #cf142b, #000, #00247d, #fff);
-    background-size: 400% 400%;
-    animation: bg 15s ease infinite;
-    color: #fff;
-    margin: 0;
-    padding: 20px;
-    text-align: center;
-  }
-  @keyframes bg {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-  }
-  h1 { color: #FFD700; text-shadow: 2px 2px 8px rgba(0,0,0,0.6); }
-
-  input[type=file], select {
-    margin-top: 20px;
-    padding: 10px;
-    border-radius: 8px;
-    border: none;
-    background: #fff;
-    color: #000;
-    cursor: pointer;
-  }
-
-  button {
-    background: linear-gradient(90deg, #cf142b, #FFD700, #00247d);
-    border: none;
-    padding: 12px 28px;
-    margin-top: 25px;
-    border-radius: 8px;
-    color: #fff;
-    font-weight: bold;
-    cursor: pointer;
-    transition: transform 0.3s, box-shadow 0.3s;
-  }
-  button:hover {
-    transform: scale(1.05);
-    box-shadow: 0 5px 20px rgba(255,255,255,0.3);
-  }
-
-  /* GALLERY GRID */
-  .gallery {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 15px;
-    margin-top: 40px;
-    padding: 0 10px;
-  }
-  .image-card {
-    position: relative;
-    border-radius: 15px;
-    overflow: hidden;
-    background: rgba(255,255,255,0.1);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    transition: transform 0.3s;
-    text-align: center;
-    padding-bottom: 10px;
-  }
-  .image-card:hover { transform: scale(1.03); }
-  .image-card img {
-    width: 100%;
-    height: 150px;
-    object-fit: cover;
-    cursor: pointer;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-  }
-  .file-name {
-    font-size: 0.8rem;
-    color: #ddd;
-    word-break: break-all;
-    margin-top: 5px;
-    padding: 0 5px;
-  }
-  .delete-btn {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: rgba(255,0,0,0.8);
-    border: none;
-    color: #fff;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    cursor: pointer;
-    font-weight: bold;
-    transition: background 0.3s;
-  }
-  .delete-btn:hover { background: rgba(255,0,0,1); }
-
-  /* PROGRESS BAR */
-  .progress-container {
-    margin-top: 10px;
-    width: 90%;
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
-    background: rgba(255,255,255,0.1);
-    border-radius: 10px;
-    overflow: hidden;
-  }
-  .progress-bar {
-    height: 18px;
-    background: linear-gradient(90deg, #FFD700, #f59e0b);
-    width: 0%;
-    text-align: center;
-    color: #000;
-    font-weight: bold;
-    font-size: 0.8rem;
-    transition: width 0.2s ease;
-  }
-
-  /* MODAL (ภาพเต็มจอ) */
-  .modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.9);
-    z-index: 1000;
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
-    padding: 10px;
-  }
-
-  .modal.active { display: flex; }
-
-  .modal img {
-    max-width: 95%;
-    max-height: 80vh;
-    border-radius: 10px;
-    box-shadow: 0 4px 25px rgba(255,255,255,0.3);
-    object-fit: contain;
-  }
-
-  .modal .info {
-    color: #fefefe;
-    margin-top: 15px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    word-break: break-all;
-  }
-
-  .modal .filename {
-    font-size: 1rem;
-    text-align: center;
-  }
-
-  .download-btn {
-    background: linear-gradient(90deg, #FFD700, #f59e0b);
-    color: #000;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: bold;
-  }
-  .download-btn:hover { background: #FFD700; }
-
-  .close-btn {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: rgba(0,0,0,0.6);
-    border: 2px solid #fff;
-    border-radius: 50%;
-    color: #fff;
-    width: 40px;
-    height: 40px;
-    font-size: 24px;
-    font-weight: bold;
-    cursor: pointer;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1100;
-    transition: background 0.3s;
-  }
-  .close-btn:hover { background: #cf142b; }
-
-  @media (max-width: 600px) {
-    .modal img {
-      max-width: 100%;
-      max-height: 70vh;
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LINE Login Upload | BCR RUN</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: 'Prompt', sans-serif;
+      background: linear-gradient(135deg,#0f172a,#1e293b,#0f172a);
+      color: #fff;
+      text-align: center;
+      padding: 20px;
     }
-    .close-btn {
-      top: 10px;
-      right: 10px;
-      width: 35px;
-      height: 35px;
-      font-size: 22px;
+    h1 { color: #facc15; }
+    button {
+      background: linear-gradient(90deg,#06C755,#00B900);
+      color: #fff;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 25px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
     }
-  }
-</style>
+    button:hover { opacity: 0.9; }
+    #userProfile img {
+      border-radius: 50%;
+      width: 100px;
+      height: 100px;
+      margin-top: 10px;
+    }
+    .file-list {
+      background: rgba(255,255,255,0.05);
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 600px;
+      margin: 20px auto;
+      text-align: left;
+    }
+    ul { list-style: none; padding: 0; }
+    li { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  </style>
 </head>
 <body>
-  <h1>📸 Supabase Gallery (V6)</h1>
-
-  <input type="file" id="fileInput" accept="image/*" multiple />
-  <br />
-  <label for="qualitySelect">🔧 เลือกคุณภาพ:</label>
-  <select id="qualitySelect">
-    <option value="1">100%</option>
-    <option value="0.9">90%</option>
-    <option value="0.8" selected>80%</option>
-    <option value="0.7">70%</option>
-    <option value="0.6">60%</option>
-  </select>
-  <br />
-  <button onclick="uploadImages()">อัปโหลดภาพ</button>
-
-  <div id="progressContainer" class="progress-container" style="display:none;">
-    <div id="progressBar" class="progress-bar">0%</div>
+  <h1>📤 Upload with LINE Login</h1>
+  <div id="loginSection">
+    <button id="loginBtn" onclick="login()">เข้าสู่ระบบด้วย LINE</button>
   </div>
 
-  <div class="gallery" id="gallery"></div>
-
-  <!-- 🔍 Modal -->
-  <div class="modal" id="previewModal" onclick="tapToClose(event)">
-    <button class="close-btn" onclick="closeModal(event)">×</button>
-    <img id="modalImg" src="">
-    <div class="info">
-      <div class="filename" id="modalFilename"></div>
-      <button id="downloadBtn" class="download-btn">📥 ดาวน์โหลดภาพ</button>
+  <div id="uploadSection" style="display:none;">
+    <div id="userProfile"></div>
+    <input type="file" id="fileInput" multiple accept="image/*"><br><br>
+    <button onclick="uploadFiles()">อัปโหลด</button>
+    <button onclick="listFiles()">ดูไฟล์ของฉัน</button>
+    <div class="file-list">
+      <ul id="fileList"></ul>
+      <div id="count"></div>
     </div>
   </div>
 
-<script>
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-const { createClient } = supabase;
-const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const bucketName = "gallery";
+  <script>
+    const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+    const BUCKET = "gallery";
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-async function loadGallery() {
-  const galleryDiv = document.getElementById("gallery");
-  galleryDiv.innerHTML = "<p>⏳ กำลังโหลด...</p>";
-  const { data, error } = await client.storage.from(bucketName).list("", { limit: 1000, sortBy: { column: "created_at", order: "desc" }});
-  if (error) return galleryDiv.innerHTML = "<p>❌ โหลดภาพไม่สำเร็จ</p>";
-  galleryDiv.innerHTML = data.length ? "" : "<p>ไม่มีภาพในคลัง</p>";
+    const LIFF_ID = "2001781240-k2PJ3Ap2"; // 👈 เปลี่ยนตรงนี้
 
-  data.forEach((file) => {
-    const card = document.createElement("div");
-    card.classList.add("image-card");
-    const img = document.createElement("img");
-    img.src = `${SUPABASE_URL}/storage/v1/object/public/${bucketName}/${encodeURIComponent(file.name)}?t=${Date.now()}`;
-    img.onclick = () => openModal(img.src, file.name);
-    const delBtn = document.createElement("button");
-    delBtn.classList.add("delete-btn");
-    delBtn.textContent = "🗑️";
-    delBtn.onclick = () => deleteImage(file.name, card);
-    const label = document.createElement("div");
-    label.classList.add("file-name");
-    label.textContent = file.name;
-    card.append(img, delBtn, label);
-    galleryDiv.appendChild(card);
-  });
-}
+    let userId = "", userName = "", userPic = "";
 
-async function deleteImage(fileName, cardElement) {
-  if (!confirm(`คุณต้องการลบภาพนี้หรือไม่?\n${fileName}`)) return;
-  const { error } = await client.storage.from(bucketName).remove([fileName]);
-  if (error) alert("❌ ลบไม่สำเร็จ: " + error.message);
-  else { cardElement.remove(); setTimeout(loadGallery, 1000); alert("✅ ลบสำเร็จ!"); }
-}
+    async function main() {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) {
+        document.getElementById("loginSection").style.display = "block";
+      } else {
+        const profile = await liff.getProfile();
+        userId = profile.userId;
+        userName = profile.displayName;
+        userPic = profile.pictureUrl;
+        showUploadSection();
+      }
+    }
 
-function compressImage(file, maxSizeMB = 5, quality = 0.8) {
-  return new Promise((resolve, reject) => {
-    if (file.size > maxSizeMB * 1024 * 1024)
-      return reject(new Error(`❌ ${file.name} มีขนาดเกิน 5MB`));
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        const scale = Math.min(1, Math.sqrt((maxSizeMB * 1024 * 1024) / file.size));
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Compression failed")), "image/jpeg", quality);
-      };
-      img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
+    function login() { liff.login(); }
 
-async function uploadImages() {
-  const input = document.getElementById("fileInput");
-  const files = input.files;
-  const quality = parseFloat(document.getElementById("qualitySelect").value);
-  const bar = document.getElementById("progressBar");
-  const container = document.getElementById("progressContainer");
+    function showUploadSection() {
+      document.getElementById("loginSection").style.display = "none";
+      document.getElementById("uploadSection").style.display = "block";
+      document.getElementById("userProfile").innerHTML =
+        `<img src="${userPic}" alt="profile"><p>${userName}</p>`;
+    }
 
-  if (!files.length) return alert("กรุณาเลือกภาพก่อนอัปโหลด!");
-  if (files.length > 1000) return alert("อัปโหลดได้สูงสุด 1000 รูป");
+    async function uploadFiles() {
+      const files = document.getElementById("fileInput").files;
+      if (!files.length) return alert("กรุณาเลือกไฟล์");
 
-  container.style.display = "block"; bar.style.width = "0%"; bar.innerText = "0%";
-  let success = 0;
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i];
-    if (f.size > 5 * 1024 * 1024) { alert(`❌ ${f.name} เกิน 5MB`); continue; }
-    try {
-      const compressed = await compressImage(f, 5, quality);
-      if (compressed.size > 5 * 1024 * 1024) { alert(`❌ ${f.name} ยังเกิน 5MB`); continue; }
-      const fileName = `img_${Date.now()}_${i}.jpg`;
-      const { error } = await client.storage.from(bucketName).upload(fileName, compressed, { contentType: "image/jpeg" });
-      if (error) { alert(`❌ ${f.name} อัปโหลดไม่สำเร็จ`); continue; }
-      success++;
-      const p = ((i + 1) / files.length) * 100; bar.style.width = `${p.toFixed(0)}%`; bar.innerText = `${p.toFixed(0)}%`;
-    } catch (err) { alert(err.message); }
-  }
-  if (success) { bar.style.width = "100%"; bar.innerText = "✅ เสร็จสิ้น"; alert(`✅ อัปโหลดสำเร็จ ${success} ภาพ`); loadGallery(); }
-  else { bar.style.width = "0%"; bar.innerText = "0%"; alert("⚠️ ไม่มีไฟล์ถูกอัปโหลด"); }
-}
+      let success = 0;
+      for (const file of files) {
+        if (file.size > 5 * 1024 * 1024) {
+          alert(`❌ ${file.name} เกิน 5MB`);
+          continue;
+        }
+        const path = `${userId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+        const { error } = await supabase.storage.from(BUCKET).upload(path, file);
+        if (!error) success++;
+      }
 
-/* MODAL FUNCTIONS */
-function openModal(src, filename) {
-  const modal = document.getElementById("previewModal");
-  const modalImg = document.getElementById("modalImg");
-  const modalFile = document.getElementById("modalFilename");
-  const downloadBtn = document.getElementById("downloadBtn");
-  modalImg.src = src; modalFile.innerText = filename;
-  downloadBtn.onclick = () => window.open(src, "_blank");
-  modal.classList.add("active");
-}
-function closeModal(e) {
-  e.stopPropagation();
-  document.getElementById("previewModal").classList.remove("active");
-}
-function tapToClose(e) {
-  if (e.target.id === "previewModal") closeModal(e);
-}
+      alert(`✅ อัปโหลดสำเร็จ ${success} ไฟล์`);
+      listFiles();
+    }
 
-loadGallery();
-</script>
+    async function listFiles() {
+      const { data, error } = await supabase.storage.from(BUCKET).list(userId + "/", {
+        limit: 1000, sortBy: { column: "created_at", order: "desc" }
+      });
+      if (error) return alert("โหลดไฟล์ไม่สำเร็จ");
+
+      const list = document.getElementById("fileList");
+      const count = document.getElementById("count");
+      const files = (data || []).filter(f => f.name !== ".emptyFolderPlaceholder");
+      list.innerHTML = files.length
+        ? files.map(f => `<li>${f.name}</li>`).join("")
+        : "<li>ไม่มีไฟล์</li>";
+      count.innerText = `จำนวนไฟล์ทั้งหมด: ${files.length}`;
+    }
+
+    main();
+  </script>
 </body>
 </html>
