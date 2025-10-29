@@ -10,7 +10,12 @@
   body { font-family: 'Prompt', sans-serif; }
   .status-dnf { background-color: #fee2e2; color: #991b1b; }
   .status-finisher { background-color: #dcfce7; color: #065f46; }
-  .table-scroll { max-height: 75vh; overflow-y: auto; }
+  .table-scroll { max-height: 70vh; overflow-y: auto; }
+  @media print {
+    #filterSection, #exportBtn, #printBtn { display: none; }
+    body { background: white; }
+    .table-scroll { max-height: none; overflow: visible; }
+  }
 </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-6">
@@ -18,10 +23,35 @@
 <div class="max-w-6xl mx-auto bg-white shadow-md rounded-lg p-6">
   <h1 class="text-3xl font-bold text-center mb-6">📊 รายงานนักวิ่งที่ออกจากการแข่งขัน</h1>
 
+  <!-- 🔍 ฟิลเตอร์ -->
+  <div id="filterSection" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+    <div>
+      <label class="block text-sm font-semibold mb-1">รุ่นการแข่งขัน</label>
+      <select id="filterType" class="w-full border rounded-md p-2">
+        <option value="ALL">ทั้งหมด</option>
+        <option value="BCR 50.4">BCR 50.4</option>
+        <option value="BCR 69.3">BCR 69.3</option>
+        <option value="BCR 100.8">BCR 100.8</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-semibold mb-1">วันที่เริ่มต้น</label>
+      <input type="date" id="filterStart" class="w-full border rounded-md p-2">
+    </div>
+    <div>
+      <label class="block text-sm font-semibold mb-1">วันที่สิ้นสุด</label>
+      <input type="date" id="filterEnd" class="w-full border rounded-md p-2">
+    </div>
+    <div class="flex flex-col justify-end gap-2">
+      <button id="filterBtn" class="bg-blue-600 text-white rounded-md py-2">แสดงผล</button>
+      <button id="printBtn" class="bg-gray-700 text-white rounded-md py-2">🖨️ พิมพ์รายงาน</button>
+    </div>
+  </div>
+
   <!-- ค้นหา -->
-  <div class="flex flex-wrap justify-between mb-4 gap-2">
+  <div class="flex justify-between mb-4">
     <input id="searchInput" type="text" placeholder="🔍 ค้นหาชื่อ, BIB, หรือ Tag ID..." class="border rounded-md p-2 flex-grow max-w-md">
-    <button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded">⬇️ ส่งออก Excel</button>
+    <button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded ml-2">⬇️ ส่งออก Excel</button>
   </div>
 
   <!-- ตาราง -->
@@ -52,16 +82,22 @@ const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const searchInput = document.getElementById("searchInput");
 const reportBody = document.getElementById("reportBody");
+const searchInput = document.getElementById("searchInput");
 const exportBtn = document.getElementById("exportBtn");
+const printBtn = document.getElementById("printBtn");
+const filterBtn = document.getElementById("filterBtn");
 
 let allData = [];
 
 async function loadReport() {
   reportBody.innerHTML = `<tr><td colspan="11" class="text-center py-4 text-gray-500">⏳ กำลังโหลด...</td></tr>`;
 
-  const { data, error } = await supabase.from("v_runner_exit_report").select("*").order("exit_time_th", { ascending: false });
+  const { data, error } = await supabase
+    .from("v_runner_exit_report")
+    .select("*")
+    .order("exit_time_th", { ascending: false });
+
   if (error) {
     console.error(error);
     reportBody.innerHTML = `<tr><td colspan="11" class="text-center text-red-500 py-4">❌ โหลดข้อมูลไม่สำเร็จ</td></tr>`;
@@ -94,12 +130,33 @@ function renderReport(list) {
         <td class="p-2">${r.exit_reason || "-"}</td>
         <td class="p-2 text-center">${r.updated_by_name || "-"}</td>
         <td class="p-2 text-center">${r.exit_time_th ? new Date(r.exit_time_th).toLocaleString("th-TH") : "-"}</td>
-      </tr>
-    `;
+      </tr>`;
   });
 }
 
-// 🔍 ค้นหาชื่อ / BIB / Tag ID
+// 🎯 ฟิลเตอร์ก่อนแสดงผล
+filterBtn.addEventListener("click", () => {
+  const type = document.getElementById("filterType").value;
+  const start = document.getElementById("filterStart").value ? new Date(document.getElementById("filterStart").value) : null;
+  const end = document.getElementById("filterEnd").value ? new Date(document.getElementById("filterEnd").value + "T23:59:59") : null;
+
+  let filtered = [...allData];
+
+  if (type !== "ALL") {
+    filtered = filtered.filter(r => (r.race_type || "").includes(type));
+  }
+
+  if (start && end) {
+    filtered = filtered.filter(r => {
+      const exitDate = new Date(r.exit_time_th);
+      return exitDate >= start && exitDate <= end;
+    });
+  }
+
+  renderReport(filtered);
+});
+
+// 🔍 ค้นหา
 searchInput.addEventListener("input", e => {
   const q = e.target.value.toLowerCase();
   const filtered = allData.filter(r =>
@@ -110,22 +167,15 @@ searchInput.addEventListener("input", e => {
   renderReport(filtered);
 });
 
-// ⬇️ ส่งออก Excel (CSV)
+// ⬇️ ส่งออก CSV
 exportBtn.addEventListener("click", () => {
   if (!allData.length) return alert("ไม่มีข้อมูลสำหรับส่งออก");
-  const headers = [
-    "BIB","ชื่อ","ประเภท","สถานะ","รอบสุดท้าย","ระยะ(กม.)",
-    "เวลารวม","เวลาเฉลี่ย/รอบ","เหตุผล","กรรมการ","เวลาออก"
-  ];
-  const csv = [
-    headers.join(","),
-    ...allData.map(r => [
-      r.bib, `"${r.runner_name}"`, r.race_name_th, r.exit_status, r.last_lap,
-      r.distance_km, r.total_running_time, r.avg_lap_time,
-      `"${r.exit_reason || ""}"`, `"${r.updated_by_name || ""}"`, r.exit_time_th
-    ].join(","))
-  ].join("\n");
-
+  const headers = ["BIB","ชื่อ","ประเภท","สถานะ","รอบสุดท้าย","ระยะ(กม.)","เวลารวม","เวลาเฉลี่ย/รอบ","เหตุผล","กรรมการ","เวลาออก"];
+  const csv = [headers.join(","), ...allData.map(r =>
+    [r.bib, `"${r.runner_name}"`, r.race_name_th, r.exit_status, r.last_lap,
+    r.distance_km, r.total_running_time, r.avg_lap_time,
+    `"${r.exit_reason || ""}"`, `"${r.updated_by_name || ""}"`, r.exit_time_th].join(",")
+  )].join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -135,13 +185,11 @@ exportBtn.addEventListener("click", () => {
   URL.revokeObjectURL(url);
 });
 
-// โหลดข้อมูล
-loadReport();
+// 🖨️ พิมพ์รายงาน
+printBtn.addEventListener("click", () => window.print());
 
-// อัปเดตเรียลไทม์เมื่อมีการเปลี่ยนสถานะ
-supabase.channel("dnf_log_changes")
-  .on("postgres_changes", { event: "*", schema: "public", table: "dnf_log" }, loadReport)
-  .subscribe();
+// โหลดข้อมูลเริ่มต้น
+loadReport();
 </script>
 </body>
 </html>
