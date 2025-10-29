@@ -476,6 +476,39 @@ async function deleteAllFiles() {
   listFiles(true);
 }
 
+// --- เพิ่มฟังก์ชันจัดการ Pagination (วางต่อท้าย script เดิม) ---
+
+async function nextPage() {
+  // ไปหน้าถัดไป
+  currentPage++;
+  // โหลดรายการหน้าปัจจุบัน (forceReload เพื่ออัพเดต)
+  await listFiles(true);
+  // เปิดปุ่มย้อนกลับเมื่อไม่ใช่หน้าแรก
+  document.getElementById('prevBtn').disabled = currentPage <= 1;
+  // ปิดปุ่มถัดไปถ้าจำนวนไฟล์ในหน้าน้อยกว่า PAGE_SIZE (แสดงว่าไม่มีหน้าถัดไป)
+  document.getElementById('nextBtn').disabled = (allFiles.length < PAGE_SIZE);
+}
+
+async function prevPage() {
+  if (currentPage <= 1) return;
+  currentPage--;
+  await listFiles(true);
+  document.getElementById('prevBtn').disabled = currentPage <= 1;
+  document.getElementById('nextBtn').disabled = (allFiles.length < PAGE_SIZE);
+}
+
+// เรียกใช้ตอนเริ่มต้น เพื่อเตะสถานะปุ่มให้ถูกต้อง (กรณี listFiles ถูกเรียกก่อน)
+(function initPaginationButtons() {
+  // ถ้าปุ่มไม่มีบนหน้า ไม่ต้องทำอะไร
+  const prev = document.getElementById('prevBtn');
+  const next = document.getElementById('nextBtn');
+  if (!prev || !next) return;
+  // ค่าเริ่มต้น
+  prev.disabled = currentPage <= 1;
+  // next ถูกเปิดไว้จนกว่า listFiles จะโหลดและตั้งค่าอีกครั้ง
+  next.disabled = false;
+})();
+  
 /* Modal */
 function openModal(url) {
   document.getElementById("modalImg").src = url;
