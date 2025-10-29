@@ -112,7 +112,7 @@
 
   ul { list-style: none; padding: 0; margin: 0; }
 
-  /* ✅ ปรับ layout ของรายการไฟล์ให้ชื่อไม่ตกบรรทัด */
+  /* ✅ แก้ชื่อไฟล์ไม่ให้ตกบรรทัด */
   li {
     padding: 10px 8px;
     border-bottom: 1px solid var(--border);
@@ -193,7 +193,7 @@
 
     <input type="file" id="fileInput" multiple accept="image/*"><br>
     <button class="btn-green" onclick="uploadFilesChecked()">📤 อัปโหลด</button>
-    <button class="btn-green" onclick="listFiles(true)">🔄 รีเฟรช</button>
+    <button id="refreshBtn" class="btn-green" onclick="refreshFiles()">🔄 รีเฟรช</button>
     <button id="deleteAllBtn" onclick="deleteAllFiles()">🗑️ ลบรูปทั้งหมด</button>
     <button id="logoutBtn" onclick="logout()">🚪 ออกจากระบบ</button>
 
@@ -219,7 +219,7 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const LIFF_ID = "2001781240-k2PJ3Ap2";
@@ -262,6 +262,28 @@ function showUploadSection() {
   document.getElementById("uploadSection").style.display = "block";
   document.getElementById("userProfile").innerHTML = `<img src="${userPic}"><p>${userName}</p>`;
   listFiles(true);
+}
+
+// ✅ ปุ่มรีเฟรชปลอดภัย
+async function refreshFiles() {
+  const btn = document.getElementById('refreshBtn');
+  const status = document.getElementById('status');
+  try {
+    if (!userId) {
+      status.innerText = "⚠️ กรุณาเข้าสู่ระบบก่อนรีเฟรช";
+      return;
+    }
+    btn.disabled = true;
+    status.innerText = "⏳ กำลังรีเฟรชรายการไฟล์...";
+    await listFiles(true);
+    status.innerText = "✅ รีเฟรชเสร็จแล้ว";
+  } catch (err) {
+    console.error('refreshFiles error', err);
+    status.innerText = "❌ รีเฟรชไม่สำเร็จ";
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { if (status.innerText.startsWith('✅')) status.innerText = ''; }, 2500);
+  }
 }
 
 async function uploadFilesChecked() {
