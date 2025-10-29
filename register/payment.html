@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ชำระเงินค่าสมัคร / Payment</title>
+<title>ชำระเงินค่าสมัคร TOP100 / Payment</title>
 <style>
   body {
     font-family: 'Segoe UI', sans-serif;
@@ -68,29 +68,6 @@
     box-shadow:0 6px 20px rgba(250,204,21,0.5);
   }
 
-  .plan-btn {
-    display:inline-block;
-    margin:10px;
-    padding:10px 18px;
-    border-radius:25px;
-    border:none;
-    cursor:pointer;
-    font-weight:bold;
-    transition: all 0.3s;
-  }
-  .plan-btn.run {
-    background:#22c55e;
-    color:#fff;
-  }
-  .plan-btn.top {
-    background:#3b82f6;
-    color:#fff;
-  }
-  .plan-btn:hover {
-    transform: scale(1.05);
-    opacity:0.9;
-  }
-
   .lang-switch {
     position:absolute;
     top:20px;
@@ -127,50 +104,19 @@
 <button class="lang-switch" onclick="toggleLang()"><span id="langFlag">🇬🇧</span> <span id="langText">EN</span></button>
 
 <div class="container">
-  <h1 id="title">📌 เลือกรุ่นและชำระเงินค่าสมัคร</h1>
+  <h1 id="title">📌 ชำระเงินค่าสมัคร TOP100</h1>
+  <p id="desc">กรุณาสแกน QR Code เพื่อชำระเงินค่าสมัคร 200 บาท</p>
 
-  <div>
-    <button class="plan-btn run" onclick="selectPlan('run')">🏃‍♂️ BANGWAD CHARITY RUN (500 บาท)</button>
-    <button class="plan-btn top" onclick="selectPlan('top')">⭐ TOP100 (100 บาท)</button>
+  <div class="qr-container" id="qrSection">
+    <img id="qrImg" src="https://promptpay.io/0936494961/200" alt="QR Code" class="qr">
   </div>
 
-  <p id="desc">กรุณาเลือกรุ่นก่อนเพื่อแสดง QR Code สำหรับชำระเงิน</p>
-
-  <div class="qr-container" id="qrSection" style="display:none;" data-tooltip="Scan QR Code to pay / สแกนจ่ายเงิน">
-    <img id="qrImg" src="" alt="QR Code" class="qr">
-  </div>
-
-  <p id="afterPay" style="display:none;">หลังจากชำระเงินเสร็จแล้ว กดปุ่มด้านล่างเพื่อลงทะเบียน</p>
-  <a href="registerbangwad.html" class="btn" id="registerBtn" style="display:none;">ไปหน้าลงทะเบียน</a>
+  <p id="afterPay">หลังจากชำระเงินเสร็จแล้ว กดปุ่มด้านล่างเพื่อลงทะเบียน</p>
+  <a href="register.html" class="btn" id="registerBtn">ไปหน้าลงทะเบียน</a>
 </div>
 
 <script>
 let currentLang = "TH";
-let selectedPlan = "";
-
-function selectPlan(plan){
-  const title = document.getElementById("title");
-  const desc = document.getElementById("desc");
-  const qrSection = document.getElementById("qrSection");
-  const qrImg = document.getElementById("qrImg");
-  const afterPay = document.getElementById("afterPay");
-  const registerBtn = document.getElementById("registerBtn");
-
-  if(plan === "run"){
-    selectedPlan = "BANGWAD CHARITY RUN";
-    qrImg.src = "https://promptpay.io/0936494961/500";
-    title.innerText = "📌 ชำระเงินค่าสมัคร BANGWAD CHARITY RUN (500 บาท)";
-  } else {
-    selectedPlan = "TOP100";
-    qrImg.src = "https://promptpay.io/0936494961/100";
-    title.innerText = "📌 ชำระเงินค่าสมัคร TOP100 (100 บาท)";
-  }
-
-  desc.innerText = "กรุณาสแกน QR Code เพื่อชำระเงินสำหรับรุ่น " + selectedPlan;
-  qrSection.style.display = "block";
-  afterPay.style.display = "block";
-  registerBtn.style.display = "inline-block";
-}
 
 function toggleLang(){
   const title = document.getElementById("title");
@@ -181,16 +127,16 @@ function toggleLang(){
   const langText = document.getElementById("langText");
 
   if(currentLang==="TH"){
-    title.innerText="📌 Select a category and make payment";
-    desc.innerText="Please choose a plan to show the QR Code for payment.";
+    title.innerText="📌 Pay for TOP100 Registration";
+    desc.innerText="Please scan the QR Code to pay the 200 THB registration fee.";
     afterPay.innerText="After payment, click the button below to register.";
     btn.innerText="Go to Registration";
     langFlag.innerText="🇹🇭";
     langText.innerText="TH";
     currentLang="EN";
   } else {
-    title.innerText="📌 เลือกรุ่นและชำระเงินค่าสมัคร";
-    desc.innerText="กรุณาเลือกรุ่นก่อนเพื่อแสดง QR Code สำหรับชำระเงิน";
+    title.innerText="📌 ชำระเงินค่าสมัคร TOP100";
+    desc.innerText="กรุณาสแกน QR Code เพื่อชำระเงินค่าสมัคร 200 บาท";
     afterPay.innerText="หลังจากชำระเงินเสร็จแล้ว กดปุ่มด้านล่างเพื่อลงทะเบียน";
     btn.innerText="ไปหน้าลงทะเบียน";
     langFlag.innerText="🇬🇧";
