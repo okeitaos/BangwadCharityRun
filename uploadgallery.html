@@ -5,12 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>📤 LINE Upload Gallery</title>
 
-<!-- LINE LIFF & Supabase -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<!-- Face API -->
-<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
 <style>
   :root {
@@ -31,212 +27,343 @@
     min-height: 100vh;
   }
 
-  h1 { color: var(--gold); text-shadow: 0 0 10px rgba(250,204,21,0.5); }
-  #userProfile img { border-radius: 50%; width: 90px; height: 90px; border: 3px solid var(--gold); }
+  h1 {
+    color: var(--gold);
+    font-size: 2rem;
+    margin-bottom: 15px;
+    text-shadow: 0 0 10px rgba(250,204,21,0.5);
+  }
+
+  #userProfile img {
+    border-radius: 50%;
+    width: 90px;
+    height: 90px;
+    border: 3px solid var(--gold);
+    margin-bottom: 10px;
+  }
+
+  #userProfile p {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--gold);
+  }
 
   input[type="file"], input[type="text"] {
-    margin: 10px 0; background: var(--panel); border: 1px solid var(--border);
-    padding: 10px; border-radius: 10px; color: #fff; width: 90%; max-width: 400px;
+    margin: 15px 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 10px;
+    border-radius: 10px;
+    color: #fff;
+    width: 90%;
+    max-width: 400px;
+  }
+
+  input[type="text"] {
+    border-radius: 25px;
+    font-size: 1rem;
+    text-align: center;
   }
 
   button {
-    border: none; padding: 10px 20px; border-radius: 25px;
-    font-weight: bold; color: #fff; cursor: pointer; margin: 6px;
-    transition: 0.3s; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    border: none;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-weight: bold;
+    color: #fff;
+    cursor: pointer;
+    margin: 6px;
+    transition: 0.3s;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
   }
 
-  .btn-green { background: linear-gradient(90deg,#06C755,#00B900); }
-  #deleteAllBtn { background: linear-gradient(90deg,#ef4444,#dc2626); }
+  button:hover { transform: translateY(-2px); opacity: 0.9; }
+
+  .btn-green { background: linear-gradient(90deg, #06C755, #00B900); }
+  #deleteAllBtn { background: linear-gradient(90deg, #ef4444, #dc2626); }
   #logoutBtn { background: #475569; }
+  .delete-btn { background: #dc2626; font-size: 0.8rem; padding: 5px 10px; }
 
-  #progressContainer { width: 90%; max-width: 500px; height: 10px;
-    background: var(--panel); border-radius: 10px; margin: 10px auto; overflow: hidden; }
-  #progressBar { height: 100%; background: linear-gradient(90deg,var(--green),#22c55e);
-    width: 0%; transition: width 0.2s; }
+  #status { margin-top: 10px; color: var(--gold); font-weight: bold; }
 
-  .file-list { background: var(--panel); border-radius: 15px; padding: 20px; margin: 25px auto;
-    max-width: 700px; text-align: left; }
+  #progressContainer {
+    width: 90%; max-width: 500px; height: 10px;
+    background: var(--panel); border-radius: 10px;
+    margin: 10px auto; overflow: hidden;
+  }
+
+  #progressBar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), #22c55e);
+    width: 0%; transition: width 0.2s;
+  }
+
+  .file-list {
+    background: var(--panel);
+    border-radius: 15px;
+    padding: 20px;
+    margin: 25px auto;
+    max-width: 700px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    text-align: left;
+  }
+
   ul { list-style: none; padding: 0; margin: 0; }
-  li { padding: 10px 8px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 12px; }
-  img.thumb { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; cursor: pointer; }
-  .filename { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    color: #38bdf8; cursor: pointer; text-decoration: underline; }
+
+  li {
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  li img.thumb {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    object-fit: cover;
+    cursor: pointer;
+  }
+
+  .file-info {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .filename {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #38bdf8;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
   .filename:hover { color: var(--gold); }
+
+  .file-actions {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+
   #count { margin-top: 10px; text-align: right; opacity: 0.7; }
 
-  @media (max-width:600px){ h1{font-size:1.5rem;} }
+  #pagination { margin-top: 20px; }
+  #pagination button { background: #3b82f6; font-size: 0.9rem; }
+
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 999;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.95);
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+  }
+
+  .modal img {
+    max-width: 90%;
+    max-height: 80%;
+    border-radius: 15px;
+    box-shadow: 0 0 20px rgba(250,204,21,0.3);
+  }
+
+  .modal button { background: #dc2626; margin-top: 20px; }
+
+  @media (max-width:600px) {
+    body { padding: 15px; }
+    h1 { font-size: 1.5rem; }
+    .filename { max-width: 65%; }
+  }
 </style>
 </head>
 <body>
-<h1>📤 LINE Upload Gallery</h1>
+  <h1>📤 LINE Upload Gallery</h1>
 
-<div id="loginSection">
-  <button class="btn-green" onclick="login()">เข้าสู่ระบบด้วย LINE</button>
-</div>
-
-<div id="uploadSection" style="display:none;">
-  <div id="userProfile"></div>
-
-  <input type="file" id="fileInput" multiple accept="image/*"><br>
-  <button class="btn-green" onclick="uploadFiles()">📤 อัปโหลด</button>
-  <button id="deleteAllBtn" onclick="deleteAllFiles()">🗑️ ลบทั้งหมด</button>
-  <button id="logoutBtn" onclick="logout()">🚪 ออกจากระบบ</button>
-
-  <div id="status"></div>
-  <div id="progressContainer"><div id="progressBar"></div></div>
-
-  <div class="file-list">
-    <ul id="fileList"></ul>
-    <div id="count"></div>
+  <div id="loginSection">
+    <button class="btn-green" onclick="login()">เข้าสู่ระบบด้วย LINE</button>
   </div>
-</div>
 
-<!-- Preview Modal -->
-<div id="imageModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95);
- justify-content:center; align-items:center; flex-direction:column; z-index:999;">
-  <img id="modalImg" src="" style="max-width:90%; max-height:80%; border-radius:12px;">
-  <button style="margin-top:20px; background:#dc2626;" onclick="closeModal()">ปิด</button>
-</div>
+  <div id="uploadSection" style="display:none;">
+    <div id="userProfile"></div>
+
+    <input type="file" id="fileInput" multiple accept="image/*"><br>
+    <button class="btn-green" onclick="uploadFilesChecked()">📤 อัปโหลด</button>
+    <button id="refreshBtn" class="btn-green" onclick="refreshFiles()">🔄 รีเฟรช</button>
+    <button id="deleteAllBtn" onclick="deleteAllFiles()">🗑️ ลบทั้งหมด</button>
+    <button id="logoutBtn" onclick="logout()">🚪 ออกจากระบบ</button>
+
+    <div id="status"></div>
+    <div id="progressContainer"><div id="progressBar"></div></div>
+
+    <div class="file-list">
+      <input type="text" id="searchInput" placeholder="🔍 ค้นหาชื่อไฟล์...">
+      <ul id="fileList"></ul>
+      <div id="count"></div>
+    </div>
+
+    <div id="pagination">
+      <button id="prevBtn" onclick="prevPage()" disabled>⬅️ ก่อนหน้า</button>
+      <button id="nextBtn" onclick="nextPage()">ถัดไป ➡️</button>
+    </div>
+  </div>
+
+  <div class="modal" id="imageModal">
+    <img id="modalImg" src="" alt="preview">
+    <button onclick="closeModal()">ปิด</button>
+  </div>
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const BUCKET = "gallery";
-const LIFF_ID = "2001781240-k2PJ3Ap2";
-const EDGE_INDEX_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/index_face";
-
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-let userId = "", userName = "", userPic = "", allFiles = [];
-const MODEL_URL = "https://cdn.jsdelivr.net/gh/vladmandic/face-api/model/";
-let modelsLoaded = false;
+const LIFF_ID = "2001781240-k2PJ3Ap2";
+const INDEX_FACE_URL = `${SUPABASE_URL}/functions/v1/index_face`;
 
-/* ------------------ โหลดโมเดลใบหน้า ------------------ */
-async function loadModels(){
-  if(modelsLoaded) return;
-  await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-  await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-  await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-  modelsLoaded = true;
-}
+let userId = "", userName = "", userPic = "";
+let currentPage = 1;
+const PAGE_SIZE_DISPLAY = 15;
+let totalPages = 1;
+let allFiles = [];
 
-/* ------------------ LINE Login ------------------ */
+// ✅ LOGIN
 async function main() {
   await liff.init({ liffId: LIFF_ID });
-  if (!liff.isLoggedIn()) {
-    document.getElementById("loginSection").style.display = "block";
-  } else {
+  if (!liff.isLoggedIn()) document.getElementById("loginSection").style.display = "block";
+  else {
     const profile = await liff.getProfile();
-    userId = profile.userId.replace(/[^a-zA-Z0-9_-]/g,"_");
+    userId = profile.userId.replace(/[^a-zA-Z0-9_-]/g, "_");
     userName = profile.displayName;
     userPic = profile.pictureUrl;
     showUploadSection();
   }
 }
-function login(){ liff.login(); }
-async function logout(){ await liff.logout(); location.reload(); }
+function login() { liff.login(); }
+async function logout() { await liff.logout(); location.reload(); }
 
-function showUploadSection(){
+function showUploadSection() {
   document.getElementById("loginSection").style.display = "none";
   document.getElementById("uploadSection").style.display = "block";
   document.getElementById("userProfile").innerHTML = `<img src="${userPic}"><p>${userName}</p>`;
-  listFiles();
+  listFiles(true);
 }
 
-/* ------------------ อัปโหลดไฟล์ ------------------ */
-async function uploadFiles(){
+// ✅ REFRESH
+async function refreshFiles() {
+  const btn = document.getElementById('refreshBtn');
+  const status = document.getElementById('status');
+  try {
+    btn.disabled = true;
+    status.innerText = "⏳ กำลังรีเฟรช...";
+    await listFiles(true);
+    status.innerText = "✅ เสร็จสิ้น";
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => status.innerText = "", 2000);
+  }
+}
+
+// ✅ อัปโหลด + ป้องกันซ้ำ + Index ใบหน้า
+async function uploadFilesChecked() {
   const files = document.getElementById("fileInput").files;
   const status = document.getElementById("status");
-  const bar = document.getElementById("progressBar");
-  if(!files.length) return alert("กรุณาเลือกไฟล์");
+  const progressBar = document.getElementById("progressBar");
+  if (!files.length) return alert("กรุณาเลือกไฟล์");
 
-  await loadModels();
   await listFiles(true);
-  status.innerText = "⏳ กำลังอัปโหลด...";
-  let success=0, skipDup=0, skipBig=0;
+  status.innerText = "⏳ กำลังตรวจสอบ...";
+  let success = 0, skipDup = 0, skipBig = 0;
 
-  for(let i=0;i<files.length;i++){
+  for (let i = 0; i < files.length; i++) {
     const file = files[i];
-    if(file.size > 5*1024*1024){ skipBig++; continue; }
+    if (file.size > 5 * 1024 * 1024) { skipBig++; continue; }
 
-    // ตรวจซ้ำ (ชื่อ + ขนาด)
     const dup = allFiles.find(f => f.name === file.name && f.size === file.size);
-    if(dup){ skipDup++; continue; }
+    if (dup) { skipDup++; continue; }
 
-    const cleanName = file.name.replace(/\s+/g,"_");
-    const path = `${userId}/${Date.now()}_${cleanName}`;
-    const { error } = await sb.storage.from(BUCKET).upload(path, file);
-    if(!error){
-      success++;
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
-      await indexFaceDescriptor(file, publicUrl); // ✅ index descriptor
+    const name = file.name.replace(/\s+/g, "_");
+    const path = `${userId}/${Date.now()}_${name}`;
+    await sb.storage.from(BUCKET).upload(path, file);
+    success++;
+
+    // ✅ หลังอัปโหลด → ส่งไป index_face
+    try {
+      const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
+      await fetch(INDEX_FACE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_url: imageUrl, user_id: userId })
+      });
+      console.log("📸 Indexed face:", name);
+    } catch (err) {
+      console.warn("⚠️ Failed to index face:", name, err);
     }
-    bar.style.width = `${((i+1)/files.length)*100}%`;
+
+    progressBar.style.width = `${((i + 1) / files.length) * 100}%`;
   }
 
   status.innerText = `✅ สำเร็จ ${success}, ซ้ำ ${skipDup}, เกินขนาด ${skipBig}`;
-  bar.style.width = "100%";
+  progressBar.style.width = "100%";
+  listFiles(true);
   document.getElementById("fileInput").value = "";
-  setTimeout(()=>{ bar.style.width="0%"; listFiles(true); },1500);
 }
 
-/* ------------------ index descriptor ------------------ */
-async function indexFaceDescriptor(file, publicUrl){
-  try {
-    const img = await faceapi.bufferToImage(file);
-    const detection = await faceapi
-      .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize:416 }))
-      .withFaceLandmarks().withFaceDescriptor();
-
-    if(!detection) return false;
-    const descriptor = Array.from(detection.descriptor);
-    await fetch(EDGE_INDEX_URL, {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ user_id:userId, image_url:publicUrl, descriptor })
-    });
-    return true;
-  } catch(err){ console.warn("index error",err); return false; }
+// ✅ โหลดและแสดงไฟล์
+async function listFiles() {
+  const { data } = await sb.storage.from(BUCKET).list(`${userId}/`, { limit: 10000 });
+  allFiles = data || [];
+  allFiles.sort((a,b)=> new Date(b.created_at)-new Date(a.created_at));
+  totalPages = Math.max(1, Math.ceil(allFiles.length / PAGE_SIZE_DISPLAY));
+  renderPage(currentPage);
 }
 
-/* ------------------ แสดงรายการไฟล์ ------------------ */
-async function listFiles(force=false){
-  const { data } = await sb.storage.from(BUCKET).list(`${userId}/`,{ limit:10000 });
-  allFiles = (data||[]).filter(f=>f.name!==".emptyFolderPlaceholder");
+function renderPage(page) {
+  const start = (page - 1) * PAGE_SIZE_DISPLAY;
+  renderFileList(allFiles.slice(start, start + PAGE_SIZE_DISPLAY));
+  document.getElementById("count").innerText = `📦 ${allFiles.length} ไฟล์ — หน้า ${page}/${totalPages}`;
+}
+
+function renderFileList(files) {
   const list = document.getElementById("fileList");
-  if(!allFiles.length){ list.innerHTML="<li>ไม่มีไฟล์</li>"; return; }
-
-  list.innerHTML = allFiles.slice().reverse().map(f=>{
+  if (!files.length) { list.innerHTML = "<li>ไม่มีไฟล์</li>"; return; }
+  list.innerHTML = files.map(f => {
     const url = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${f.name}`;
-    return `<li><img src="${url}" class="thumb" onclick="openModal('${url}')">
-      <span class="filename" onclick="openModal('${url}')">${f.name}</span>
-      <button style="background:#dc2626;padding:4px 10px;border-radius:10px;"
-        onclick="deleteFile('${f.name}')">ลบ</button></li>`;
+    const time = new Date(f.created_at || Date.now()).toLocaleString("th-TH",{hour12:false});
+    return `
+      <li>
+        <img src="${url}" class="thumb" onclick="openModal('${url}')">
+        <div class="file-info">
+          <span class="filename" title="${f.name}" onclick="openModal('${url}')">${f.name}</span>
+          <div class="file-actions">
+            <small>${time}</small>
+            <button class="delete-btn" onclick="deleteFile('${f.name}')">ลบ</button>
+          </div>
+        </div>
+      </li>`;
   }).join("");
-  document.getElementById("count").innerText = `📦 ${allFiles.length} ไฟล์`;
 }
 
-/* ------------------ ลบไฟล์ ------------------ */
-async function deleteFile(name){
-  if(!confirm(`ลบไฟล์นี้หรือไม่?\n${name}`)) return;
-  await sb.storage.from(BUCKET).remove([`${userId}/${name}`]);
-  listFiles(true);
-}
-async function deleteAllFiles(){
-  if(!confirm("⚠️ ต้องการลบรูปทั้งหมดหรือไม่?")) return;
-  const paths = allFiles.map(f=>`${userId}/${f.name}`);
-  await sb.storage.from(BUCKET).remove(paths);
-  listFiles(true);
-}
+function nextPage(){if(currentPage<totalPages){currentPage++;renderPage(currentPage);}}
+function prevPage(){if(currentPage>1){currentPage--;renderPage(currentPage);}}
 
-/* ------------------ Modal ------------------ */
-function openModal(url){
-  document.getElementById("modalImg").src=url;
-  document.getElementById("imageModal").style.display="flex";
-}
-function closeModal(){
-  document.getElementById("imageModal").style.display="none";
-}
+// ✅ ลบไฟล์
+async function deleteFile(name){if(confirm(`ลบไฟล์นี้หรือไม่?\n${name}`)){await sb.storage.from(BUCKET).remove([`${userId}/${name}`]);listFiles();}}
+async function deleteAllFiles(){if(confirm("⚠️ ต้องการลบทั้งหมดหรือไม่?")){await sb.storage.from(BUCKET).remove(allFiles.map(f=>`${userId}/${f.name}`));listFiles();}}
+
+// ✅ Modal
+function openModal(url){document.getElementById("modalImg").src=url;document.getElementById("imageModal").style.display="flex";}
+function closeModal(){document.getElementById("imageModal").style.display="none";}
 
 main();
 </script>
