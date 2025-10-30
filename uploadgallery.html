@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>📤 LINE Upload Gallery</title>
-
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -225,29 +224,29 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 🔑 ใส่คีย์ของคุณ
 const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const LIFF_ID = "2001781240-k2PJ3Ap2";
-const INDEX_FACE_URL = `${SUPABASE_URL}/functions/v1/index_face`;
 
 let userId = "", userName = "", userPic = "";
-let currentPage = 1;
-const PAGE_SIZE_DISPLAY = 15;
-let totalPages = 1;
 let allFiles = [];
+const PAGE_SIZE = 15;
+let currentPage = 1;
 
-// ✅ LOGIN
+// Utility
+function safeUserId(uid) { return uid.replace(/[^a-zA-Z0-9_-]/g, "_"); }
+
+// Init
 async function main() {
   await liff.init({ liffId: LIFF_ID });
-  if (!liff.isLoggedIn()) document.getElementById("loginSection").style.display = "block";
-  else {
-    const profile = await liff.getProfile();
-    userId = profile.userId.replace(/[^a-zA-Z0-9_-]/g, "_");
-    userName = profile.displayName;
-    userPic = profile.pictureUrl;
-    showUploadSection();
-  }
+  if (!liff.isLoggedIn()) return document.getElementById("loginSection").style.display = "block";
+
+  const profile = await liff.getProfile();
+  userId = safeUserId(profile.userId);
+  userName = profile.displayName;
+  userPic = profile.pictureUrl;
+  showUploadSection();
 }
 function login() { liff.login(); }
 async function logout() { await liff.logout(); location.reload(); }
@@ -259,22 +258,7 @@ function showUploadSection() {
   listFiles(true);
 }
 
-// ✅ REFRESH
-async function refreshFiles() {
-  const btn = document.getElementById('refreshBtn');
-  const status = document.getElementById('status');
-  try {
-    btn.disabled = true;
-    status.innerText = "⏳ กำลังรีเฟรช...";
-    await listFiles(true);
-    status.innerText = "✅ เสร็จสิ้น";
-  } finally {
-    btn.disabled = false;
-    setTimeout(() => status.innerText = "", 2000);
-  }
-}
-
-// ✅ อัปโหลด + ป้องกันซ้ำ + Index ใบหน้า
+// Upload
 async function uploadFilesChecked() {
   const files = document.getElementById("fileInput").files;
   const status = document.getElementById("status");
@@ -282,64 +266,58 @@ async function uploadFilesChecked() {
   if (!files.length) return alert("กรุณาเลือกไฟล์");
 
   await listFiles(true);
-  status.innerText = "⏳ กำลังตรวจสอบ...";
   let success = 0, skipDup = 0, skipBig = 0;
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     if (file.size > 5 * 1024 * 1024) { skipBig++; continue; }
+    if (allFiles.some(f => f.name === file.name && f.size === file.size)) { skipDup++; continue; }
 
-    const dup = allFiles.find(f => f.name === file.name && f.size === file.size);
-    if (dup) { skipDup++; continue; }
-
-    const name = file.name.replace(/\s+/g, "_");
-    const path = `${userId}/${Date.now()}_${name}`;
-    await sb.storage.from(BUCKET).upload(path, file);
+    const path = `${userId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+    const { error } = await sb.storage.from(BUCKET).upload(path, file);
+    if (error) continue;
     success++;
 
-    // ✅ หลังอัปโหลด → ส่งไป index_face
-    try {
-      const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
-      await fetch(INDEX_FACE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_url: imageUrl, user_id: userId })
-      });
-      console.log("📸 Indexed face:", name);
-    } catch (err) {
-      console.warn("⚠️ Failed to index face:", name, err);
-    }
+    // ✅ ส่งภาพไปทำ Embedding ที่ index_face
+    const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
+    await fetch(`${SUPABASE_URL}/functions/v1/index_face`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image_url: imageUrl, user_id: userId }),
+    }).catch(() => console.warn("⚠️ Indexing error:", file.name));
 
     progressBar.style.width = `${((i + 1) / files.length) * 100}%`;
   }
 
-  status.innerText = `✅ สำเร็จ ${success}, ซ้ำ ${skipDup}, เกินขนาด ${skipBig}`;
+  status.innerText = `✅ อัปโหลดสำเร็จ ${success}, ซ้ำ ${skipDup}, เกินขนาด ${skipBig}`;
   progressBar.style.width = "100%";
-  listFiles(true);
   document.getElementById("fileInput").value = "";
+  listFiles(true);
 }
 
-// ✅ โหลดและแสดงไฟล์
-async function listFiles() {
-  const { data } = await sb.storage.from(BUCKET).list(`${userId}/`, { limit: 10000 });
-  allFiles = data || [];
-  allFiles.sort((a,b)=> new Date(b.created_at)-new Date(a.created_at));
-  totalPages = Math.max(1, Math.ceil(allFiles.length / PAGE_SIZE_DISPLAY));
-  renderPage(currentPage);
+// Refresh
+async function refreshFiles() {
+  document.getElementById("status").innerText = "⏳ กำลังรีเฟรช...";
+  await listFiles(true);
+  document.getElementById("status").innerText = "✅ เสร็จสิ้น";
 }
 
-function renderPage(page) {
-  const start = (page - 1) * PAGE_SIZE_DISPLAY;
-  renderFileList(allFiles.slice(start, start + PAGE_SIZE_DISPLAY));
-  document.getElementById("count").innerText = `📦 ${allFiles.length} ไฟล์ — หน้า ${page}/${totalPages}`;
+// List Files
+async function listFiles(forceReload = false) {
+  const { data } = await sb.storage.from(BUCKET).list(`${userId}/`, { limit: 1000 });
+  allFiles = (data || []).filter(f => f.name !== ".emptyFolderPlaceholder");
+  renderFileList(allFiles);
+  document.getElementById("count").innerText = `📦 ทั้งหมด ${allFiles.length} ไฟล์`;
 }
 
+// Render
 function renderFileList(files) {
   const list = document.getElementById("fileList");
-  if (!files.length) { list.innerHTML = "<li>ไม่มีไฟล์</li>"; return; }
+  if (!files.length) return list.innerHTML = "<li>ไม่มีไฟล์</li>";
+
   list.innerHTML = files.map(f => {
     const url = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${f.name}`;
-    const time = new Date(f.created_at || Date.now()).toLocaleString("th-TH",{hour12:false});
+    const time = new Date(f.created_at || Date.now()).toLocaleString("th-TH");
     return `
       <li>
         <img src="${url}" class="thumb" onclick="openModal('${url}')">
@@ -354,16 +332,26 @@ function renderFileList(files) {
   }).join("");
 }
 
-function nextPage(){if(currentPage<totalPages){currentPage++;renderPage(currentPage);}}
-function prevPage(){if(currentPage>1){currentPage--;renderPage(currentPage);}}
+// Delete
+async function deleteFile(name) {
+  if (!confirm(`ลบไฟล์ ${name}?`)) return;
+  await sb.storage.from(BUCKET).remove([`${userId}/${name}`]);
+  listFiles(true);
+}
+async function deleteAllFiles() {
+  if (!confirm("⚠️ ต้องการลบรูปทั้งหมดของคุณหรือไม่?")) return;
+  await sb.storage.from(BUCKET).remove(allFiles.map(f => `${userId}/${f.name}`));
+  listFiles(true);
+}
 
-// ✅ ลบไฟล์
-async function deleteFile(name){if(confirm(`ลบไฟล์นี้หรือไม่?\n${name}`)){await sb.storage.from(BUCKET).remove([`${userId}/${name}`]);listFiles();}}
-async function deleteAllFiles(){if(confirm("⚠️ ต้องการลบทั้งหมดหรือไม่?")){await sb.storage.from(BUCKET).remove(allFiles.map(f=>`${userId}/${f.name}`));listFiles();}}
-
-// ✅ Modal
-function openModal(url){document.getElementById("modalImg").src=url;document.getElementById("imageModal").style.display="flex";}
-function closeModal(){document.getElementById("imageModal").style.display="none";}
+// Modal
+function openModal(url) {
+  document.getElementById("modalImg").src = url;
+  document.getElementById("imageModal").style.display = "flex";
+}
+function closeModal() {
+  document.getElementById("imageModal").style.display = "none";
+}
 
 main();
 </script>
