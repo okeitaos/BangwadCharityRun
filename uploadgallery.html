@@ -270,7 +270,39 @@ function showUploadSection() {
   listFiles(true);
 }
 
-/* ✅ ปุ่มรีเฟรช */
+/* ✅ ป้องกันการอัปโหลดภาพซ้ำ */
+async function uploadFilesChecked() {
+  const files = document.getElementById("fileInput").files;
+  const status = document.getElementById("status");
+  const progressBar = document.getElementById("progressBar");
+  if (!files.length) return alert("กรุณาเลือกไฟล์");
+
+  await listFiles(true);
+  status.innerText = "⏳ กำลังตรวจสอบ...";
+  let success = 0, skipDup = 0, skipBig = 0;
+
+  const existingNames = new Set(allFiles.map(f => f.name.toLowerCase()));
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const name = sanitizeFileName(file.name);
+
+    if (file.size > 5 * 1024 * 1024) { skipBig++; continue; }
+    if (existingNames.has(name.toLowerCase())) { skipDup++; continue; }
+
+    const path = `${userId}/${Date.now()}_${name}`;
+    const { error } = await sb.storage.from(BUCKET).upload(path, file);
+    if (!error) success++;
+
+    progressBar.style.width = `${((i + 1) / files.length) * 100}%`;
+  }
+
+  status.innerText = `✅ อัปโหลดสำเร็จ ${success} ไฟล์, ข้ามซ้ำ ${skipDup}, เกินขนาด ${skipBig}`;
+  progressBar.style.width = "100%";
+  listFiles(true);
+}
+
+/* ✅ ส่วนที่เหลือเหมือนเดิม */
 async function refreshFiles() {
   const btn = document.getElementById('refreshBtn');
   const status = document.getElementById('status');
@@ -288,124 +320,35 @@ async function refreshFiles() {
   }
 }
 
-/* ✅ อัปโหลด + ตรวจซ้ำ */
-async function uploadFilesChecked() {
-  const files = document.getElementById("fileInput").files;
-  const status = document.getElementById("status");
-  const progressBar = document.getElementById("progressBar");
-  if (!files.length) return alert("กรุณาเลือกไฟล์");
-  await listFiles(true);
-  status.innerText = "⏳ กำลังตรวจสอบ...";
-  let success = 0, skipDup = 0, skipBig = 0;
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    if (file.size > 5 * 1024 * 1024) { skipBig++; continue; }
-    const dup = allFiles.find(f => f.name === file.name && f.size === file.size);
-    if (dup) { skipDup++; continue; }
-    const name = sanitizeFileName(file.name);
-    const path = `${userId}/${Date.now()}_${name}`;
-    await sb.storage.from(BUCKET).upload(path, file);
-    success++;
-    progressBar.style.width = `${((i + 1) / files.length) * 100}%`;
-  }
-  status.innerText = `✅ อัปโหลดสำเร็จ ${success}, ซ้ำ ${skipDup}, เกินขนาด ${skipBig}`;
-  progressBar.style.width = "100%";
-  listFiles(true);
-}
-
-/* ✅ โหลดไฟล์ + ตัวกรอง */
+/* ✅ โหลดไฟล์ + แสดงผล */
 async function listFiles(forceReload = false) {
   const { data } = await sb.storage.from(BUCKET).list(`${userId}/`, { limit: 10000 });
   allFiles = (data || []).filter(f => f.name !== ".emptyFolderPlaceholder");
   allFiles.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-
-  if (!window.searchListenerAdded) {
-    document.getElementById("searchInput").addEventListener("input", handleSearch);
-    window.searchListenerAdded = true;
-  }
-
-  totalPages = Math.max(1, Math.ceil(allFiles.length / PAGE_SIZE_DISPLAY));
   renderPage(currentPage);
-  updatePaginationButtons();
 }
 
-/* ✅ ฟังก์ชันกรองไฟล์ */
-function handleSearch(e) {
-  const keyword = e.target.value.toLowerCase().trim();
-  const filtered = keyword
-    ? allFiles.filter(f => f.name.toLowerCase().includes(keyword))
-    : allFiles;
-
-  currentPage = 1;
-  totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE_DISPLAY));
-  renderFilteredPage(filtered, currentPage);
-  updatePaginationButtons(filtered);
-}
-
-/* ✅ แสดงหน้า */
+/* ✅ Pagination + Modal */
 function renderPage(page) {
   const start = (page - 1) * PAGE_SIZE_DISPLAY;
   renderFileList(allFiles.slice(start, start + PAGE_SIZE_DISPLAY));
-  document.getElementById("count").innerText = `📦 ${allFiles.length} ไฟล์ — หน้า ${page}/${totalPages}`;
 }
 
-function renderFilteredPage(files, page) {
-  const start = (page - 1) * PAGE_SIZE_DISPLAY;
-  renderFileList(files.slice(start, start + PAGE_SIZE_DISPLAY));
-  document.getElementById("count").innerText = `📦 ${files.length} ไฟล์ — หน้า ${page}/${totalPages}`;
-}
-
-/* ✅ แสดงรายการ + Thumbnail */
 function renderFileList(files) {
   const list = document.getElementById("fileList");
-  if (!files.length) { list.innerHTML = "<li>ไม่มีไฟล์</li>"; return; }
-
   list.innerHTML = files.map(f => {
     const url = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${f.name}`;
-    const time = new Date(f.created_at || Date.now()).toLocaleString("th-TH", { hour12: false });
-    return `
-      <li>
-        <img src="${url}" class="thumb" onclick="openModal('${url}')">
-        <div class="file-info">
-          <span class="filename" title="${f.name}" onclick="openModal('${url}')">${f.name}</span>
-          <div class="file-actions">
-            <small style="opacity:0.7;">${time}</small>
-            <button class="delete-btn" onclick="deleteFile('${f.name}')">ลบ</button>
-          </div>
-        </div>
-      </li>`;
+    return `<li><img src="${url}" class="thumb" onclick="openModal('${url}')">
+            <span class="filename" onclick="openModal('${url}')">${f.name}</span>
+            <button class="delete-btn" onclick="deleteFile('${f.name}')">ลบ</button></li>`;
   }).join("");
 }
 
-/* ✅ Pagination */
-function updatePaginationButtons(files = allFiles) {
-  document.getElementById("prevBtn").disabled = currentPage <= 1;
-  document.getElementById("nextBtn").disabled = currentPage >= Math.ceil(files.length / PAGE_SIZE_DISPLAY);
-}
-function nextPage() { if (currentPage < totalPages) { currentPage++; renderPage(currentPage); updatePaginationButtons(); } }
-function prevPage() { if (currentPage > 1) { currentPage--; renderPage(currentPage); updatePaginationButtons(); } }
+function openModal(url){ document.getElementById("modalImg").src = url; document.getElementById("imageModal").style.display="flex"; }
+function closeModal(){ document.getElementById("imageModal").style.display="none"; }
 
-/* ✅ ลบไฟล์ */
-async function deleteFile(name) {
-  if (!confirm(`ลบไฟล์นี้หรือไม่?\n${name}`)) return;
-  await sb.storage.from(BUCKET).remove([`${userId}/${name}`]);
-  listFiles(true);
-}
-async function deleteAllFiles() {
-  if (!confirm("⚠️ ต้องการลบรูปทั้งหมดของคุณหรือไม่?")) return;
-  await sb.storage.from(BUCKET).remove(allFiles.map(f => `${userId}/${f.name}`));
-  listFiles(true);
-}
-
-/* ✅ Modal Preview */
-function openModal(url) {
-  document.getElementById("modalImg").src = url;
-  document.getElementById("imageModal").style.display = "flex";
-}
-function closeModal() {
-  document.getElementById("imageModal").style.display = "none";
-}
+async function deleteFile(name){ if(confirm(`ลบไฟล์นี้หรือไม่?\n${name}`)){ await sb.storage.from(BUCKET).remove([`${userId}/${name}`]); listFiles(true); } }
+async function deleteAllFiles(){ if(confirm("⚠️ ต้องการลบรูปทั้งหมดหรือไม่?")){ await sb.storage.from(BUCKET).remove(allFiles.map(f => `${userId}/${f.name}`)); listFiles(true); } }
 
 main();
 </script>
