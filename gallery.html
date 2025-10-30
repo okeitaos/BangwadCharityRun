@@ -1,136 +1,263 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📤 LINE Upload Gallery</title>
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>📸 ค้นหารูปด้วยใบหน้า | BCR RUN GALLERY</title>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet">
+
 <style>
   body {
     font-family: "Prompt", sans-serif;
-    background: radial-gradient(circle at top, #1e293b, #0f172a);
+    margin: 0;
+    background: linear-gradient(135deg, #0f172a, #1e293b);
     color: #fff;
     text-align: center;
-    padding: 25px;
+    padding: 20px;
   }
-  h1 { color: #facc15; text-shadow: 0 0 10px rgba(250,204,21,0.5); }
-  button {
-    border: none; padding: 10px 20px; border-radius: 25px;
-    font-weight: bold; color: #fff; cursor: pointer; margin: 6px;
-    transition: 0.3s; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+
+  h1 {
+    color: #facc15;
+    text-shadow: 0 0 8px rgba(250,204,21,0.3);
   }
-  .btn-green { background: linear-gradient(90deg, #06C755, #00B900); }
-  #status { margin-top: 10px; color: #facc15; font-weight: bold; }
-  #progressContainer { width: 90%; max-width: 500px; height: 10px;
-    background: rgba(255,255,255,0.1); border-radius: 10px; margin: 10px auto; overflow: hidden; }
-  #progressBar { height: 100%; background: linear-gradient(90deg, #06C755, #22c55e); width: 0%; transition: width 0.2s; }
+
+  #status {
+    margin: 10px auto;
+    font-size: 1.1rem;
+  }
+
+  #uploadInput {
+    margin: 20px;
+    padding: 12px;
+    border-radius: 25px;
+    background: #06c755;
+    border: none;
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    width: 80%;
+    max-width: 300px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    transition: 0.2s;
+  }
+
+  #uploadInput:hover {
+    background: #00b900;
+  }
+
+  .progress-container {
+    width: 90%;
+    max-width: 600px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    margin: 10px auto;
+    overflow: hidden;
+  }
+
+  .progress-bar {
+    height: 20px;
+    width: 0%;
+    background: linear-gradient(90deg, #22c55e, #84cc16);
+    transition: width 0.3s ease;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 25px;
+  }
+
+  .card {
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  }
+
+  .card img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+
+  .card p {
+    margin: 6px 0;
+    color: #f1f5f9;
+  }
+
+  .download-btn {
+    background: linear-gradient(90deg, #2563eb, #3b82f6);
+    border: none;
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 25px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    margin-top: 6px;
+  }
+
+  .download-btn:hover {
+    background: #1d4ed8;
+  }
+
+  #cacheInfo {
+    margin-top: 10px;
+    color: #9ca3af;
+  }
 </style>
 </head>
 <body>
-<h1>📤 LINE Upload Gallery</h1>
+  <h1>📸 ค้นหารูปจากใบหน้า</h1>
+  <p>เลือกภาพใบหน้าของคุณ ระบบจะค้นหารูปทั้งหมดในคลังที่มีใบหน้าคล้ายกัน</p>
 
-<div id="loginSection">
-  <button class="btn-green" onclick="login()">เข้าสู่ระบบด้วย LINE</button>
-</div>
+  <input type="file" id="uploadInput" accept="image/*" value="เลือกภาพของคุณ">
+  <div id="status">⏳ กำลังโหลดระบบ...</div>
 
-<div id="uploadSection" style="display:none;">
-  <div id="userProfile"></div>
-  <input type="file" id="fileInput" multiple accept="image/*"><br>
-  <button class="btn-green" onclick="uploadFilesChecked()">📤 อัปโหลด</button>
-  <div id="status"></div>
-  <div id="progressContainer"><div id="progressBar"></div></div>
-</div>
+  <div class="progress-container"><div id="progressBar" class="progress-bar"></div></div>
+
+  <div id="cacheInfo"></div>
+  <div id="resultGrid" class="grid"></div>
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-const LIFF_ID = "2001781240-k2PJ3Ap2";
+const MODEL_URL = "https://cdn.jsdelivr.net/gh/vladmandic/face-api/model/";
+const DB_NAME = "face-cache", DB_STORE = "descriptors";
 
-const MAX_FILES = 1000;
-const MAX_SIZE_MB = 5 * 1024 * 1024;
+async function openDb() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE, { keyPath: "url" });
+    };
+    r.onsuccess = e => res(e.target.result);
+    r.onerror = e => rej(e.target.error);
+  });
+}
+async function idbGetAll() {
+  const db = await openDb();
+  return new Promise((res, rej) => {
+    const t = db.transaction(DB_STORE, "readonly").objectStore(DB_STORE).getAll();
+    t.onsuccess = () => res(t.result);
+    t.onerror = e => rej(e);
+  });
+}
+async function idbPut(item) {
+  const db = await openDb();
+  db.transaction(DB_STORE, "readwrite").objectStore(DB_STORE).put(item);
+}
 
-let userId = "", userName = "", userPic = "";
+async function loadModels() {
+  document.getElementById("status").innerText = "🧠 กำลังโหลดโมเดลตรวจจับใบหน้า...";
+  await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+  document.getElementById("status").innerText = "✅ พร้อมใช้งานแล้ว";
+}
 
-function safeUserId(uid) { return uid.replace(/[^a-zA-Z0-9_-]/g, "_"); }
-
-async function main() {
-  await liff.init({ liffId: LIFF_ID });
-  if (!liff.isLoggedIn()) document.getElementById("loginSection").style.display = "block";
-  else {
-    const profile = await liff.getProfile();
-    userId = safeUserId(profile.userId);
-    userName = profile.displayName;
-    userPic = profile.pictureUrl;
-    showUploadSection();
+async function listAllImages() {
+  const { data: folders } = await sb.storage.from(BUCKET).list("", { limit: 100 });
+  const list = [];
+  for (const folder of folders || []) {
+    const { data: files } = await sb.storage.from(BUCKET).list(folder.name + "/", { limit: 500 });
+    for (const f of files || []) {
+      if (/\.(jpg|jpeg|png)$/i.test(f.name)) {
+        list.push({
+          url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${folder.name}/${f.name}`,
+          name: f.name
+        });
+      }
+    }
   }
-}
-function login() { liff.login(); }
-
-/* ✅ แสดงหน้า Upload */
-function showUploadSection() {
-  document.getElementById("loginSection").style.display = "none";
-  document.getElementById("uploadSection").style.display = "block";
-  document.getElementById("userProfile").innerHTML = `<img src="${userPic}" style="width:80px;border-radius:50%"><p>${userName}</p>`;
+  return list;
 }
 
-/* ✅ สร้าง hash ของไฟล์ (SHA-1) */
-async function getFileHash(file) {
-  const buffer = await file.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest("SHA-1", buffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+async function descriptorFromUrl(url) {
+  const img = await faceapi.fetchImage(url);
+  const det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+  return det ? Array.from(det.descriptor) : null;
+}
+function euclid(a, b) {
+  let sum = 0; for (let i = 0; i < a.length; i++) { const d = a[i] - b[i]; sum += d * d; }
+  return Math.sqrt(sum);
 }
 
-/* ✅ ตรวจ + อัปโหลด */
-async function uploadFilesChecked() {
-  const input = document.getElementById("fileInput");
-  const files = Array.from(input.files);
+document.getElementById("uploadInput").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
   const status = document.getElementById("status");
+  const grid = document.getElementById("resultGrid");
   const progress = document.getElementById("progressBar");
-  if (files.length === 0) return alert("กรุณาเลือกไฟล์");
+  status.innerText = "🕵️‍♀️ กำลังวิเคราะห์ใบหน้า...";
+  const userImg = await faceapi.bufferToImage(file);
+  const det = await faceapi.detectSingleFace(userImg, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+  if (!det) { status.innerText = "❌ ไม่พบใบหน้าในภาพที่อัปโหลด"; return; }
 
-  // ✅ โหลด hash ทั้งหมดของ user จากตาราง
-  const { data: existing } = await sb.from("file_hashes").select("hash").eq("user_id", userId);
-  const existingHashes = new Set(existing?.map(e => e.hash) || []);
+  const q = det.descriptor;
+  const cache = await idbGetAll();
+  const valid = cache.filter(c => c.descriptor && c.descriptor.length > 0);
+  if (valid.length === 0) { status.innerText = "⚙️ ระบบยังไม่พร้อม กรุณารอให้โหลดข้อมูลก่อน"; return; }
 
-  // ✅ โหลดจำนวนไฟล์ปัจจุบัน
-  const { data: currentFiles } = await sb.storage.from(BUCKET).list(`${userId}/`, { limit: 10000 });
-  if ((currentFiles?.length || 0) >= MAX_FILES) {
-    alert(`📦 มีครบ ${MAX_FILES} ไฟล์แล้ว`);
+  status.innerText = "🔍 กำลังค้นหารูปที่คล้ายกัน...";
+  const results = [];
+  for (let i = 0; i < valid.length; i++) {
+    const d = euclid(q, valid[i].descriptor);
+    if (d < 0.6) results.push({ ...valid[i], distance: d });
+    progress.style.width = `${(i / valid.length) * 100}%`;
+    await new Promise(r => setTimeout(r, 5));
+  }
+  progress.style.width = "0%";
+
+  if (results.length === 0) { status.innerText = "😢 ไม่พบรูปที่คล้ายกัน"; grid.innerHTML = ""; return; }
+  status.innerText = `✅ พบ ${results.length} ภาพที่คล้ายกัน`;
+  grid.innerHTML = results.slice(0, 50).map(r => `
+    <div class="card">
+      <img src="${r.url}" alt="${r.name}">
+      <p>${r.name}<br><small>ความคล้าย ${(100 - r.distance * 100).toFixed(1)}%</small></p>
+      <button class="download-btn" onclick="downloadImage('${r.url}', '${r.name}')">📥 ดาวน์โหลด</button>
+    </div>`).join("");
+});
+
+function downloadImage(url, filename) {
+  fetch(url)
+    .then(res => res.blob())
+    .then(blob => {
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    })
+    .catch(() => alert("❌ ดาวน์โหลดไม่สำเร็จ"));
+}
+
+(async () => {
+  await loadModels();
+  const imgs = await listAllImages();
+  document.getElementById("status").innerText = `📦 พบ ${imgs.length} รูป กำลังสร้างข้อมูล...`;
+  const cache = await idbGetAll();
+  const exist = new Set(cache.map(c => c.url));
+  const missing = imgs.filter(i => !exist.has(i.url));
+  if (missing.length === 0) {
+    document.getElementById("status").innerText = "✅ พร้อมใช้งาน";
     return;
   }
-
-  let success = 0, skippedDup = 0, skippedBig = 0;
-  status.innerText = "⏳ กำลังอัปโหลด...";
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-
-    if (file.size > MAX_SIZE_MB) { skippedBig++; continue; }
-
-    const hash = await getFileHash(file);
-    if (existingHashes.has(hash)) { skippedDup++; continue; }
-
-    const filename = `${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
-    const path = `${userId}/${filename}`;
-    const { error } = await sb.storage.from(BUCKET).upload(path, file);
-    if (!error) {
-      success++;
-      existingHashes.add(hash);
-      await sb.from("file_hashes").insert({ user_id: userId, hash, filename });
-    }
-
-    progress.style.width = `${((i + 1) / files.length) * 100}%`;
+  for (let i = 0; i < missing.length; i++) {
+    const d = await descriptorFromUrl(missing[i].url);
+    await idbPut({ url: missing[i].url, descriptor: d });
+    document.getElementById("progressBar").style.width = `${(i / missing.length) * 100}%`;
   }
-
-  status.innerText = `✅ สำเร็จ ${success}, 🔁 ซ้ำ ${skippedDup}, 🚫 เกินขนาด ${skippedBig}`;
-  progress.style.width = "100%";
-  input.value = "";
-}
-main();
+  document.getElementById("status").innerText = "✅ ระบบพร้อมค้นหาแล้ว";
+})();
 </script>
 </body>
 </html>
