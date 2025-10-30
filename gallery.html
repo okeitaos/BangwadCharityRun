@@ -12,51 +12,42 @@
   <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
   <!-- Font -->
-  <link
-    href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap"
-    rel="stylesheet"
-  />
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet" />
 
   <style>
     body {
       font-family: "Prompt", sans-serif;
-      margin: 0;
       background: linear-gradient(135deg, #0f172a, #1e293b, #0f172a);
       color: #fff;
       text-align: center;
-      min-height: 100vh;
       padding: 20px;
+      min-height: 100vh;
     }
 
     h1 {
       color: #facc15;
+      text-shadow: 0 0 10px rgba(250,204,21,0.4);
       margin-bottom: 10px;
-      text-shadow: 0 0 10px rgba(250, 204, 21, 0.4);
     }
 
-    p {
-      opacity: 0.85;
-    }
+    p { opacity: 0.85; }
 
     #uploadInput {
-      margin: 20px 0;
+      margin: 15px 0;
       padding: 10px;
       border-radius: 25px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
       color: #fff;
       cursor: pointer;
       transition: all 0.3s;
     }
-
-    #uploadInput:hover {
-      background: rgba(255, 255, 255, 0.15);
-    }
+    #uploadInput:hover { background: rgba(255,255,255,0.15); }
 
     #status {
-      margin: 10px;
       color: #facc15;
       font-weight: 600;
+      margin: 10px 0;
     }
 
     .preview-container {
@@ -75,11 +66,24 @@
       border: 2px solid #facc15;
     }
 
+    .slider-box {
+      margin: 15px auto;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 15px;
+      padding: 10px;
+      max-width: 400px;
+    }
+
+    input[type="range"] {
+      width: 80%;
+    }
+
     .progress-container {
       width: 80%;
       max-width: 600px;
-      margin: 10px auto 20px;
-      background: rgba(255, 255, 255, 0.1);
+      margin: 15px auto;
+      background: rgba(255,255,255,0.1);
       border-radius: 30px;
       overflow: hidden;
       height: 20px;
@@ -97,14 +101,12 @@
     .progress-text {
       position: absolute;
       width: 100%;
-      height: 100%;
       top: 0;
       left: 0;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 0.9rem;
-      color: #fff;
     }
 
     .grid {
@@ -112,32 +114,28 @@
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 15px;
       max-width: 1000px;
-      margin: 20px auto;
+      margin: 25px auto;
     }
 
     .card {
-      background: rgba(255, 255, 255, 0.05);
+      background: rgba(255,255,255,0.05);
       border-radius: 15px;
       overflow: hidden;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
       transition: transform 0.2s ease;
     }
-
-    .card:hover {
-      transform: scale(1.03);
-    }
+    .card:hover { transform: scale(1.03); }
 
     .card img {
       width: 100%;
       height: 200px;
       object-fit: cover;
-      transition: opacity 0.3s;
     }
 
     .card p {
-      font-size: 0.9rem;
-      margin: 8px 0;
+      margin: 6px 0;
       color: #eee;
+      font-size: 0.9rem;
     }
 
     .download-btn {
@@ -146,23 +144,26 @@
       color: #fff;
       padding: 6px 14px;
       border-radius: 25px;
-      font-size: 0.85rem;
       cursor: pointer;
-      transition: background 0.3s ease;
+      transition: 0.3s;
       margin-bottom: 10px;
     }
 
-    .download-btn:hover {
-      background: #1d4ed8;
-    }
+    .download-btn:hover { background: #1d4ed8; }
   </style>
 </head>
-
 <body>
   <h1>🔍 ค้นหารูปด้วยใบหน้า</h1>
-  <p>อัปโหลดรูปใบหน้าของคุณ (ได้หลายภาพ) เพื่อค้นหารูปใน Gallery ที่คล้ายกัน</p>
+  <p>อัปโหลดรูปใบหน้าของคุณ (ได้หลายภาพ) และปรับระดับความเข้มของการค้นหา</p>
 
   <input type="file" id="uploadInput" accept="image/*" multiple />
+
+  <div class="slider-box">
+    <label for="similarityRange">ระดับความเข้มในการค้นหา:</label><br>
+    <input type="range" id="similarityRange" min="0.4" max="0.65" step="0.01" value="0.55" />
+    <p>🔧 ระดับปัจจุบัน: <span id="similarityLabel">0.55 (ปานกลาง)</span></p>
+  </div>
+
   <div id="status">⏳ รออัปโหลดรูปเพื่อเริ่มค้นหา...</div>
 
   <div class="preview-container" id="previewContainer"></div>
@@ -180,8 +181,9 @@
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
     const BUCKET = "gallery";
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    let allImages = [],
-      modelsLoaded = false;
+
+    let allImages = [];
+    let modelsLoaded = false;
 
     window.onload = async () => {
       await loadModels();
@@ -191,23 +193,20 @@
     // โหลดโมเดล
     async function loadModels() {
       const MODEL_URL = "https://cdn.jsdelivr.net/gh/vladmandic/face-api/model/";
-      await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+      await faceapi.nets.sssdMobilenetv1?.loadFromUri?.(MODEL_URL) ?? faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
       await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
       await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
       modelsLoaded = true;
-      document.getElementById("status").innerText =
-        "✅ พร้อมใช้งานแล้ว กรุณาอัปโหลดรูป (หลายภาพได้)";
+      document.getElementById("status").innerText = "✅ พร้อมใช้งานแล้ว (สามารถอัปโหลดหลายภาพได้)";
     }
 
-    // โหลดรูปทั้งหมดจาก Supabase
+    // โหลดภาพทั้งหมด
     async function loadAllImages() {
       const { data: folders } = await sb.storage.from(BUCKET).list("", { limit: 100 });
       for (const folder of folders) {
         if (!folder.name.startsWith(".")) {
-          const { data: files } = await sb.storage
-            .from(BUCKET)
-            .list(folder.name + "/", { limit: 1000 });
-          files?.forEach((f) => {
+          const { data: files } = await sb.storage.from(BUCKET).list(folder.name + "/", { limit: 1000 });
+          files?.forEach(f => {
             if (/\.(jpg|jpeg|png)$/i.test(f.name)) {
               allImages.push({
                 url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${folder.name}/${f.name}`,
@@ -217,15 +216,26 @@
           });
         }
       }
-      console.log("📸 โหลดรูปทั้งหมดแล้ว:", allImages.length, "ไฟล์");
+      console.log("📸 โหลดรูปทั้งหมดแล้ว:", allImages.length);
     }
 
-    // แสดง preview
-    document.getElementById("uploadInput").addEventListener("change", (e) => {
+    // ปรับแสดงค่า slider
+    const slider = document.getElementById("similarityRange");
+    const label = document.getElementById("similarityLabel");
+    slider.addEventListener("input", () => {
+      const val = parseFloat(slider.value);
+      let level = "ปานกลาง";
+      if (val <= 0.45) level = "เข้ม (แม่นยำสูง)";
+      else if (val >= 0.6) level = "ยืดหยุ่น (ค้นหากว้าง)";
+      label.innerText = `${val.toFixed(2)} (${level})`;
+    });
+
+    // แสดง preview แล้วเริ่มค้นหา
+    document.getElementById("uploadInput").addEventListener("change", e => {
       const files = Array.from(e.target.files);
       const previewContainer = document.getElementById("previewContainer");
       previewContainer.innerHTML = "";
-      files.forEach((file) => {
+      files.forEach(file => {
         const img = document.createElement("img");
         img.src = URL.createObjectURL(file);
         previewContainer.appendChild(img);
@@ -233,81 +243,62 @@
       if (files.length) searchFaces(files);
     });
 
-    // ค้นหาด้วยใบหน้า (หลายภาพ)
+    // ค้นหาใบหน้า
     async function searchFaces(files) {
-      if (!files.length) return;
-      if (!modelsLoaded) return alert("⏳ โมเดลยังโหลดไม่เสร็จ กรุณารอสักครู่");
-
+      const THRESHOLD = parseFloat(slider.value);
       const status = document.getElementById("status");
       const progressBar = document.getElementById("progressBar");
       const progressText = document.getElementById("progressText");
+
+      if (!files.length) return;
+      if (!modelsLoaded) return alert("⏳ โมเดลยังโหลดไม่เสร็จ");
 
       status.innerText = "🔍 กำลังวิเคราะห์ใบหน้า...";
       const descriptors = [];
 
       for (const file of files) {
         const img = await faceapi.bufferToImage(file);
-        const det = await faceapi
-          .detectSingleFace(img)
-          .withFaceLandmarks()
-          .withFaceDescriptor();
+        const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
         if (det) descriptors.push(det.descriptor);
       }
 
-      if (descriptors.length === 0) {
+      if (!descriptors.length) {
         status.innerText = "❌ ไม่พบใบหน้าในภาพที่อัปโหลด";
         return;
       }
 
-      // ใช้ค่าเฉลี่ย descriptor รวมกัน
       const avgDescriptor = new Float32Array(128);
-      for (const desc of descriptors) {
-        for (let i = 0; i < 128; i++)
-          avgDescriptor[i] += desc[i] / descriptors.length;
-      }
+      descriptors.forEach(d => {
+        for (let i = 0; i < 128; i++) avgDescriptor[i] += d[i] / descriptors.length;
+      });
 
       const matches = [];
-      const THRESHOLD = 0.52; // 🎯 ระดับกลาง
       for (let i = 0; i < allImages.length; i++) {
         const img = allImages[i];
         try {
           const refImg = new Image();
           refImg.crossOrigin = "anonymous";
           refImg.src = img.url;
-          await new Promise((res, rej) => {
-            refImg.onload = res;
-            refImg.onerror = rej;
-          });
+          await new Promise((res, rej) => { refImg.onload = res; refImg.onerror = rej; });
 
-          const refDet = await faceapi
-            .detectSingleFace(refImg)
-            .withFaceLandmarks()
-            .withFaceDescriptor();
+          const refDet = await faceapi.detectSingleFace(refImg).withFaceLandmarks().withFaceDescriptor();
           if (!refDet) continue;
 
-          const distance = faceapi.euclideanDistance(
-            avgDescriptor,
-            refDet.descriptor
-          );
+          const distance = faceapi.euclideanDistance(avgDescriptor, refDet.descriptor);
           const confidence = Math.round((1 - distance) * 100);
 
-          if (distance < THRESHOLD && confidence >= 75) {
-            matches.push({ ...img, similarity: confidence });
-          }
-        } catch (err) {
-          console.warn("ข้ามรูป:", img.name);
-        }
+          if (distance < THRESHOLD && confidence >= 50) matches.push({ ...img, similarity: confidence });
+        } catch { }
 
         const percent = Math.round(((i + 1) / allImages.length) * 100);
         progressBar.style.width = `${percent}%`;
         progressText.textContent = `${percent}% (${i + 1}/${allImages.length})`;
-        status.innerText = `🔎 ตรวจสอบ ${i + 1}/${allImages.length} ...`;
       }
 
       matches.sort((a, b) => b.similarity - a.similarity);
-      matches.splice(15); // แสดงสูงสุด 15 ภาพ
+      matches.splice(30);
 
-      if (matches.length === 0) {
+      if (!matches.length) {
         status.innerText = "😢 ไม่พบภาพที่มีใบหน้าคล้ายกัน";
         document.getElementById("resultGrid").innerHTML = "";
       } else {
@@ -319,34 +310,25 @@
       progressText.textContent = "0%";
     }
 
-    // แสดงผลลัพธ์
     function renderResults(list) {
-      const grid = document.getElementById("resultGrid");
-      grid.innerHTML = list
-        .map(
-          (i) => `
+      document.getElementById("resultGrid").innerHTML = list.map(i => `
         <div class="card">
           <img src="${i.url}" alt="${i.name}">
           <p>ความคล้าย: ${i.similarity}%</p>
           <button class="download-btn" onclick="downloadImage('${i.url}', '${i.name}')">📥 ดาวน์โหลด</button>
-        </div>
-      `
-        )
-        .join("");
+        </div>`).join("");
     }
 
-    // ดาวน์โหลดไฟล์
     function downloadImage(url, filename) {
       fetch(url)
-        .then((res) => res.blob())
-        .then((blob) => {
-          const link = document.createElement("a");
-          link.href = URL.createObjectURL(blob);
-          link.download = filename;
-          link.click();
-          URL.revokeObjectURL(link.href);
-        })
-        .catch(() => alert("❌ ดาวน์โหลดไม่สำเร็จ"));
+        .then(res => res.blob())
+        .then(blob => {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(a.href);
+        });
     }
   </script>
 </body>
