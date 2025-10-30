@@ -112,35 +112,49 @@
 
   ul { list-style: none; padding: 0; margin: 0; }
 
-  /* ✅ แก้ชื่อไฟล์ไม่ให้ตกบรรทัด */
+  /* ✅ แสดง thumbnail + ปรับชื่อไม่ตกบรรทัด */
   li {
     padding: 10px 8px;
     border-bottom: 1px solid var(--border);
     display: flex;
-    justify-content: space-between;
     align-items: center;
     gap: 12px;
     flex-wrap: nowrap;
-    word-break: normal;
+  }
+
+  li img.thumb {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+  li img.thumb:hover { transform: scale(1.05); }
+
+  .file-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
   }
 
   li .filename {
-    display: inline-block;
     flex: 1 1 auto;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    vertical-align: middle;
     color: #38bdf8;
     cursor: pointer;
     text-decoration: underline;
   }
-
   li .filename:hover { color: var(--gold); }
 
-  li > div {
-    flex: 0 0 auto;
+  li .file-actions {
+    flex-shrink: 0;
     text-align: right;
     display: flex;
     flex-direction: column;
@@ -177,7 +191,7 @@
     body { padding: 15px; }
     h1 { font-size: 1.5rem; }
     li { gap: 8px; }
-    li .filename { max-width: 70%; }
+    li .filename { max-width: 65%; }
   }
 </style>
 </head>
@@ -264,15 +278,11 @@ function showUploadSection() {
   listFiles(true);
 }
 
-// ✅ ปุ่มรีเฟรชปลอดภัย
 async function refreshFiles() {
   const btn = document.getElementById('refreshBtn');
   const status = document.getElementById('status');
   try {
-    if (!userId) {
-      status.innerText = "⚠️ กรุณาเข้าสู่ระบบก่อนรีเฟรช";
-      return;
-    }
+    if (!userId) { status.innerText = "⚠️ กรุณาเข้าสู่ระบบก่อนรีเฟรช"; return; }
     btn.disabled = true;
     status.innerText = "⏳ กำลังรีเฟรชรายการไฟล์...";
     await listFiles(true);
@@ -339,13 +349,17 @@ function renderFileList(files) {
   list.innerHTML = files.map(f => {
     const time = new Date(f.created_at || Date.now()).toLocaleString("th-TH", { hour12: false });
     const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${f.name}`;
-    return `<li>
-      <span class="filename" title="${escapeHtml(f.name)}" onclick="openModal('${imgUrl}')">${f.name}</span>
-      <div>
-        <small style="opacity:0.7;">${time}</small>
-        <button class="delete-btn" onclick="deleteFile('${f.name}')">ลบ</button>
-      </div>
-    </li>`;
+    return `
+      <li>
+        <img src="${imgUrl}" class="thumb" onclick="openModal('${imgUrl}')">
+        <div class="file-info">
+          <span class="filename" title="${escapeHtml(f.name)}" onclick="openModal('${imgUrl}')">${f.name}</span>
+          <div class="file-actions">
+            <small style="opacity:0.7;">${time}</small>
+            <button class="delete-btn" onclick="deleteFile('${f.name}')">ลบ</button>
+          </div>
+        </div>
+      </li>`;
   }).join("");
 }
 
