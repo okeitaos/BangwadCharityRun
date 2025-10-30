@@ -92,6 +92,7 @@
 
   <div id="uploadSection" style="display:none;">
     <div id="userProfile"></div>
+    <p id="fileCount"></p>
     <input type="file" id="fileInput" multiple accept="image/*"><br>
     <button class="btn-green" onclick="uploadFilesChecked()">📤 อัปโหลด</button>
     <button class="btn-green" onclick="refreshFiles()">🔄 รีเฟรช</button>
@@ -112,7 +113,7 @@ const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const LIFF_ID = "2001781240-k2PJ3Ap2";
 let userId = "", userName = "", userPic = "";
-const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_SIZE = 5 * 1024 * 1024;
 const MAX_FILES = 1000;
 
 async function main() {
@@ -148,18 +149,25 @@ async function uploadFilesChecked() {
     files = files.slice(0, MAX_FILES);
   }
 
+  // reset
+  progress.style.width = "0%";
+  status.innerText = "⏳ กำลังตรวจสอบไฟล์...";
+
   const { data: existing } = await sb.from("file_hashes").select("hash").eq("user_id", userId);
   const existingHashes = new Set(existing?.map(e => e.hash) || []);
-  let success = 0, skippedDup = 0, skippedBig = 0;
 
+  let success = 0, skippedDup = 0, skippedBig = 0;
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
     if (f.size > MAX_SIZE) { skippedBig++; continue; }
+
     const hash = await getFileHash(f);
     if (existingHashes.has(hash)) { skippedDup++; continue; }
 
     const filename = `${Date.now()}_${f.name.replace(/\s+/g, "_")}`;
     const path = `${userId}/${filename}`;
+
+    status.innerText = `📤 กำลังอัปโหลด (${i + 1}/${files.length}) ...`;
     const { error } = await sb.storage.from(BUCKET).upload(path, f);
     if (!error) {
       success++;
@@ -174,16 +182,25 @@ async function uploadFilesChecked() {
     progress.style.width = `${((i + 1) / files.length) * 100}%`;
   }
 
-  status.innerText = `✅ สำเร็จ ${success} ไฟล์, 🔁 ซ้ำ ${skippedDup}, 🚫 เกินขนาด ${skippedBig}`;
+  status.innerText = `✅ อัปโหลดสำเร็จ ${success} | 🔁 ซ้ำ ${skippedDup} | 🚫 เกินขนาด ${skippedBig}`;
   input.value = "";
-  progress.style.width = "100%";
+  setTimeout(() => progress.style.width = "0%", 1500);
   listFiles();
 }
 
 async function listFiles() {
   const { data } = await sb.from("file_hashes").select("*").eq("user_id", userId).order("created_at", { ascending: false });
   const list = document.getElementById("fileList");
-  if (!data?.length) return list.innerHTML = "<li>ไม่มีไฟล์</li>";
+  const count = document.getElementById("fileCount");
+
+  if (!data?.length) {
+    list.innerHTML = "<li>ไม่มีไฟล์</li>";
+    count.innerText = "📸 ยังไม่มีรูปในแกลเลอรี";
+    return;
+  }
+
+  count.innerText = `📸 จำนวนรูปทั้งหมด: ${data.length} รูป`;
+
   list.innerHTML = data.map(f => `
     <li>
       <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${f.filename}" class="thumb">
@@ -211,7 +228,7 @@ async function deleteAllFiles() {
 
 async function refreshFiles() {
   document.getElementById("progressBar").style.width = "0%";
-  document.getElementById("status").innerText = "🔄 รีเฟรชเสร็จสิ้น";
+  document.getElementById("status").innerText = "🔄 เคลียร์ progress bar แล้ว";
   setTimeout(() => document.getElementById("status").innerText = "", 1500);
 }
 
