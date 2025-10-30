@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>🔍 ค้นหารูปด้วยใบหน้า | BCR RUN GALLERY</title>
 
   <!-- Face Recognition -->
   <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
   <!-- Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet" />
 
   <style>
     body {
@@ -21,24 +21,31 @@
       min-height: 100vh;
       padding: 20px;
     }
+
     h1 {
       color: #facc15;
       margin-bottom: 10px;
-      text-shadow: 0 0 10px rgba(250,204,21,0.4);
+      text-shadow: 0 0 10px rgba(250, 204, 21, 0.4);
     }
-    p { opacity: 0.85; }
+
+    p {
+      opacity: 0.85;
+    }
 
     #uploadInput {
       margin: 20px 0;
       padding: 10px;
       border-radius: 25px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.2);
       color: #fff;
       cursor: pointer;
       transition: all 0.3s;
     }
-    #uploadInput:hover { background: rgba(255,255,255,0.15); }
+
+    #uploadInput:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
 
     #status {
       margin: 10px;
@@ -50,11 +57,12 @@
       width: 80%;
       max-width: 600px;
       margin: 10px auto 20px;
-      background: rgba(255,255,255,0.1);
+      background: rgba(255, 255, 255, 0.1);
       border-radius: 30px;
       overflow: hidden;
       height: 20px;
     }
+
     .progress-bar {
       height: 100%;
       width: 0%;
@@ -72,20 +80,28 @@
     }
 
     .card {
-      background: rgba(255,255,255,0.05);
+      background: rgba(255, 255, 255, 0.05);
       border-radius: 15px;
       overflow: hidden;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
       transition: transform 0.2s ease;
     }
-    .card:hover { transform: scale(1.03); }
+
+    .card:hover {
+      transform: scale(1.03);
+    }
+
     .card img {
       width: 100%;
       height: 200px;
       object-fit: cover;
       transition: opacity 0.3s;
     }
-    .card img:hover { opacity: 0.9; }
+
+    .card img:hover {
+      opacity: 0.9;
+    }
+
     .card p {
       font-size: 0.9rem;
       margin: 8px 0;
@@ -103,14 +119,17 @@
       transition: background 0.3s ease;
       margin-bottom: 10px;
     }
-    .download-btn:hover { background: #1d4ed8; }
+
+    .download-btn:hover {
+      background: #1d4ed8;
+    }
   </style>
 </head>
 <body>
   <h1>🔍 ค้นหารูปด้วยใบหน้า</h1>
   <p>อัปโหลดรูปใบหน้าของคุณ เพื่อค้นหารูปใน Gallery ที่มีใบหน้าคล้ายกัน</p>
 
-  <input type="file" id="uploadInput" accept="image/*">
+  <input type="file" id="uploadInput" accept="image/*" />
   <div id="status">⏳ กำลังโหลดโมเดล AI...</div>
 
   <div class="progress-container">
@@ -119,107 +138,113 @@
 
   <div class="grid" id="resultGrid"></div>
 
-<script>
-const SEARCH_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/search_face"; // ✅ เปลี่ยนตามโปรเจกต์คุณ
-const MODEL_URL = "https://cdn.jsdelivr.net/gh/vladmandic/face-api/model/";
+  <script>
+    const SEARCH_URL =
+      "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/search_face"; // ✅ Edge Function
+    const MODEL_URL = "https://cdn.jsdelivr.net/gh/vladmandic/face-api/model/";
 
-let modelsLoaded = false;
+    let modelsLoaded = false;
 
-// ✅ โหลดโมเดล AI
-async function loadModels() {
-  await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-  await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-  await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-  modelsLoaded = true;
-  document.getElementById("status").innerText = "✅ พร้อมใช้งานแล้ว กรุณาอัปโหลดรูป";
-}
-loadModels();
-
-// ✅ เมื่อเลือกไฟล์ภาพ
-document.getElementById("uploadInput").addEventListener("change", async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  if (!modelsLoaded) return alert("⏳ กำลังโหลดโมเดล AI... กรุณารอสักครู่");
-
-  const status = document.getElementById("status");
-  const progressBar = document.getElementById("progressBar");
-  const resultGrid = document.getElementById("resultGrid");
-
-  status.innerText = "🧠 กำลังวิเคราะห์ใบหน้า...";
-  progressBar.style.width = "30%";
-
-  // ✅ แปลงภาพเป็น descriptor (vector)
-  const img = await faceapi.bufferToImage(file);
-  const detection = await faceapi
-    .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 }))
-    .withFaceLandmarks()
-    .withFaceDescriptor();
-
-  if (!detection) {
-    status.innerText = "❌ ไม่พบใบหน้าในภาพนี้";
-    progressBar.style.width = "0%";
-    return;
-  }
-
-  progressBar.style.width = "60%";
-  status.innerText = "🔍 กำลังค้นหาภาพในระบบ...";
-
-  // ✅ ส่ง descriptor ไปค้นหาที่ Supabase Edge Function
-  const descriptor = Array.from(detection.descriptor);
-  try {
-    const res = await fetch(SEARCH_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ descriptor, limit: 20 })
-    });
-
-    if (!res.ok) throw new Error("ค้นหาไม่สำเร็จ");
-
-    const data = await res.json();
-    const results = data.results || [];
-
-    progressBar.style.width = "100%";
-
-    if (results.length === 0) {
-      status.innerText = "😢 ไม่พบภาพที่มีใบหน้าคล้ายกัน";
-      resultGrid.innerHTML = "";
-    } else {
-      status.innerText = `✅ พบ ${results.length} ภาพที่มีใบหน้าคล้ายกัน`;
-      renderResults(results);
+    // ✅ โหลดโมเดล
+    async function loadModels() {
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+      await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+      modelsLoaded = true;
+      document.getElementById("status").innerText =
+        "✅ พร้อมใช้งานแล้ว กรุณาอัปโหลดรูป";
     }
-  } catch (err) {
-    console.error(err);
-    status.innerText = "❌ เกิดข้อผิดพลาดในการค้นหา";
-  }
+    loadModels();
 
-  progressBar.style.width = "0%";
-  e.target.value = "";
-});
+    // ✅ อัปโหลดภาพ
+    document
+      .getElementById("uploadInput")
+      .addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (!modelsLoaded)
+          return alert("⏳ รอโมเดลโหลดให้เสร็จก่อนใช้งาน");
 
-// ✅ แสดงผลลัพธ์
-function renderResults(list) {
-  const grid = document.getElementById("resultGrid");
-  grid.innerHTML = list.map(i => `
-    <div class="card">
-      <img src="${i.image_url}" alt="result">
-      <p>ความคล้าย ${(100 - i.distance * 100).toFixed(1)}%</p>
-      <button class="download-btn" onclick="downloadImage('${i.image_url}')">📥 ดาวน์โหลด</button>
-    </div>
-  `).join("");
-}
+        const status = document.getElementById("status");
+        const progressBar = document.getElementById("progressBar");
+        const resultGrid = document.getElementById("resultGrid");
 
-// ✅ ดาวน์โหลดภาพ
-function downloadImage(url) {
-  fetch(url)
-    .then(res => res.blob())
-    .then(blob => {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = url.split("/").pop();
-      a.click();
-      URL.revokeObjectURL(a.href);
-    });
-}
-</script>
+        status.innerText = "🧠 กำลังวิเคราะห์ใบหน้า...";
+        progressBar.style.width = "25%";
+
+        const img = await faceapi.bufferToImage(file);
+        const detection = await faceapi
+          .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+
+        if (!detection) {
+          status.innerText = "❌ ไม่พบใบหน้าในภาพนี้";
+          progressBar.style.width = "0%";
+          return;
+        }
+
+        progressBar.style.width = "60%";
+        status.innerText = "🔍 กำลังค้นหาภาพในระบบ...";
+
+        const descriptor = Array.from(detection.descriptor);
+
+        try {
+          const res = await fetch(SEARCH_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ descriptor, limit: 20 }),
+          });
+
+          if (!res.ok) throw new Error("ค้นหาไม่สำเร็จ");
+          const data = await res.json();
+          const results = data.results || [];
+
+          progressBar.style.width = "100%";
+
+          if (results.length === 0) {
+            status.innerText = "😢 ไม่พบภาพที่มีใบหน้าคล้ายกัน";
+            resultGrid.innerHTML = "";
+          } else {
+            status.innerText = `✅ พบ ${results.length} ภาพที่มีใบหน้าคล้ายกัน`;
+            renderResults(results);
+          }
+        } catch (err) {
+          console.error(err);
+          status.innerText = "❌ เกิดข้อผิดพลาดในการค้นหา";
+        }
+
+        progressBar.style.width = "0%";
+        e.target.value = "";
+      });
+
+    // ✅ แสดงผลลัพธ์
+    function renderResults(list) {
+      const grid = document.getElementById("resultGrid");
+      grid.innerHTML = list
+        .map(
+          (i) => `
+        <div class="card">
+          <img src="${i.image_url}" alt="result" />
+          <p>ความคล้าย ${(100 - i.distance * 100).toFixed(1)}%</p>
+          <button class="download-btn" onclick="downloadImage('${i.image_url}')">📥 ดาวน์โหลด</button>
+        </div>`
+        )
+        .join("");
+    }
+
+    // ✅ ดาวน์โหลดภาพ
+    function downloadImage(url) {
+      fetch(url)
+        .then((res) => res.blob())
+        .then((blob) => {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = url.split("/").pop();
+          a.click();
+          URL.revokeObjectURL(a.href);
+        });
+    }
+  </script>
 </body>
 </html>
