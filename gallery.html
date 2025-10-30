@@ -32,7 +32,7 @@
 
     p { opacity: 0.85; }
 
-    #uploadInput {
+    input[type="file"] {
       margin: 15px 0;
       padding: 10px;
       border-radius: 25px;
@@ -42,7 +42,7 @@
       cursor: pointer;
       transition: all 0.3s;
     }
-    #uploadInput:hover { background: rgba(255,255,255,0.15); }
+    input[type="file"]:hover { background: rgba(255,255,255,0.15); }
 
     #status {
       color: #facc15;
@@ -78,6 +78,19 @@
     input[type="range"] {
       width: 80%;
     }
+
+    button {
+      background: linear-gradient(90deg, #06C755, #00B900);
+      border: none;
+      border-radius: 25px;
+      padding: 10px 20px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.3s;
+      margin: 10px 5px;
+    }
+    button:hover { opacity: 0.9; transform: scale(1.02); }
 
     .progress-container {
       width: 80%;
@@ -159,10 +172,12 @@
   <input type="file" id="uploadInput" accept="image/*" multiple />
 
   <div class="slider-box">
-    <label for="similarityRange">ระดับความเข้มในการค้นหา:</label><br>
+    <label for="similarityRange">ระดับความเข้มของการค้นหา:</label><br>
     <input type="range" id="similarityRange" min="0.4" max="0.65" step="0.01" value="0.55" />
     <p>🔧 ระดับปัจจุบัน: <span id="similarityLabel">0.55 (ปานกลาง)</span></p>
   </div>
+
+  <button id="clearBtn">🧹 ค้นหาใหม่</button>
 
   <div id="status">⏳ รออัปโหลดรูปเพื่อเริ่มค้นหา...</div>
 
@@ -190,17 +205,15 @@
       await loadAllImages();
     };
 
-    // โหลดโมเดล
     async function loadModels() {
       const MODEL_URL = "https://cdn.jsdelivr.net/gh/vladmandic/face-api/model/";
-      await faceapi.nets.sssdMobilenetv1?.loadFromUri?.(MODEL_URL) ?? faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+      await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
       await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
       await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
       modelsLoaded = true;
-      document.getElementById("status").innerText = "✅ พร้อมใช้งานแล้ว (สามารถอัปโหลดหลายภาพได้)";
+      document.getElementById("status").innerText = "✅ พร้อมใช้งานแล้ว";
     }
 
-    // โหลดภาพทั้งหมด
     async function loadAllImages() {
       const { data: folders } = await sb.storage.from(BUCKET).list("", { limit: 100 });
       for (const folder of folders) {
@@ -219,7 +232,6 @@
       console.log("📸 โหลดรูปทั้งหมดแล้ว:", allImages.length);
     }
 
-    // ปรับแสดงค่า slider
     const slider = document.getElementById("similarityRange");
     const label = document.getElementById("similarityLabel");
     slider.addEventListener("input", () => {
@@ -230,7 +242,17 @@
       label.innerText = `${val.toFixed(2)} (${level})`;
     });
 
-    // แสดง preview แล้วเริ่มค้นหา
+    document.getElementById("clearBtn").addEventListener("click", clearSearch);
+
+    function clearSearch() {
+      document.getElementById("previewContainer").innerHTML = "";
+      document.getElementById("resultGrid").innerHTML = "";
+      document.getElementById("progressBar").style.width = "0%";
+      document.getElementById("progressText").textContent = "0%";
+      document.getElementById("status").innerText = "🧹 รีเซ็ตเรียบร้อย กรุณาอัปโหลดรูปใหม่";
+      document.getElementById("uploadInput").value = "";
+    }
+
     document.getElementById("uploadInput").addEventListener("change", e => {
       const files = Array.from(e.target.files);
       const previewContainer = document.getElementById("previewContainer");
@@ -243,7 +265,6 @@
       if (files.length) searchFaces(files);
     });
 
-    // ค้นหาใบหน้า
     async function searchFaces(files) {
       const THRESHOLD = parseFloat(slider.value);
       const status = document.getElementById("status");
@@ -287,8 +308,9 @@
           const distance = faceapi.euclideanDistance(avgDescriptor, refDet.descriptor);
           const confidence = Math.round((1 - distance) * 100);
 
-          if (distance < THRESHOLD && confidence >= 50) matches.push({ ...img, similarity: confidence });
-        } catch { }
+          if (distance < THRESHOLD && confidence >= 50)
+            matches.push({ ...img, similarity: confidence });
+        } catch {}
 
         const percent = Math.round(((i + 1) / allImages.length) * 100);
         progressBar.style.width = `${percent}%`;
