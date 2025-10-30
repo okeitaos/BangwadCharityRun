@@ -90,6 +90,22 @@
     color: #f1f5f9;
   }
 
+  .download-btn {
+    background: linear-gradient(90deg, #2563eb, #3b82f6);
+    border: none;
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 25px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    margin-top: 6px;
+  }
+
+  .download-btn:hover {
+    background: #1d4ed8;
+  }
+
   #cacheInfo {
     margin-top: 10px;
     color: #9ca3af;
@@ -98,7 +114,7 @@
 </head>
 <body>
   <h1>📸 ค้นหารูปจากใบหน้า</h1>
-  <p>เลือกภาพใบหน้าของคุณ ระบบจะช่วยค้นหารูปทั้งหมดในคลังที่มีใบหน้าคล้ายกัน</p>
+  <p>เลือกภาพใบหน้าของคุณ ระบบจะค้นหารูปทั้งหมดในคลังที่มีใบหน้าคล้ายกัน</p>
 
   <input type="file" id="uploadInput" accept="image/*" value="เลือกภาพของคุณ">
   <div id="status">⏳ กำลังโหลดระบบ...</div>
@@ -137,7 +153,7 @@ async function idbGetAll() {
 }
 async function idbPut(item) {
   const db = await openDb();
-  const tx = db.transaction(DB_STORE, "readwrite").objectStore(DB_STORE).put(item);
+  db.transaction(DB_STORE, "readwrite").objectStore(DB_STORE).put(item);
 }
 
 async function loadModels() {
@@ -206,9 +222,23 @@ document.getElementById("uploadInput").addEventListener("change", async e => {
   grid.innerHTML = results.slice(0, 50).map(r => `
     <div class="card">
       <img src="${r.url}" alt="${r.name}">
-      <p>${r.name}<br><small>ความคล้าย ${(1 - r.distance).toFixed(3)}</small></p>
+      <p>${r.name}<br><small>ความคล้าย ${(100 - r.distance * 100).toFixed(1)}%</small></p>
+      <button class="download-btn" onclick="downloadImage('${r.url}', '${r.name}')">📥 ดาวน์โหลด</button>
     </div>`).join("");
 });
+
+function downloadImage(url, filename) {
+  fetch(url)
+    .then(res => res.blob())
+    .then(blob => {
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    })
+    .catch(() => alert("❌ ดาวน์โหลดไม่สำเร็จ"));
+}
 
 (async () => {
   await loadModels();
