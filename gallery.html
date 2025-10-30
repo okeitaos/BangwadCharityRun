@@ -235,7 +235,8 @@ document.getElementById("uploadInput").addEventListener("change", async (e) => {
       const distance = faceapi.euclideanDistance(userDesc, refDetection.descriptor);
       const confidence = Math.round((1 - distance) * 100);
 
-      if (distance < 0.45 && confidence >= 85) {
+      // พื้นที่ตรวจสอบใบหน้า 0.6 - 0.45
+      if (distance < 0.6 && confidence >= 85) {
         matches.push({ ...img, similarity: confidence });
       }
 
