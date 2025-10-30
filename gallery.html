@@ -1,194 +1,232 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>🔍 ค้นหารูปด้วยใบหน้า (Auto Cache)</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>📸 ค้นหารูปด้วยใบหน้า | BCR RUN GALLERY</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet">
 
 <style>
-  body{font-family:"Prompt",sans-serif;margin:0;background:#0f172a;color:#fff;text-align:center;padding:20px}
-  h1{color:#facc15}
-  #uploadInput{margin:12px;padding:10px;border-radius:14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12)}
-  #status{color:#facc15;margin:8px;font-weight:600}
-  .progress{width:80%;max-width:900px;margin:14px auto;background:rgba(255,255,255,0.06);height:18px;border-radius:9px;overflow:hidden}
-  .bar{height:100%;width:0%;background:linear-gradient(90deg,#22c55e,#84cc16);transition:width .2s}
-  .controls{margin:12px}
-  button{margin:6px;padding:8px 14px;border-radius:12px;border:none;cursor:pointer}
-  .btn{background:#06C755;color:#fff}
-  .btn-muted{background:#334155;color:#fff}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;max-width:1100px;margin:18px auto}
-  .card{background:rgba(255,255,255,0.04);border-radius:12px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,0.4)}
-  .card img{width:100%;height:180px;object-fit:cover}
-  .card p{margin:8px;color:#eee}
-  small{opacity:.75}
-  #cacheInfo{margin-top:8px;color:#cbd5e1}
+  body {
+    font-family: "Prompt", sans-serif;
+    margin: 0;
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: #fff;
+    text-align: center;
+    padding: 20px;
+  }
+
+  h1 {
+    color: #facc15;
+    text-shadow: 0 0 8px rgba(250,204,21,0.3);
+  }
+
+  #status {
+    margin: 10px auto;
+    font-size: 1.1rem;
+  }
+
+  #uploadInput {
+    margin: 20px;
+    padding: 12px;
+    border-radius: 25px;
+    background: #06c755;
+    border: none;
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    width: 80%;
+    max-width: 300px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    transition: 0.2s;
+  }
+
+  #uploadInput:hover {
+    background: #00b900;
+  }
+
+  .progress-container {
+    width: 90%;
+    max-width: 600px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    margin: 10px auto;
+    overflow: hidden;
+  }
+
+  .progress-bar {
+    height: 20px;
+    width: 0%;
+    background: linear-gradient(90deg, #22c55e, #84cc16);
+    transition: width 0.3s ease;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 25px;
+  }
+
+  .card {
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  }
+
+  .card img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+
+  .card p {
+    margin: 6px 0;
+    color: #f1f5f9;
+  }
+
+  #cacheInfo {
+    margin-top: 10px;
+    color: #9ca3af;
+  }
 </style>
 </head>
 <body>
-  <h1>🔍 ค้นหารูปด้วยใบหน้า (Auto Cache)</h1>
-  <p>ระบบจะสร้าง descriptor อัตโนมัติสำหรับรูปใหม่ทุกครั้งที่เปิดหน้านี้</p>
+  <h1>📸 ค้นหารูปจากใบหน้า</h1>
+  <p>เลือกภาพใบหน้าของคุณ ระบบจะช่วยค้นหารูปทั้งหมดในคลังที่มีใบหน้าคล้ายกัน</p>
 
-  <input id="uploadInput" type="file" accept="image/*">
-  <div id="status">⏳ โหลดโมเดลและข้อมูล...</div>
+  <input type="file" id="uploadInput" accept="image/*" value="เลือกภาพของคุณ">
+  <div id="status">⏳ กำลังโหลดระบบ...</div>
 
-  <div class="progress"><div id="bar" class="bar"></div></div>
+  <div class="progress-container"><div id="progressBar" class="progress-bar"></div></div>
 
-  <div class="controls">
-    <button id="btnClear" class="btn-muted">🗑️ ล้าง Cache</button>
-    <button id="btnReindex" class="btn">🔁 รีคาลคูเลตทั้งหมด</button>
-    <span id="cacheInfo"></span>
-  </div>
-
+  <div id="cacheInfo"></div>
   <div id="resultGrid" class="grid"></div>
 
 <script>
-/* === CONFIG === */
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const MODEL_URL = "https://cdn.jsdelivr.net/gh/vladmandic/face-api/model/";
 const DB_NAME = "face-cache", DB_STORE = "descriptors";
-const BATCH_SIZE = 25;
 
-/* === IndexedDB === */
-function openDb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains(DB_STORE)){db.createObjectStore(DB_STORE,{keyPath:"url"})}};r.onsuccess=e=>res(e.target.result);r.onerror=e=>rej(e.target.error)})}
-async function idbGetAll(){const db=await openDb();return new Promise((res,rej)=>{const t=db.transaction(DB_STORE,"readonly");const s=t.objectStore(DB_STORE);const q=s.getAll();q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
-async function idbPut(item){const db=await openDb();return new Promise((res,rej)=>{const t=db.transaction(DB_STORE,"readwrite");const s=t.objectStore(DB_STORE);const q=s.put(item);q.onsuccess=()=>res(true);q.onerror=()=>rej(q.error)})}
-async function idbClear(){const db=await openDb();return new Promise((res,rej)=>{const t=db.transaction(DB_STORE,"readwrite");const s=t.objectStore(DB_STORE);const q=s.clear();q.onsuccess=()=>res(true);q.onerror=()=>rej(q.error)})}
+async function openDb() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE, { keyPath: "url" });
+    };
+    r.onsuccess = e => res(e.target.result);
+    r.onerror = e => rej(e.target.error);
+  });
+}
+async function idbGetAll() {
+  const db = await openDb();
+  return new Promise((res, rej) => {
+    const t = db.transaction(DB_STORE, "readonly").objectStore(DB_STORE).getAll();
+    t.onsuccess = () => res(t.result);
+    t.onerror = e => rej(e);
+  });
+}
+async function idbPut(item) {
+  const db = await openDb();
+  const tx = db.transaction(DB_STORE, "readwrite").objectStore(DB_STORE).put(item);
+}
 
-/* === FaceAPI === */
-let modelsLoaded=false;
-async function loadModels(){
-  const s=document.getElementById("status");
-  s.innerText="⏳ กำลังโหลดโมเดล...";
+async function loadModels() {
+  document.getElementById("status").innerText = "🧠 กำลังโหลดโมเดลตรวจจับใบหน้า...";
   await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
   await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
   await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-  modelsLoaded=true;
-  s.innerText="✅ โมเดลพร้อมใช้งาน";
+  document.getElementById("status").innerText = "✅ พร้อมใช้งานแล้ว";
 }
-function euclid(a,b){let sum=0;for(let i=0;i<a.length;i++){const d=a[i]-b[i];sum+=d*d;}return Math.sqrt(sum);}
-async function descriptorFromUrl(url){const img=await faceapi.fetchImage(url);const det=await faceapi.detectSingleFace(img,new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();return det?Array.from(det.descriptor):null;}
-async function descriptorFromFile(file){const img=await faceapi.bufferToImage(file);const det=await faceapi.detectSingleFace(img,new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();return det?Array.from(det.descriptor):null;}
 
-/* === Supabase list === */
-async function listAllImages(){
-  const {data:folders}=await sb.storage.from(BUCKET).list("",{limit:100});
-  const images=[];
-  for(const folder of folders||[]){
-    if(!folder.name||folder.name.startsWith("."))continue;
-    const {data:files}=await sb.storage.from(BUCKET).list(folder.name+"/",{limit:10000});
-    for(const f of files||[]){
-      if(/\.(jpe?g|png)$/i.test(f.name)){
-        images.push({url:`${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${folder.name}/${f.name}`,name:f.name,folder:folder.name});
+async function listAllImages() {
+  const { data: folders } = await sb.storage.from(BUCKET).list("", { limit: 100 });
+  const list = [];
+  for (const folder of folders || []) {
+    const { data: files } = await sb.storage.from(BUCKET).list(folder.name + "/", { limit: 500 });
+    for (const f of files || []) {
+      if (/\.(jpg|jpeg|png)$/i.test(f.name)) {
+        list.push({
+          url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${folder.name}/${f.name}`,
+          name: f.name
+        });
       }
     }
   }
-  return images;
+  return list;
 }
 
-/* === Cache handling === */
-async function ensureCacheIndexed(allImages){
-  const status=document.getElementById("status");
-  const bar=document.getElementById("bar");
-  const cached=await idbGetAll();
-  const cachedMap=new Map(cached.map(c=>[c.url,c]));
-  const missing=allImages.filter(img=>!cachedMap.has(img.url));
-  if(missing.length===0){status.innerText=`✅ Cache พร้อม (${cached.length} รายการ)`;updateCacheInfo();return;}
-  status.innerText=`⚙️ พบ ${missing.length} รูปใหม่ กำลังสร้าง descriptor...`;
-  let done=0;
-  for(let i=0;i<missing.length;i+=BATCH_SIZE){
-    const batch=missing.slice(i,i+BATCH_SIZE);
-    await Promise.all(batch.map(async img=>{
-      try{
-        const desc=await descriptorFromUrl(img.url);
-        await idbPut({url:img.url,name:img.name,folder:img.folder,descriptor:desc});
-      }catch{await idbPut({url:img.url,name:img.name,folder:img.folder,descriptor:null,noface:true});}
-    }));
-    done+=batch.length;
-    bar.style.width=Math.min((done/missing.length)*100,100)+"%";
-    await new Promise(r=>setTimeout(r,80));
+async function descriptorFromUrl(url) {
+  const img = await faceapi.fetchImage(url);
+  const det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+  return det ? Array.from(det.descriptor) : null;
+}
+function euclid(a, b) {
+  let sum = 0; for (let i = 0; i < a.length; i++) { const d = a[i] - b[i]; sum += d * d; }
+  return Math.sqrt(sum);
+}
+
+document.getElementById("uploadInput").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const status = document.getElementById("status");
+  const grid = document.getElementById("resultGrid");
+  const progress = document.getElementById("progressBar");
+  status.innerText = "🕵️‍♀️ กำลังวิเคราะห์ใบหน้า...";
+  const userImg = await faceapi.bufferToImage(file);
+  const det = await faceapi.detectSingleFace(userImg, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+  if (!det) { status.innerText = "❌ ไม่พบใบหน้าในภาพที่อัปโหลด"; return; }
+
+  const q = det.descriptor;
+  const cache = await idbGetAll();
+  const valid = cache.filter(c => c.descriptor && c.descriptor.length > 0);
+  if (valid.length === 0) { status.innerText = "⚙️ ระบบยังไม่พร้อม กรุณารอให้โหลดข้อมูลก่อน"; return; }
+
+  status.innerText = "🔍 กำลังค้นหารูปที่คล้ายกัน...";
+  const results = [];
+  for (let i = 0; i < valid.length; i++) {
+    const d = euclid(q, valid[i].descriptor);
+    if (d < 0.6) results.push({ ...valid[i], distance: d });
+    progress.style.width = `${(i / valid.length) * 100}%`;
+    await new Promise(r => setTimeout(r, 5));
   }
-  bar.style.width="0%";
-  status.innerText=`✅ สร้าง descriptor เสร็จ (${missing.length})`;
-  updateCacheInfo();
-}
+  progress.style.width = "0%";
 
-/* === Search === */
-async function onSearchFile(file){
-  const status=document.getElementById("status");
-  const bar=document.getElementById("bar");
-  const grid=document.getElementById("resultGrid");
-  if(!modelsLoaded)return alert("รอโหลดโมเดลก่อน");
-  status.innerText="🔍 วิเคราะห์ใบหน้า...";
-  const q=await descriptorFromFile(file);
-  if(!q){status.innerText="❌ ไม่พบใบหน้าในภาพ";return;}
-  const cache=await idbGetAll();
-  const valid=cache.filter(c=>Array.isArray(c.descriptor)&&c.descriptor.length>0);
-  if(!valid.length){status.innerText="⚠️ ยังไม่มี descriptor ในเครื่อง";return;}
-  const results=[];
-  const chunk=300;
-  for(let i=0;i<valid.length;i+=chunk){
-    const part=valid.slice(i,i+chunk);
-    for(const item of part){
-      const d=euclid(q,item.descriptor);
-      if(d<0.6)results.push({...item,distance:d});
-    }
-    bar.style.width=Math.min(((i+chunk)/valid.length)*100,100)+"%";
-    await new Promise(r=>setTimeout(r,10));
-  }
-  bar.style.width="0%";
-  if(!results.length){status.innerText="😢 ไม่พบภาพที่คล้ายกัน";grid.innerHTML="";return;}
-  results.sort((a,b)=>a.distance-b.distance);
-  status.innerText=`✅ พบ ${results.length} ภาพที่คล้ายกัน (แสดง top 50)`;
-  renderResults(results.slice(0,50));
-}
-function renderResults(list){
-  const g=document.getElementById("resultGrid");
-  g.innerHTML=list.map(i=>`
-  <div class="card">
-    <img src="${i.url}">
-    <p>${i.name}<br><small>ระยะห่าง: ${i.distance.toFixed(3)}</small></p>
-  </div>`).join("");
-}
-
-/* === UI + Events === */
-document.getElementById("uploadInput").addEventListener("change",async e=>{
-  const f=e.target.files[0];if(!f)return;await onSearchFile(f);
-});
-document.getElementById("btnClear").addEventListener("click",async()=>{
-  if(confirm("ล้าง Cache บนเครื่องใช่ไหม?")){await idbClear();updateCacheInfo();document.getElementById("status").innerText="🗑️ Cache ถูกล้าง";}
-});
-document.getElementById("btnReindex").addEventListener("click",async()=>{
-  document.getElementById("status").innerText="🔁 สร้าง descriptor ทั้งหมดใหม่...";
-  const imgs=await listAllImages();await ensureCacheIndexed(imgs);
+  if (results.length === 0) { status.innerText = "😢 ไม่พบรูปที่คล้ายกัน"; grid.innerHTML = ""; return; }
+  status.innerText = `✅ พบ ${results.length} ภาพที่คล้ายกัน`;
+  grid.innerHTML = results.slice(0, 50).map(r => `
+    <div class="card">
+      <img src="${r.url}" alt="${r.name}">
+      <p>${r.name}<br><small>ความคล้าย ${(1 - r.distance).toFixed(3)}</small></p>
+    </div>`).join("");
 });
 
-/* === Helpers === */
-async function updateCacheInfo(){
-  const all=await idbGetAll();
-  const total=all.filter(a=>a.descriptor&&a.descriptor.length>0).length;
-  document.getElementById("cacheInfo").innerText=`Cache: ${total}/${all.length} descriptors`;
-}
-
-/* === Main init === */
-(async()=>{
-  try{
-    await loadModels();
-    const images=await listAllImages();
-    document.getElementById("status").innerText=`📦 พบ ${images.length} รูป กำลังตรวจ Cache...`;
-    await ensureCacheIndexed(images); // 👈 ทำอัตโนมัติ
-    await updateCacheInfo();
-    document.getElementById("status").innerText="✅ พร้อมใช้งาน! อัปโหลดรูปเพื่อค้นหา";
-  }catch(e){
-    console.error(e);
-    document.getElementById("status").innerText="❌ เกิดข้อผิดพลาด: "+e.message;
+(async () => {
+  await loadModels();
+  const imgs = await listAllImages();
+  document.getElementById("status").innerText = `📦 พบ ${imgs.length} รูป กำลังสร้างข้อมูล...`;
+  const cache = await idbGetAll();
+  const exist = new Set(cache.map(c => c.url));
+  const missing = imgs.filter(i => !exist.has(i.url));
+  if (missing.length === 0) {
+    document.getElementById("status").innerText = "✅ พร้อมใช้งาน";
+    return;
   }
+  for (let i = 0; i < missing.length; i++) {
+    const d = await descriptorFromUrl(missing[i].url);
+    await idbPut({ url: missing[i].url, descriptor: d });
+    document.getElementById("progressBar").style.width = `${(i / missing.length) * 100}%`;
+  }
+  document.getElementById("status").innerText = "✅ ระบบพร้อมค้นหาแล้ว";
 })();
 </script>
 </body>
