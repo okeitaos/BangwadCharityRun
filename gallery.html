@@ -1,21 +1,24 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🔍 ค้นหารูปด้วยใบหน้า | BCR RUN GALLERY</title>
 
-  <!-- Face Recognition -->
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Face API -->
   <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
   <!-- Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet">
 
   <style>
     body {
       font-family: "Prompt", sans-serif;
       margin: 0;
-      background: linear-gradient(135deg, #0f172a, #1e293b, #0f172a);
+      background: linear-gradient(135deg, #0f172a, #1e293b);
       color: #fff;
       text-align: center;
       min-height: 100vh;
@@ -24,28 +27,21 @@
 
     h1 {
       color: #facc15;
-      margin-bottom: 10px;
-      text-shadow: 0 0 10px rgba(250, 204, 21, 0.4);
-    }
-
-    p {
-      opacity: 0.85;
+      text-shadow: 0 0 10px rgba(250,204,21,0.4);
     }
 
     #uploadInput {
       margin: 20px 0;
       padding: 10px;
       border-radius: 25px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
       color: #fff;
       cursor: pointer;
-      transition: all 0.3s;
+      transition: 0.3s;
     }
 
-    #uploadInput:hover {
-      background: rgba(255, 255, 255, 0.15);
-    }
+    #uploadInput:hover { background: rgba(255,255,255,0.2); }
 
     #status {
       margin: 10px;
@@ -57,10 +53,10 @@
       width: 80%;
       max-width: 600px;
       margin: 10px auto 20px;
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255,255,255,0.1);
       border-radius: 30px;
       overflow: hidden;
-      height: 20px;
+      height: 18px;
     }
 
     .progress-bar {
@@ -80,16 +76,14 @@
     }
 
     .card {
-      background: rgba(255, 255, 255, 0.05);
+      background: rgba(255,255,255,0.05);
       border-radius: 15px;
       overflow: hidden;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
       transition: transform 0.2s ease;
     }
 
-    .card:hover {
-      transform: scale(1.03);
-    }
+    .card:hover { transform: scale(1.03); }
 
     .card img {
       width: 100%;
@@ -98,9 +92,7 @@
       transition: opacity 0.3s;
     }
 
-    .card img:hover {
-      opacity: 0.9;
-    }
+    .card img:hover { opacity: 0.9; }
 
     .card p {
       font-size: 0.9rem;
@@ -120,131 +112,138 @@
       margin-bottom: 10px;
     }
 
-    .download-btn:hover {
-      background: #1d4ed8;
-    }
+    .download-btn:hover { background: #1d4ed8; }
   </style>
 </head>
 <body>
   <h1>🔍 ค้นหารูปด้วยใบหน้า</h1>
-  <p>อัปโหลดรูปใบหน้าของคุณ เพื่อค้นหารูปใน Gallery ที่มีใบหน้าคล้ายกัน</p>
+  <p>อัปโหลดรูปใบหน้าของคุณ เพื่อค้นหารูปที่มีใบหน้าคล้ายกัน</p>
 
-  <input type="file" id="uploadInput" accept="image/*" />
-  <div id="status">⏳ กำลังโหลดโมเดล AI...</div>
+  <input type="file" id="uploadInput" accept="image/*">
+  <div id="status">⏳ รออัปโหลดรูปเพื่อเริ่มค้นหา...</div>
 
-  <div class="progress-container">
-    <div class="progress-bar" id="progressBar"></div>
-  </div>
+  <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
 
   <div class="grid" id="resultGrid"></div>
 
-  <script>
-    const SEARCH_URL =
-      "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/search_face"; // ✅ Edge Function
-    const MODEL_URL = "https://cdn.jsdelivr.net/gh/vladmandic/face-api/model/";
+<script>
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const BUCKET = "gallery";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    let modelsLoaded = false;
+let modelsLoaded = false;
+let allImages = [];
 
-    // ✅ โหลดโมเดล
-    async function loadModels() {
-      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-      await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-      modelsLoaded = true;
-      document.getElementById("status").innerText =
-        "✅ พร้อมใช้งานแล้ว กรุณาอัปโหลดรูป";
-    }
-    loadModels();
+window.onload = async () => {
+  await loadModels();
+  await loadAllImages();
+};
 
-    // ✅ อัปโหลดภาพ
-    document
-      .getElementById("uploadInput")
-      .addEventListener("change", async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (!modelsLoaded)
-          return alert("⏳ รอโมเดลโหลดให้เสร็จก่อนใช้งาน");
+// ✅ โหลดโมเดลแบบเบา TinyFaceDetector (เร็วกว่า SSD 3–5 เท่า)
+async function loadModels() {
+  const MODEL_URL = "https://cdn.jsdelivr.net/gh/vladmandic/face-api/model/";
+  await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+  modelsLoaded = true;
+  document.getElementById("status").innerText = "✅ พร้อมใช้งานแล้ว กรุณาอัปโหลดรูปเพื่อค้นหา";
+}
 
-        const status = document.getElementById("status");
-        const progressBar = document.getElementById("progressBar");
-        const resultGrid = document.getElementById("resultGrid");
+// ✅ โหลดภาพทั้งหมดจาก Supabase (แบบ batch)
+async function loadAllImages() {
+  const { data: folders } = await sb.storage.from(BUCKET).list("", { limit: 100 });
+  for (const folder of folders) {
+    const { data: files } = await sb.storage.from(BUCKET).list(folder.name + "/", { limit: 100 });
+    files?.forEach(f => {
+      if (/\.(jpg|jpeg|png)$/i.test(f.name)) {
+        allImages.push({
+          url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${folder.name}/${f.name}`,
+          name: f.name
+        });
+      }
+    });
+  }
+  console.log(`📸 โหลดรูปทั้งหมดแล้ว: ${allImages.length}`);
+}
 
-        status.innerText = "🧠 กำลังวิเคราะห์ใบหน้า...";
-        progressBar.style.width = "25%";
+// ✅ ค้นหาใบหน้าที่คล้าย
+document.getElementById("uploadInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!modelsLoaded) return alert("รอโมเดลโหลดก่อน");
 
-        const img = await faceapi.bufferToImage(file);
-        const detection = await faceapi
-          .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
+  const status = document.getElementById("status");
+  const progressBar = document.getElementById("progressBar");
+  const resultGrid = document.getElementById("resultGrid");
+  resultGrid.innerHTML = "";
+
+  status.innerText = "🔍 กำลังวิเคราะห์ใบหน้า...";
+  const userImg = await faceapi.bufferToImage(file);
+  const detection = await faceapi
+    .detectSingleFace(userImg, new faceapi.TinyFaceDetectorOptions())
+    .withFaceLandmarks()
+    .withFaceDescriptor();
+
+  if (!detection) {
+    status.innerText = "❌ ไม่พบใบหน้าในภาพนี้";
+    return;
+  }
+
+  const userDesc = detection.descriptor;
+  const matches = [];
+  const batchSize = 25; // โหลดทีละ 25 ภาพเพื่อไม่ให้ lag
+
+  for (let i = 0; i < allImages.length; i += batchSize) {
+    const batch = allImages.slice(i, i + batchSize);
+    await Promise.all(batch.map(async (img) => {
+      try {
+        const refImg = await faceapi.fetchImage(img.url);
+        const refDetect = await faceapi
+          .detectSingleFace(refImg, new faceapi.TinyFaceDetectorOptions())
           .withFaceLandmarks()
           .withFaceDescriptor();
-
-        if (!detection) {
-          status.innerText = "❌ ไม่พบใบหน้าในภาพนี้";
-          progressBar.style.width = "0%";
-          return;
-        }
-
-        progressBar.style.width = "60%";
-        status.innerText = "🔍 กำลังค้นหาภาพในระบบ...";
-
-        const descriptor = Array.from(detection.descriptor);
-
-        try {
-          const res = await fetch(SEARCH_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ descriptor, limit: 20 }),
-          });
-
-          if (!res.ok) throw new Error("ค้นหาไม่สำเร็จ");
-          const data = await res.json();
-          const results = data.results || [];
-
-          progressBar.style.width = "100%";
-
-          if (results.length === 0) {
-            status.innerText = "😢 ไม่พบภาพที่มีใบหน้าคล้ายกัน";
-            resultGrid.innerHTML = "";
-          } else {
-            status.innerText = `✅ พบ ${results.length} ภาพที่มีใบหน้าคล้ายกัน`;
-            renderResults(results);
+        if (refDetect) {
+          const distance = faceapi.euclideanDistance(userDesc, refDetect.descriptor);
+          if (distance < 0.55) {
+            matches.push({ ...img, similarity: (1 - distance).toFixed(2) });
           }
-        } catch (err) {
-          console.error(err);
-          status.innerText = "❌ เกิดข้อผิดพลาดในการค้นหา";
         }
+      } catch {}
+    }));
+    progressBar.style.width = `${Math.min(((i + batchSize) / allImages.length) * 100, 100)}%`;
+    status.innerText = `🔎 ตรวจสอบ ${(i + batchSize)} / ${allImages.length} ...`;
+  }
 
-        progressBar.style.width = "0%";
-        e.target.value = "";
-      });
+  progressBar.style.width = "0%";
+  if (matches.length === 0) {
+    status.innerText = "😢 ไม่พบภาพที่มีใบหน้าคล้ายกัน";
+  } else {
+    status.innerText = `✅ พบ ${matches.length} ภาพที่มีใบหน้าคล้ายกัน`;
+    renderResults(matches);
+  }
+});
 
-    // ✅ แสดงผลลัพธ์
-    function renderResults(list) {
-      const grid = document.getElementById("resultGrid");
-      grid.innerHTML = list
-        .map(
-          (i) => `
-        <div class="card">
-          <img src="${i.image_url}" alt="result" />
-          <p>ความคล้าย ${(100 - i.distance * 100).toFixed(1)}%</p>
-          <button class="download-btn" onclick="downloadImage('${i.image_url}')">📥 ดาวน์โหลด</button>
-        </div>`
-        )
-        .join("");
-    }
+function renderResults(list) {
+  const grid = document.getElementById("resultGrid");
+  grid.innerHTML = list.map(i => `
+    <div class="card">
+      <img src="${i.url}" alt="${i.name}">
+      <p>ความคล้าย ${(i.similarity * 100).toFixed(0)}%</p>
+      <button class="download-btn" onclick="downloadImage('${i.url}', '${i.name}')">📥 ดาวน์โหลด</button>
+    </div>
+  `).join("");
+}
 
-    // ✅ ดาวน์โหลดภาพ
-    function downloadImage(url) {
-      fetch(url)
-        .then((res) => res.blob())
-        .then((blob) => {
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(blob);
-          a.download = url.split("/").pop();
-          a.click();
-          URL.revokeObjectURL(a.href);
-        });
-    }
-  </script>
+function downloadImage(url, filename) {
+  fetch(url).then(r => r.blob()).then(b => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(b);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+}
+</script>
 </body>
 </html>
