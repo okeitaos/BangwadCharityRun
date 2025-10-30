@@ -31,7 +31,6 @@
     margin-bottom: 10px;
   }
 
-  /* ปุ่มหลัก */
   button {
     border: none;
     padding: 10px 20px;
@@ -47,10 +46,10 @@
   button:hover { transform: translateY(-2px); opacity: 0.9; }
 
   .btn-green { background: linear-gradient(90deg, #06C755, #00B900); }
+  .btn-blue { background: linear-gradient(90deg, #3b82f6, #2563eb); }
   .btn-red { background: linear-gradient(90deg, #ef4444, #dc2626); }
   .btn-gray { background: #475569; }
 
-  /* ปุ่ม Choose File */
   .file-input-wrapper {
     position: relative;
     display: inline-block;
@@ -178,6 +177,7 @@
     <br>
 
     <button class="btn-green" onclick="uploadFilesChecked()">📤 อัปโหลด</button>
+    <button class="btn-blue" onclick="refreshPage()">🔄 รีเฟรช</button>
     <button class="btn-red" onclick="deleteAllFiles()">🗑️ ลบทั้งหมด</button>
     <button class="btn-gray" onclick="logout()">🚪 ออกจากระบบ</button>
 
@@ -243,7 +243,7 @@ async function getFileHash(file) {
   return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-/* ✅ อัปโหลด (กันซ้ำ + จำกัดขนาด + จำกัดครั้งละ 1000 รูป) */
+/* ✅ อัปโหลด */
 async function uploadFilesChecked() {
   const input = document.getElementById("fileInput");
   let files = Array.from(input.files);
@@ -286,6 +286,16 @@ async function uploadFilesChecked() {
   progress.style.width = "100%";
   input.value = "";
   await listFiles();
+}
+
+/* ✅ ปุ่ม Refresh (รีเซ็ต Progress + สถานะ + โหลดไฟล์ใหม่) */
+async function refreshPage() {
+  const progress = document.getElementById("progressBar");
+  const status = document.getElementById("status");
+  progress.style.width = "0%";
+  status.innerText = "🔄 รีเฟรชข้อมูล...";
+  await listFiles();
+  setTimeout(() => { status.innerText = "✅ พร้อมใช้งาน"; }, 500);
 }
 
 /* ✅ ลบไฟล์รายภาพ */
