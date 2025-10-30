@@ -20,14 +20,13 @@
     background: linear-gradient(135deg, #0f172a, #1e293b);
     color: #fff;
     text-align: center;
-    min-height: 100vh;
     padding: 20px;
+    min-height: 100vh;
     margin: 0;
   }
 
   h1 {
     color: #facc15;
-    margin-bottom: 10px;
     text-shadow: 0 0 10px rgba(250,204,21,0.5);
   }
 
@@ -72,12 +71,9 @@
   .card {
     background: rgba(255,255,255,0.05);
     border-radius: 15px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     overflow: hidden;
-    transition: transform 0.2s ease;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
   }
-
-  .card:hover { transform: scale(1.03); }
 
   .card img {
     width: 100%;
@@ -85,10 +81,7 @@
     object-fit: cover;
   }
 
-  .card p {
-    margin: 8px 0;
-    color: #eee;
-  }
+  .card p { margin: 8px 0; color: #eee; }
 
   .download-btn {
     background: linear-gradient(90deg, #2563eb, #3b82f6);
@@ -106,15 +99,12 @@
 </head>
 <body>
 <h1>🔍 ค้นหารูปด้วยใบหน้า</h1>
-<p>อัปโหลดรูปใบหน้าของคุณ ระบบจะค้นหารูปที่มีใบหน้าคล้ายกันจาก Supabase Gallery</p>
+<p>อัปโหลดภาพของคุณ ระบบจะตัดเฉพาะใบหน้าและค้นหารูปคล้ายกันใน Gallery</p>
 
 <input type="file" id="uploadInput" accept="image/*">
 <div id="status">⏳ กำลังโหลดโมเดล...</div>
 
-<div class="progress-container">
-  <div class="progress-bar" id="progressBar"></div>
-</div>
-
+<div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
 <div class="grid" id="resultGrid"></div>
 
 <script>
@@ -126,19 +116,19 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let allImages = [];
 let modelsLoaded = false;
 
+/* ✅ โหลดโมเดล */
 window.onload = async () => {
   await loadModels();
   await loadAllImages();
 };
 
-/* ✅ โหลดโมเดล TinyFaceDetector (แม่นกว่าและเบากว่า) */
 async function loadModels() {
   const MODEL_URL = "https://cdn.jsdelivr.net/gh/vladmandic/face-api/model/";
   await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
   await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
   await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
   modelsLoaded = true;
-  document.getElementById("status").innerText = "✅ พร้อมใช้งานแล้ว กรุณาอัปโหลดรูปเพื่อเริ่มค้นหา";
+  document.getElementById("status").innerText = "✅ พร้อมใช้งานแล้ว กรุณาอัปโหลดรูป";
 }
 
 /* ✅ โหลดรูปทั้งหมดจาก Supabase */
@@ -160,7 +150,7 @@ async function loadAllImages() {
   console.log("📸 โหลดรูปทั้งหมดแล้ว:", allImages.length);
 }
 
-/* ✅ ค้นหาด้วยใบหน้า */
+/* ✅ Crop ใบหน้า + ค้นหา */
 document.getElementById("uploadInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -168,16 +158,21 @@ document.getElementById("uploadInput").addEventListener("change", async (e) => {
 
   const status = document.getElementById("status");
   const progressBar = document.getElementById("progressBar");
-  status.innerText = "🔍 กำลังวิเคราะห์ใบหน้า...";
+  status.innerText = "🔍 กำลังตรวจจับใบหน้า...";
   const img = await faceapi.bufferToImage(file);
 
   const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 });
   const detections = await faceapi.detectAllFaces(img, options).withFaceLandmarks().withFaceDescriptors();
 
   if (!detections.length) {
-    status.innerText = "❌ ไม่พบใบหน้าในภาพที่อัปโหลด";
+    status.innerText = "❌ ไม่พบใบหน้าในภาพนี้";
     return;
   }
+
+  // ✅ Crop ใบหน้าเฉพาะส่วน
+  const faceCanvases = await faceapi.extractFaces(img, detections.map(det => det.detection));
+  const faceDescriptors = detections.map(d => d.descriptor);
+  console.log("🧠 พบใบหน้า:", faceDescriptors.length);
 
   const matches = [];
   let checked = 0;
@@ -187,18 +182,16 @@ document.getElementById("uploadInput").addEventListener("change", async (e) => {
       const refImg = await faceapi.fetchImage(ref.url);
       const refDetections = await faceapi.detectAllFaces(refImg, options).withFaceLandmarks().withFaceDescriptors();
 
-      if (!refDetections.length) continue;
-
-      for (const face of detections) {
-        for (const refFace of refDetections) {
-          const distance = faceapi.euclideanDistance(face.descriptor, refFace.descriptor);
-          if (distance < 0.45) { // ✅ threshold เข้มงวดขึ้น
+      for (const refFace of refDetections) {
+        for (const desc of faceDescriptors) {
+          const distance = faceapi.euclideanDistance(desc, refFace.descriptor);
+          if (distance < 0.43) { // ✅ threshold เข้มขึ้นอีก
             matches.push({ ...ref, similarity: (1 - distance).toFixed(2) });
           }
         }
       }
     } catch (err) {
-      console.warn("ข้ามรูป:", ref.name);
+      console.warn("⚠️ ข้ามรูป:", ref.name);
     }
 
     checked++;
@@ -208,15 +201,13 @@ document.getElementById("uploadInput").addEventListener("change", async (e) => {
 
   progressBar.style.width = "0%";
 
-  if (matches.length === 0) {
-    status.innerText = "😢 ไม่พบภาพที่มีใบหน้าคล้ายกัน";
+  if (!matches.length) {
+    status.innerText = "😢 ไม่พบภาพที่คล้ายกัน";
     document.getElementById("resultGrid").innerHTML = "";
   } else {
     status.innerText = `✅ พบ ${matches.length} ภาพที่คล้ายกัน`;
     renderResults(matches);
   }
-
-  e.target.value = "";
 });
 
 /* ✅ แสดงผล */
