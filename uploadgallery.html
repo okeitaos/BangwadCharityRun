@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📤 LINE Upload Gallery (Anti-Duplicate)</title>
+<title>📤 LINE Upload Gallery (Fixed Refresh + Clear Input)</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -50,7 +50,7 @@
 
   <input type="file" id="fileInput" multiple accept="image/*"><br>
   <button class="btn-green" onclick="uploadFiles()">📤 อัปโหลด</button>
-  <button id="refreshBtn" class="btn-green" onclick="listFiles()">🔄 รีเฟรช</button>
+  <button id="refreshBtn" class="btn-green" onclick="refreshFiles()">🔄 รีเฟรช</button>
   <button id="deleteAllBtn" onclick="deleteAllFiles()">🗑️ ลบทั้งหมด</button>
   <button id="logoutBtn" onclick="logout()">🚪 ออกจากระบบ</button>
 
@@ -111,7 +111,7 @@ async function main(){
 function login(){ liff.login(); }
 async function logout(){ await liff.logout(); location.reload(); }
 
-/* ✅ Upload with HASH + Supabase Table Check */
+/* ✅ อัปโหลดแบบกันซ้ำ */
 async function uploadFiles(){
   const files = document.getElementById("fileInput").files;
   const status = document.getElementById("status");
@@ -144,10 +144,32 @@ async function uploadFiles(){
 
   status.innerText = `✅ สำเร็จ ${success} | ซ้ำ ${skipDup} | เกินขนาด ${skipBig}`;
   bar.style.width = "100%";
-  listFiles();
+
+  // ✅ เคลียร์ input
+  document.getElementById("fileInput").value = "";
+
+  // ✅ โหลดไฟล์ใหม่ทันที
+  await listFiles();
 }
 
-/* ✅ List Files */
+/* ✅ ปุ่ม Refresh */
+async function refreshFiles(){
+  const btn = document.getElementById("refreshBtn");
+  const status = document.getElementById("status");
+  try {
+    btn.disabled = true;
+    status.innerText = "🔄 กำลังโหลด...";
+    await listFiles();
+    status.innerText = "✅ โหลดใหม่เรียบร้อย";
+  } catch {
+    status.innerText = "❌ โหลดไม่สำเร็จ";
+  } finally {
+    btn.disabled = false;
+    setTimeout(()=>status.innerText="",1500);
+  }
+}
+
+/* ✅ โหลดรายการไฟล์ */
 async function listFiles(){
   const { data } = await sb.storage.from(BUCKET).list(`${userId}/`, { limit: 1000 });
   allFiles = (data||[]).filter(f=>f.name!==".emptyFolderPlaceholder");
@@ -162,9 +184,19 @@ async function listFiles(){
   document.getElementById("count").innerText=`📦 ทั้งหมด ${allFiles.length} ไฟล์`;
 }
 
-/* ✅ Delete */
-async function deleteFile(name){ if(confirm(`ลบไฟล์นี้หรือไม่?\n${name}`)){ await sb.storage.from(BUCKET).remove([`${userId}/${name}`]); listFiles(); } }
-async function deleteAllFiles(){ if(confirm("⚠️ ต้องการลบรูปทั้งหมดหรือไม่?")){ await sb.storage.from(BUCKET).remove(allFiles.map(f=>`${userId}/${f.name}`)); listFiles(); } }
+/* ✅ ลบไฟล์ */
+async function deleteFile(name){
+  if(confirm(`ลบไฟล์นี้หรือไม่?\n${name}`)){
+    await sb.storage.from(BUCKET).remove([`${userId}/${name}`]);
+    listFiles();
+  }
+}
+async function deleteAllFiles(){
+  if(confirm("⚠️ ต้องการลบรูปทั้งหมดหรือไม่?")){
+    await sb.storage.from(BUCKET).remove(allFiles.map(f=>`${userId}/${f.name}`));
+    listFiles();
+  }
+}
 
 /* ✅ Modal */
 function openModal(url){ document.getElementById("modalImg").src=url; document.getElementById("imageModal").style.display="flex";}
