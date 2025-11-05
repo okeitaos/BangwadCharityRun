@@ -248,7 +248,7 @@ const TEXT = {
     labelPhone: "เบอร์โทรศัพท์",
     labelEmail: "Email",
     labelAge: "อายุ",
-    labelShirtSize: "ไซส์เสื้อ",
+    // labelShirtSize: "ไซส์เสื้อ",
     labelCategory: "รุ่นอายุ/เพศ",
     labelSlip: "แนบสลิปโอนเงิน",
     submitBtn: "ลงทะเบียน",
@@ -273,7 +273,7 @@ const TEXT = {
     labelPhone: "Phone Number",
     labelEmail: "Email",
     labelAge: "Age",
-    labelShirtSize: "Shirt Size",
+    // labelShirtSize: "Shirt Size",
     labelCategory: "Category (Age / Gender)",
     labelSlip: "Upload Payment Slip",
     submitBtn: "Register",
@@ -296,7 +296,7 @@ function applyLanguageUI(){
   document.getElementById("labelPhone").innerText = t.labelPhone;
   document.getElementById("labelEmail").innerText = t.labelEmail;
   document.getElementById("labelAge").innerText = t.labelAge;
-  document.getElementById("labelShirtSize").innerText = t.labelShirtSize;
+  // document.getElementById("labelShirtSize").innerText = t.labelShirtSize;
   document.getElementById("labelCategory").innerText = t.labelCategory;
   document.getElementById("labelSlip").innerText = t.labelSlip;
   document.getElementById("submitBtn").innerText = t.submitBtn;
@@ -524,8 +524,11 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
     }
 
     // show modal with details
-    document.getElementById("resultText").innerText =
-      `${TEXT[currentLang].labelFirstName}: ${firstName} ${lastName}\n${TEXT[currentLang].labelAge}: ${age}\n${TEXT[currentLang].labelShirtSize}: ${shirtSize}\n${TEXT[currentLang].labelCategory}: ${category}\n${TEXT[currentLang].labelPhone}: ${phone}\nEmail: ${email}`;
+    // document.getElementById("resultText").innerText =
+    //   `${TEXT[currentLang].labelFirstName}: ${firstName} ${lastName}\n${TEXT[currentLang].labelAge}: ${age}\n${TEXT[currentLang].labelShirtSize}: ${shirtSize}\n${TEXT[currentLang].labelCategory}: ${category}\n${TEXT[currentLang].labelPhone}: ${phone}\nEmail: ${email}`;
+   document.getElementById("resultText").innerText =
+  `${TEXT[currentLang].labelFirstName}: ${firstName} ${lastName}\n${TEXT[currentLang].labelAge}: ${age}\n${TEXT[currentLang].labelCategory}: ${category}\n${TEXT[currentLang].labelPhone}: ${phone}\nEmail: ${email}`;
+
     document.getElementById("slipPreview").src = slipUrl;
     document.getElementById("resultModal").style.display = "flex";
 
