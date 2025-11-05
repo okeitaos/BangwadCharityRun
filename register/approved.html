@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>อนุมัติผู้สมัคร - Bangwad Charity Run</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <header class="bg-green-600 text-white p-4 text-center text-xl font-bold shadow-md">
+    ระบบอนุมัติผู้สมัคร - Bangwad Charity Run
+  </header>
+
+  <main class="p-4">
+    <div class="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg p-6">
+      <div class="mb-4 flex justify-between items-center">
+        <input id="searchInput" type="text" placeholder="🔍 ค้นหาชื่อหรือเบอร์โทร..." 
+               class="border rounded-lg p-2 w-2/3 focus:outline-none focus:ring-2 focus:ring-green-400" />
+        <button id="reloadBtn" 
+                class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg shadow">
+          🔄 โหลดข้อมูลใหม่
+        </button>
+      </div>
+
+      <table class="w-full border-collapse">
+        <thead>
+          <tr class="bg-green-50 text-left border-b">
+            <th class="p-2">ชื่อ-นามสกุล</th>
+            <th class="p-2">เบอร์โทร</th>
+            <th class="p-2 text-center">สถานะ</th>
+            <th class="p-2 text-center">การจัดการ</th>
+          </tr>
+        </thead>
+        <tbody id="memberList"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <footer class="text-center text-gray-500 text-sm py-4">
+    © 2025 Bangwad Charity Run
+  </footer>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+    // ✅ ใส่ค่าของคุณเองตรงนี้
+    const SUPABASE_URL = 'https://xjdjurdflowiwdxgkvfr.supabase.co'
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics'
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+    const memberList = document.getElementById('memberList')
+    const searchInput = document.getElementById('searchInput')
+    const reloadBtn = document.getElementById('reloadBtn')
+
+    async function loadMembers() {
+      memberList.innerHTML = `<tr><td colspan="4" class="text-center p-4">⏳ กำลังโหลดข้อมูล...</td></tr>`
+
+      const { data, error } = await supabase
+        .from('member')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        memberList.innerHTML = `<tr><td colspan="4" class="text-center text-red-500 p-4">❌ โหลดข้อมูลล้มเหลว</td></tr>`
+        return
+      }
+
+      renderMembers(data)
+    }
+
+    function renderMembers(data) {
+      const searchValue = searchInput.value.toLowerCase()
+      const filtered = data.filter(m => 
+        m.name?.toLowerCase().includes(searchValue) ||
+        m.phone?.toLowerCase().includes(searchValue)
+      )
+
+      if (filtered.length === 0) {
+        memberList.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-gray-500">ไม่พบข้อมูล</td></tr>`
+        return
+      }
+
+      memberList.innerHTML = filtered.map(m => `
+        <tr class="border-b hover:bg-gray-50">
+          <td class="p-2">${m.name || '-'}</td>
+          <td class="p-2">${m.phone || '-'}</td>
+          <td class="p-2 text-center">
+            <span class="px-3 py-1 rounded-full text-sm ${m.approved ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">
+              ${m.approved ? '✅ อนุมัติแล้ว' : '⏳ รออนุมัติ'}
+            </span>
+          </td>
+          <td class="p-2 text-center">
+            <button onclick="approveMember('${m.id}', ${m.approved})" 
+                    class="px-3 py-1 text-white rounded-lg ${m.approved ? 'bg-gray-400' : 'bg-green-500 hover:bg-green-600'}">
+              ${m.approved ? 'ยกเลิก' : 'อนุมัติ'}
+            </button>
+          </td>
+        </tr>
+      `).join('')
+    }
+
+    window.approveMember = async (id, approved) => {
+      const confirmMsg = approved 
+        ? 'คุณต้องการยกเลิกการอนุมัติหรือไม่?' 
+        : 'คุณต้องการอนุมัติผู้สมัครคนนี้หรือไม่?'
+
+      if (!confirm(confirmMsg)) return
+
+      const { error } = await supabase
+        .from('member')
+        .update({ approved: !approved })
+        .eq('id', id)
+
+      if (error) {
+        alert('❌ ไม่สามารถอัปเดตสถานะได้')
+      } else {
+        alert('✅ อัปเดตสถานะเรียบร้อยแล้ว')
+        loadMembers()
+      }
+    }
+
+    searchInput.addEventListener('input', loadMembers)
+    reloadBtn.addEventListener('click', loadMembers)
+
+    loadMembers()
+  </script>
+</body>
+</html>
