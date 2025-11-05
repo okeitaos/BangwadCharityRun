@@ -107,6 +107,27 @@
       text-shadow: 1px 1px 6px rgba(0,0,0,0.4);
     }
 
+    .rules {
+      background: rgba(255,255,255,0.9);
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+      color: #111;
+      text-align: left;
+      line-height: 1.8;
+      font-size: 1rem;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .rules p {
+      margin-bottom: 10px;
+    }
+
+    .rules strong {
+      color: var(--red);
+    }
+
     .race-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -222,6 +243,7 @@
     @media (max-width: 768px) {
       header h1 { font-size: 2rem; }
       .register-btn { font-size: 1rem; padding: 12px 25px; }
+      .rules { font-size: 0.95rem; padding: 20px; }
     }
   </style>
 </head>
@@ -236,6 +258,17 @@
     <h2 id="date-title">📅 วันจัดการแข่งขัน</h2>
     <p id="date-detail">21 ธันวาคม 2025</p>
     <p id="time-detail">เวลา 06.00 น. – 18.00 น.</p>
+  </section>
+
+  <!-- ✅ กติกาการแข่งขัน / Rules -->
+  <section>
+    <h2 id="rules-title">📣 กติกา 4LapsTop100</h2>
+    <div class="rules" id="rules-content">
+      <p>นักวิ่งต้องวิ่งให้ครบ <strong>4 รอบเขื่อนบางวาด</strong> โดยในแต่ละรอบ ทีมงานจะแจกริสแบนด์รอบละสีให้</p>
+      <p>เมื่อนักวิ่งได้ริสแบนครบ 4 เส้น ทีมงานจะแจกป้ายห้อยคอลำดับ <strong>1 ถึง 100</strong> แยกชายและหญิง</p>
+      <p>นำป้ายลำดับมาแลกเสื้อได้ที่จุดบริการ</p>
+      <p><strong>หมายเหตุ:</strong> เนื่องจากเสื้อทำมาแบบคละไซซ์ มาแลกก่อน ได้เลือกก่อน มีสิทธิ์ก่อนครับ</p>
+    </div>
   </section>
 
   <section>
@@ -260,7 +293,6 @@
     <div class="gallery-grid">
       <img src="https://lh5.googleusercontent.com/d/1W1XAS07PsMkaRPoEpwa-EEGn8EK8Rzql" alt="TOP100 MEN">
       <img src="https://lh5.googleusercontent.com/d/1raGB4OVNvHRF0hgrp6JF8mmY9JXaaJ9B" alt="TOP100 WOMEN">
-      <!-- <img src="https://lh5.googleusercontent.com/d/1Q1l7Byav3wZ7CfeGMwn6M1F6mXwju89W" alt="SHIRT SIZE"> -->
     </div>
   </section>
 
@@ -300,6 +332,12 @@
           dateTitle: "📅 วันจัดการแข่งขัน",
           dateDetail: "21 ธันวาคม 2025",
           timeDetail: "เวลา 06.00 น. – 18.00 น.",
+          rulesTitle: "📣 กติกา 4LapsTop100",
+          rulesContent: `
+          <p>นักวิ่งต้องวิ่งให้ครบ <strong>4 รอบเขื่อนบางวาด</strong> โดยในแต่ละรอบ ทีมงานจะแจกริสแบนด์รอบละสีให้</p>
+          <p>เมื่อนักวิ่งได้ริสแบนครบ 4 เส้น ทีมงานจะแจกป้ายห้อยคอลำดับ <strong>1 ถึง 100</strong> แยกชายและหญิง</p>
+          <p>นำป้ายลำดับมาแลกเสื้อได้ที่จุดบริการ</p>
+          <p><strong>หมายเหตุ:</strong> เนื่องจากเสื้อทำมาแบบคละไซซ์ มาแลกก่อน ได้เลือกก่อน มีสิทธิ์ก่อนครับ</p>`,
           locationTitle: "📍 สถานที่จัดงาน",
           locationDetail: "เขื่อนบางวาด จังหวัดภูเก็ต",
           categoryTitle: "🏃 ประเภทการแข่งขัน & ค่าสมัคร",
@@ -313,6 +351,12 @@
           dateTitle: "📅 Race Date",
           dateDetail: "December 21, 2025",
           timeDetail: "Time: 6:00 AM – 6:00 PM",
+          rulesTitle: "📣 Rules 4LapsTop100",
+          rulesContent: `
+          <p>Each runner must complete <strong>4 laps around Bang Wad Dam</strong>. For each lap completed, the staff will give you a colored wristband.</p>
+          <p>When you have collected all 4 wristbands, the staff will issue a numbered neck tag from <strong>1 to 100</strong>, separated for men and women.</p>
+          <p>Use your tag number to redeem your finisher shirt at the service booth.</p>
+          <p><strong>Note:</strong> Shirt sizes are mixed. First come, first served.</p>`,
           locationTitle: "📍 Location",
           locationDetail: "Bang Wad Dam, Phuket, Thailand",
           categoryTitle: "🏃 Categories & Fees",
@@ -327,6 +371,8 @@
       document.getElementById("date-title").innerText = t.dateTitle;
       document.getElementById("date-detail").innerText = t.dateDetail;
       document.getElementById("time-detail").innerText = t.timeDetail;
+      document.getElementById("rules-title").innerText = t.rulesTitle;
+      document.getElementById("rules-content").innerHTML = t.rulesContent;
       document.getElementById("location-title").innerText = t.locationTitle;
       document.getElementById("location-detail").innerText = t.locationDetail;
       document.getElementById("category-title").innerText = t.categoryTitle;
