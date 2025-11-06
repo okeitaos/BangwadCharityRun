@@ -52,12 +52,20 @@
     letter-spacing: 1px;
   }
 
+  /* ✅ ปรับโลโก้ Sponsor ใหม่ให้ดูสวยขึ้น */
   .sponsor-logo {
-    margin-top: 10px;
-    width: 120px;
-    opacity: 0.85;
+    margin-top: 12px;
+    width: 90px; /* ขนาดใหม่ที่สมดุล */
+    opacity: 0.9;
+    border-radius: 10px;
     filter: drop-shadow(0 0 8px #00ffff);
     animation: sponsorFloat 3s ease-in-out infinite;
+    transition: transform 0.3s ease, filter 0.3s ease;
+  }
+
+  .sponsor-logo:hover {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 12px #00ffff);
   }
 
   footer {
@@ -119,7 +127,7 @@
   @media (max-width: 600px) {
     h1 { font-size: 2rem; }
     #countdown { font-size: 1.3rem; }
-    .sponsor-logo { width: 90px; }
+    .sponsor-logo { width: 70px; }
   }
 </style>
 </head>
@@ -138,7 +146,7 @@
 
   <!-- ✨ Sponsor Section -->
   <div class="sponsor" id="sponsorText">CORE NUTRITION V POW</div>
-  <img src="https://lh5.googleusercontent.com/d/1L8xS3WdoYc8e6fdwMKdbyUHXmCiIRKui" alt="CORE NUTRITION V POW" class="CORE NUTRITION V POW">
+  <img src="https://lh5.googleusercontent.com/d/1L8xS3WdoYc8e6fdwMKdbyUHXmCiIRKui" alt="CORE NUTRITION V POW" class="sponsor-logo">
 
   <footer>© 2025 4LAPTOP100 | Powered by Bangwad Charity Run</footer>
 
@@ -176,14 +184,14 @@
         document.getElementById("title").textContent = "Coming Soon";
         document.getElementById("desc").innerHTML =
           "กำลังเตรียมประกาศรายชื่อผู้เข้าแข่งขัน<br><span class='highlight'>4LAPTOP100 2025</span>";
-        document.getElementById("sponsorText").textContent = "Presented by Bangwad Running Club";
+        document.getElementById("sponsorText").textContent = "CORE NUTRITION V POW";
         langBtn.textContent = "EN";
       } else {
         document.documentElement.lang = "en";
         document.getElementById("title").textContent = "Coming Soon";
         document.getElementById("desc").innerHTML =
           "Preparing the announcement of participants<br><span class='highlight'>4LAPTOP100 2025</span>";
-        document.getElementById("sponsorText").textContent = "Presented by Bangwad Running Club";
+        document.getElementById("sponsorText").textContent = "CORE NUTRITION V POW";
         langBtn.textContent = "ไทย";
       }
     }
