@@ -9,13 +9,14 @@
     margin: 0;
     padding: 0;
     font-family: "Poppins", sans-serif;
-    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    background: radial-gradient(circle at center, #0f2027 0%, #203a43 60%, #2c5364 100%);
     color: white;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     height: 100vh;
+    overflow: hidden;
     text-align: center;
   }
 
@@ -41,6 +42,7 @@
   .logo {
     width: 150px;
     margin-bottom: 30px;
+    animation: float 3s ease-in-out infinite;
   }
 
   footer {
@@ -74,6 +76,26 @@
     color: #000;
   }
 
+  /* เอฟเฟกต์ประกายไฟ */
+  .spark {
+    position: fixed;
+    width: 3px;
+    height: 3px;
+    background: #00ffff;
+    border-radius: 50%;
+    animation: sparkle 1.2s linear infinite;
+  }
+
+  @keyframes sparkle {
+    0% { transform: translateY(0) scale(1); opacity: 1; }
+    100% { transform: translateY(-100px) scale(0); opacity: 0; }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
   @media (max-width: 600px) {
     h1 { font-size: 2rem; }
     #countdown { font-size: 1.3rem; }
@@ -95,9 +117,28 @@
 
   <footer>© 2025 4LAPTOP100 | Powered by Bangwad Team</footer>
 
+  <!-- เสียงนาฬิกานับถอยหลัง -->
+  <audio id="tickSound" preload="auto">
+    <source src="https://cdn.pixabay.com/download/audio/2022/03/22/audio_7b8d20d9a3.mp3?filename=clock-tick-1.mp3" type="audio/mp3">
+  </audio>
+
   <script>
+    // ===============================
+    // 🔒 ป้องกันคลิกขวา / Inspect
+    // ===============================
+    document.addEventListener("contextmenu", e => e.preventDefault());
+    document.addEventListener("keydown", e => {
+      if (e.key === "F12" || (e.ctrlKey && e.shiftKey && ["I","J","C"].includes(e.key)) || (e.ctrlKey && e.key === "U")) {
+        e.preventDefault();
+      }
+    });
+
+    // ===============================
+    // 🌐 ระบบสลับภาษา
+    // ===============================
     const langBtn = document.getElementById("langBtn");
-    let lang = "th"; // ภาษาเริ่มต้น
+    const tickSound = document.getElementById("tickSound");
+    let lang = "th";
 
     langBtn.addEventListener("click", () => {
       lang = lang === "th" ? "en" : "th";
@@ -120,21 +161,46 @@
       }
     }
 
-    // === ตั้งเวลานับถอยหลัง ===
-    const targetDate = new Date("Nov 6, 2025 20:05:00").getTime(); // ✅ ปรับเวลาตามต้องการ
+    // ===============================
+    // ✨ เอฟเฟกต์ประกายไฟ
+    // ===============================
+    function createSpark() {
+      const spark = document.createElement("div");
+      spark.classList.add("spark");
+      spark.style.left = Math.random() * window.innerWidth + "px";
+      spark.style.top = Math.random() * window.innerHeight + "px";
+      spark.style.animationDuration = (Math.random() * 1 + 0.5) + "s";
+      document.body.appendChild(spark);
+      setTimeout(() => spark.remove(), 1200);
+    }
+
+    // ===============================
+    // ⏳ ระบบนับถอยหลัง + Redirect
+    // ===============================
+    const targetDate = new Date("Nov 6, 2025 20:09:00").getTime();
     const timer = setInterval(() => {
       const now = new Date().getTime();
       const distance = targetDate - now;
 
+      // เล่นเสียง tick ทุกวินาที
+      tickSound.currentTime = 0;
+      tickSound.play().catch(() => {});
+
       if (distance <= 0) {
         clearInterval(timer);
-        // ✅ แสดงข้อความก่อน redirect
         document.getElementById("countdown").innerHTML =
           lang === "th" ? "🎉 กำลังเข้าสู่หน้าประกาศรายชื่อ..." : "🎉 Redirecting to announcement page...";
-        // ✅ รอ 2 วินาทีแล้วเปลี่ยนหน้า
+
+        // เอฟเฟกต์ประกายไฟก่อนเปลี่ยนหน้า
+        let sparkInterval = setInterval(() => createSpark(), 50);
+        setTimeout(() => clearInterval(sparkInterval), 2000);
+
+        // ✅ เปลี่ยนหน้า
         setTimeout(() => {
-          window.location.href = "adminlist.html";
-        }, 2000);
+          document.body.style.transition = "opacity 1.5s ease";
+          document.body.style.opacity = "0";
+          setTimeout(() => (window.location.href = "adminlist.html"), 1500);
+        }, 2500);
         return;
       }
 
@@ -148,6 +214,8 @@
         : `${days} Days ${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 
       document.getElementById("countdown").innerHTML = text;
+
+      if (Math.random() < 0.2) createSpark();
     }, 1000);
   </script>
 </body>
