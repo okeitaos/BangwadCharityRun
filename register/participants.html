@@ -55,6 +55,25 @@
     font-weight: bold;
   }
 
+  .lang-toggle {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid #00ffff;
+    color: #00ffff;
+    padding: 6px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: 0.3s;
+  }
+
+  .lang-toggle:hover {
+    background: #00ffff;
+    color: #000;
+  }
+
   @media (max-width: 600px) {
     h1 { font-size: 2rem; }
     #countdown { font-size: 1.3rem; }
@@ -62,26 +81,60 @@
 </style>
 </head>
 <body>
+  <button class="lang-toggle" id="langBtn">EN</button>
+
   <img src="https://lh5.googleusercontent.com/d/1gQmeWDIjDtQTFOJDZKUQMJRRdfBjlRUh" alt="4LAPTOP100 Logo" class="logo">
 
-  <h1>Coming Soon</h1>
-  <p>กำลังเตรียมประกาศรายชื่อผู้เข้าแข่งขัน<br><span class="highlight">4LAPTOP100 2025</span></p>
+  <h1 id="title">Coming Soon</h1>
+  <p id="desc">
+    กำลังเตรียมประกาศรายชื่อผู้เข้าแข่งขัน<br>
+    <span class="highlight">4LAPTOP100 2025</span>
+  </p>
 
   <div id="countdown">00 วัน 00:00:00</div>
 
   <footer>© 2025 4LAPTOP100 | Powered by Bangwad Team</footer>
 
   <script>
-    // ตั้งเวลานับถอยหลัง (ตัวอย่าง: 15 ธันวาคม 2025 เวลา 10:00)
-    const targetDate = new Date("Dec 15, 2025 06:00:00").getTime();
+    const langBtn = document.getElementById("langBtn");
+    let lang = "th"; // ภาษาเริ่มต้น
 
+    langBtn.addEventListener("click", () => {
+      lang = lang === "th" ? "en" : "th";
+      updateLanguage();
+    });
+
+    function updateLanguage() {
+      if (lang === "th") {
+        document.documentElement.lang = "th";
+        document.getElementById("title").textContent = "Coming Soon";
+        document.getElementById("desc").innerHTML =
+          "กำลังเตรียมประกาศรายชื่อผู้เข้าแข่งขัน<br><span class='highlight'>4LAPTOP100 2025</span>";
+        langBtn.textContent = "EN";
+      } else {
+        document.documentElement.lang = "en";
+        document.getElementById("title").textContent = "Coming Soon";
+        document.getElementById("desc").innerHTML =
+          "Preparing the announcement of participants<br><span class='highlight'>4LAPTOP100 2025</span>";
+        langBtn.textContent = "ไทย";
+      }
+    }
+
+    // === ตั้งเวลานับถอยหลัง ===
+    const targetDate = new Date("Nov 6, 2025 20:05:00").getTime(); // ✅ ปรับเวลาตามต้องการ
     const timer = setInterval(() => {
       const now = new Date().getTime();
       const distance = targetDate - now;
 
-      if (distance < 0) {
+      if (distance <= 0) {
         clearInterval(timer);
-        document.getElementById("countdown").innerHTML = "🎉 รายชื่อจะประกาศเร็วๆ นี้!";
+        // ✅ แสดงข้อความก่อน redirect
+        document.getElementById("countdown").innerHTML =
+          lang === "th" ? "🎉 กำลังเข้าสู่หน้าประกาศรายชื่อ..." : "🎉 Redirecting to announcement page...";
+        // ✅ รอ 2 วินาทีแล้วเปลี่ยนหน้า
+        setTimeout(() => {
+          window.location.href = "adminlist.html";
+        }, 2000);
         return;
       }
 
@@ -90,8 +143,11 @@
       const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((distance % (1000 * 60)) / 1000);
 
-      document.getElementById("countdown").innerHTML =
-        `${days} วัน ${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+      const text = lang === "th"
+        ? `${days} วัน ${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
+        : `${days} Days ${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+
+      document.getElementById("countdown").innerHTML = text;
     }, 1000);
   </script>
 </body>
