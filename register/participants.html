@@ -45,6 +45,21 @@
     animation: float 3s ease-in-out infinite;
   }
 
+  .sponsor {
+    font-size: 1rem;
+    color: #00ffff;
+    margin-top: 1.5rem;
+    letter-spacing: 1px;
+  }
+
+  .sponsor-logo {
+    margin-top: 10px;
+    width: 120px;
+    opacity: 0.85;
+    filter: drop-shadow(0 0 8px #00ffff);
+    animation: sponsorFloat 3s ease-in-out infinite;
+  }
+
   footer {
     position: absolute;
     bottom: 10px;
@@ -96,9 +111,15 @@
     50% { transform: translateY(-10px); }
   }
 
+  @keyframes sponsorFloat {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.05); opacity: 1; }
+  }
+
   @media (max-width: 600px) {
     h1 { font-size: 2rem; }
     #countdown { font-size: 1.3rem; }
+    .sponsor-logo { width: 90px; }
   }
 </style>
 </head>
@@ -114,6 +135,10 @@
   </p>
 
   <div id="countdown">00 วัน 00:00:00</div>
+
+  <!-- ✨ Sponsor Section -->
+  <div class="sponsor" id="sponsorText">CORE NUTRITION V POW</div>
+  <img src="https://lh5.googleusercontent.com/d/1L8xS3WdoYc8e6fdwMKdbyUHXmCiIRKui" alt="CORE NUTRITION V POW" class="CORE NUTRITION V POW">
 
   <footer>© 2025 4LAPTOP100 | Powered by Bangwad Charity Run</footer>
 
@@ -151,12 +176,14 @@
         document.getElementById("title").textContent = "Coming Soon";
         document.getElementById("desc").innerHTML =
           "กำลังเตรียมประกาศรายชื่อผู้เข้าแข่งขัน<br><span class='highlight'>4LAPTOP100 2025</span>";
+        document.getElementById("sponsorText").textContent = "Presented by Bangwad Running Club";
         langBtn.textContent = "EN";
       } else {
         document.documentElement.lang = "en";
         document.getElementById("title").textContent = "Coming Soon";
         document.getElementById("desc").innerHTML =
           "Preparing the announcement of participants<br><span class='highlight'>4LAPTOP100 2025</span>";
+        document.getElementById("sponsorText").textContent = "Presented by Bangwad Running Club";
         langBtn.textContent = "ไทย";
       }
     }
@@ -177,12 +204,11 @@
     // ===============================
     // ⏳ ระบบนับถอยหลัง + Redirect
     // ===============================
-    const targetDate = new Date("Dec 15, 2025 06:00:00").getTime();
+    const targetDate = new Date("Dec 15, 2025 10:00:00").getTime();
     const timer = setInterval(() => {
       const now = new Date().getTime();
       const distance = targetDate - now;
 
-      // เล่นเสียง tick ทุกวินาที
       tickSound.currentTime = 0;
       tickSound.play().catch(() => {});
 
@@ -191,11 +217,9 @@
         document.getElementById("countdown").innerHTML =
           lang === "th" ? "🎉 กำลังเข้าสู่หน้าประกาศรายชื่อ..." : "🎉 Redirecting to announcement page...";
 
-        // เอฟเฟกต์ประกายไฟก่อนเปลี่ยนหน้า
         let sparkInterval = setInterval(() => createSpark(), 50);
         setTimeout(() => clearInterval(sparkInterval), 2000);
 
-        // ✅ เปลี่ยนหน้า
         setTimeout(() => {
           document.body.style.transition = "opacity 1.5s ease";
           document.body.style.opacity = "0";
