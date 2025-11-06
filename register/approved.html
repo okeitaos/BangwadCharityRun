@@ -36,6 +36,7 @@ h1 {
   justify-content: space-between;
   flex-wrap: wrap;
   margin-bottom: 20px;
+  gap: 10px;
 }
 .controls input[type="text"] {
   padding: 8px 12px;
@@ -44,7 +45,7 @@ h1 {
   width: 100%;
   max-width: 250px;
 }
-.controls .filters button {
+.controls .filters button, .controls .export-btn {
   padding: 8px 16px;
   margin-left: 5px;
   border: none;
@@ -55,7 +56,8 @@ h1 {
   transition: 0.3s;
 }
 .controls .filters button.active, 
-.controls .filters button:hover {
+.controls .filters button:hover,
+.export-btn:hover {
   background: #28a745;
 }
 
@@ -173,6 +175,7 @@ h1 {
     <button data-status="pending">pending</button>
     <button data-status="Approved">Approved</button>
   </div>
+  <button class="export-btn" onclick="exportToExcel()">📊 Export Excel</button>
 </div>
 
 <div id="cardsContainer"></div>
@@ -187,6 +190,8 @@ h1 {
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
@@ -287,6 +292,30 @@ document.querySelectorAll(".filters button").forEach(btn=>{
 
 // Search input
 searchInput.addEventListener("input", renderCards);
+
+// Export Excel
+function exportToExcel(){
+  if(participantsData.length === 0){ alert("No data to export!"); return; }
+
+  const exportData = participantsData.map(p => ({
+    id: p.id,
+    first_name: p.first_name,
+    last_name: p.last_name,
+    national_id: p.national_id,
+    phone: p.phone,
+    category: p.category,
+    slip_url: p.slip_url,
+    created_at: p.created_at,
+    status: p.status,
+    email: p.email,
+    age: p.age
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(exportData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Participants");
+  XLSX.writeFile(wb, "Bangwad_Participants.xlsx");
+}
 
 loadParticipants();
 
