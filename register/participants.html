@@ -1,245 +1,98 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Participants</title>
+<title>Coming Soon | 4LAPTOP100 2025</title>
 <style>
-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-  color: #fff;
-  margin: 0;
-  padding: 20px;
-}
-h1 {
-  text-align: center;
-  margin-bottom: 20px;
-  font-size: 2rem;
-  text-shadow: 1px 1px 6px rgba(0,0,0,0.7);
-}
-.container {
-  max-width: 1000px;
-  margin: auto;
-  padding: 20px;
-  border-radius: 16px;
-  background: rgba(255,255,255,0.05);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-  transition: all 0.3s;
-}
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 20px;
-  align-items: center;
-  justify-content: center;
-}
-input, select {
-  padding: 10px 14px;
-  border-radius: 12px;
-  border: none;
-  font-weight: 600;
-  transition: all 0.3s;
-}
-input {
-  background: rgba(255,255,255,0.15);
-  color: #fff;
-}
-input::placeholder { color: #ddd; }
-input:hover, select:hover { cursor:pointer; }
-select { background: rgba(255,255,255,0.15); color: #fff; }
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: "Poppins", sans-serif;
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    text-align: center;
+  }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  border-radius: 12px;
-  overflow: hidden;
-  background: rgba(255,255,255,0.08);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.4);
-}
-th, td {
-  padding: 14px;
-  text-align: center;
-}
-th {
-  background: linear-gradient(90deg, #ff7e5f, #feb47b);
-  color: #fff;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-tr:nth-child(even) {background: rgba(255,255,255,0.05);}
-tr:hover {background: rgba(255,255,255,0.18); transition: 0.3s;}
-td { font-weight: 500; }
+  h1 {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
 
-.pagination {
-  margin-top: 20px;
-  text-align: center;
-}
-.pagination button {
-  padding: 8px 14px;
-  margin: 0 4px;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  background: rgba(255,255,255,0.15);
-  color: #fff;
-  font-weight: 600;
-  transition: all 0.3s;
-}
-.pagination button:hover { background: rgba(255,255,255,0.35); }
-.pagination button.active {
-  background: linear-gradient(90deg, #ff7e5f, #feb47b);
-  color: #fff;
-}
+  p {
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+  }
 
-@media(max-width:768px){
-  .controls { flex-direction: column; gap: 12px; }
-  table, thead, tbody, th, td, tr {display: block;}
-  th {display:none;}
-  td {display:flex; justify-content:space-between; padding:12px; border-bottom:1px solid rgba(255,255,255,0.2);}
-  td::before {font-weight:bold; content: attr(data-label); color:#ffd;}
-}
+  #countdown {
+    font-size: 2rem;
+    font-weight: bold;
+    letter-spacing: 2px;
+    margin-bottom: 2rem;
+  }
+
+  .logo {
+    width: 150px;
+    margin-bottom: 30px;
+  }
+
+  footer {
+    position: absolute;
+    bottom: 10px;
+    font-size: 0.9rem;
+    color: #ccc;
+  }
+
+  .highlight {
+    color: #00ffff;
+    font-weight: bold;
+  }
+
+  @media (max-width: 600px) {
+    h1 { font-size: 2rem; }
+    #countdown { font-size: 1.3rem; }
+  }
 </style>
 </head>
 <body>
-<h1 id="title">Approved Participants</h1>
-<div class="container">
-  <div class="controls">
-    <input type="text" id="searchInput" placeholder="Search by name...">
-    <select id="filterCategory"></select>
-    <select id="languageSelect">
-      <option value="en">English</option>
-      <option value="th">ไทย</option>
-    </select>
-  </div>
+  <img src="https://lh5.googleusercontent.com/d/1gQmeWDIjDtQTFOJDZKUQMJRRdfBjlRUh" alt="4LAPTOP100 Logo" class="logo">
 
-  <table id="participantsTable">
-    <thead>
-      <tr>
-        <th id="thNumber">#</th>
-        <th id="thName">Full Name</th>
-        <th id="thCategory">Category</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <h1>Coming Soon</h1>
+  <p>กำลังเตรียมประกาศรายชื่อผู้เข้าแข่งขัน<br><span class="highlight">4LAPTOP100 2025</span></p>
 
-  <div class="pagination" id="pagination"></div>
-</div>
+  <div id="countdown">00 วัน 00:00:00</div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script>
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  <footer>© 2025 4LAPTOP100 | Powered by Bangwad Team</footer>
 
-let allParticipants = [];
-let currentPage = 1;
-const itemsPerPage = 10;
-let currentLang = "en";
+  <script>
+    // ตั้งเวลานับถอยหลัง (ตัวอย่าง: 15 พฤศจิกายน 2025 เวลา 10:00)
+    const targetDate = new Date("Nov 15, 2025 10:00:00").getTime();
 
-const i18n = {
-  en: {
-    title: "Approved Participants",
-    search: "Search by name...",
-    allCategories: "All Categories",
-    number: "#",
-    name: "Full Name",
-    category: "Category",
-    noData: "No participants found"
-  },
-  th: {
-    title: "รายชื่อผู้เข้าร่วมที่อนุมัติแล้ว",
-    search: "ค้นหาชื่อ...",
-    allCategories: "ทุกหมวดหมู่",
-    number: "ลำดับ",
-    name: "ชื่อ-นามสกุล",
-    category: "หมวดหมู่",
-    noData: "ไม่พบข้อมูล"
-  }
-};
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      const distance = targetDate - now;
 
-function applyLanguage(){
-  const t = i18n[currentLang];
-  document.getElementById("title").textContent = t.title;
-  document.getElementById("searchInput").placeholder = t.search;
-  document.getElementById("thNumber").textContent = t.number;
-  document.getElementById("thName").textContent = t.name;
-  document.getElementById("thCategory").textContent = t.category;
-  populateFilter();
-  displayParticipants();
-}
+      if (distance < 0) {
+        clearInterval(timer);
+        document.getElementById("countdown").innerHTML = "🎉 รายชื่อจะประกาศเร็วๆ นี้!";
+        return;
+      }
 
-async function loadParticipants(){
-  const { data, error } = await client.from("bangwad")
-    .select("first_name,last_name,category")
-    .eq("status","Approved")
-    .order("id",{ascending:true});
-  if(error){ console.error(error); return;}
-  allParticipants = data || [];
-  populateFilter();
-  displayParticipants();
-}
+      const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
 
-function populateFilter(){
-  const select = document.getElementById("filterCategory");
-  const categories = [...new Set(allParticipants.map(p=>p.category).filter(c=>c))];
-  select.innerHTML = `<option value="">${i18n[currentLang].allCategories}</option>` + categories.map(c=>`<option value="${c}">${c}</option>`).join("");
-  select.onchange = () => { currentPage=1; displayParticipants(); };
-}
-
-function displayParticipants(){
-  const tbody = document.querySelector("#participantsTable tbody");
-  const filter = document.getElementById("filterCategory").value;
-  const search = document.getElementById("searchInput").value.toLowerCase();
-  const filtered = allParticipants.filter(p=>{
-    const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
-    return (fullName.includes(search)) && (filter ? p.category===filter : true);
-  });
-
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  const start = (currentPage-1)*itemsPerPage;
-  const pageItems = filtered.slice(start,start+itemsPerPage);
-
-  tbody.innerHTML = "";
-  pageItems.forEach((p,i)=>{
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td data-label="${i18n[currentLang].number}">${start + i + 1}</td>
-      <td data-label="${i18n[currentLang].name}">${p.first_name} ${p.last_name}</td>
-      <td data-label="${i18n[currentLang].category}">${p.category || "-"}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  if(filtered.length===0){
-    tbody.innerHTML = `<tr><td colspan="3">${i18n[currentLang].noData}</td></tr>`;
-  }
-
-  const paginationDiv = document.getElementById("pagination");
-  paginationDiv.innerHTML = "";
-  for(let i=1;i<=totalPages;i++){
-    const btn = document.createElement("button");
-    btn.textContent = i;
-    if(i===currentPage) btn.classList.add("active");
-    btn.onclick = () => { currentPage=i; displayParticipants(); };
-    paginationDiv.appendChild(btn);
-  }
-}
-
-// Search input
-document.getElementById("searchInput").addEventListener("input", () => { currentPage=1; displayParticipants(); });
-// Language select
-document.getElementById("languageSelect").addEventListener("change", (e)=>{
-  currentLang = e.target.value;
-  applyLanguage();
-});
-
-loadParticipants().then(applyLanguage);
-setInterval(loadParticipants,5000);
-</script>
+      document.getElementById("countdown").innerHTML =
+        `${days} วัน ${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+    }, 1000);
+  </script>
 </body>
 </html>
