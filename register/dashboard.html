@@ -101,16 +101,13 @@ closePopup.onclick = () => {
   popup.style.display = "none";
 };
 
-// 🕒 แปลงเวลา UTC → เวลาประเทศไทย
-function formatThaiTime(utcString) {
-  if (!utcString) return "-";
-  const date = new Date(utcString);
-  date.setHours(date.getHours() + 7); // แปลงเป็น UTC+7
-  return date.toLocaleTimeString("th-TH", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit"
-  });
+// 🕒 แสดงเวลา “ตรงกับฐานข้อมูล” โดยไม่แปลงโซน
+function formatThaiTime(localString) {
+  if (!localString) return "-";
+  const [datePart, timePart] = localString.split("T");
+  if (!timePart) return localString;
+  const [h, m, s] = timePart.replace("Z", "").split(":");
+  return `${h.padStart(2,"0")}:${m.padStart(2,"0")}:${s ? s.split(".")[0] : "00"}`;
 }
 
 // แปลงเวลารวม (ms → HH:mm:ss)
