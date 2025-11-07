@@ -96,12 +96,24 @@ const searchInput = document.getElementById("searchInput");
 let currentType = "ALL";
 let currentSearch = "";
 
-// close handler
+// ปิด popup
 closePopup.onclick = () => {
   popup.style.display = "none";
 };
 
-// helper
+// 🕒 แปลงเวลา UTC → เวลาประเทศไทย
+function formatThaiTime(utcString) {
+  if (!utcString) return "-";
+  const date = new Date(utcString);
+  date.setHours(date.getHours() + 7); // แปลงเป็น UTC+7
+  return date.toLocaleTimeString("th-TH", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+}
+
+// แปลงเวลารวม (ms → HH:mm:ss)
 function formatDuration(ms) {
   const s = Math.floor(ms / 1000);
   const h = Math.floor(s / 3600);
@@ -110,10 +122,10 @@ function formatDuration(ms) {
   return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
 }
 
+// โหลดข้อมูลทั้งหมด
 async function loadDashboard() {
   const { data: runners, error } = await supabase
     .from("runner")
-    // เพิ่ม bib ใน select
     .select("id,bib,name,tag_id,type,status,record(lap,start_time,finish_time)")
     .order("name",{ascending:true});
   if (error) return console.error(error);
@@ -125,7 +137,7 @@ async function loadDashboard() {
     filtered = filtered.filter(r => 
       (r.name || "").toLowerCase().includes(q) ||
       (r.tag_id || "").toLowerCase().includes(q) ||
-      (r.bib || "").toLowerCase().includes(q) // เพิ่มการค้นหาจาก bib
+      (r.bib || "").toLowerCase().includes(q)
     );
   }
 
@@ -147,6 +159,7 @@ async function loadDashboard() {
   renderRunners([...finished, ...running, ...dnf]);
 }
 
+// แสดงรายการนักวิ่ง
 function renderRunners(list) {
   runnerTableBody.innerHTML = "";
   list.forEach((r,i) => {
@@ -154,7 +167,6 @@ function renderRunners(list) {
     const totalTimeText = r.totalTime ? formatDuration(r.totalTime) : "-";
     const row = document.createElement("tr");
     row.className = `${rowClass} border-b hover:bg-gray-50 cursor-pointer`;
-    // เพิ่มคอลัมน์ BIB (r.bib)
     row.innerHTML = `
       <td class="p-2 text-center">${i+1}</td>
       <td class="p-2 text-center font-medium">${r.bib || "-"}</td>
@@ -169,10 +181,9 @@ function renderRunners(list) {
   });
 }
 
+// แสดงรายละเอียด popup
 function showDetails(runner) {
-  // แสดง popup_background
   popup.style.display = "flex";
-  // แสดงข้อมูล BIB ใน popup
   popupTitle.textContent = `${runner.name} (${runner.type})`;
   popupBib.textContent = `BIB: ${runner.bib || "-"}`;
   const totalTime = runner.totalTime ? formatDuration(runner.totalTime) : "-";
@@ -182,6 +193,7 @@ function showDetails(runner) {
     ระยะทาง: <b>${runner.distance} กม.</b> |
     เวลารวม: <b>${totalTime}</b>
   `;
+
   const laps = (runner.record || [])
     .filter(rec => rec.lap >= 0 && (rec.start_time || rec.finish_time))
     .sort((a,b) => a.lap - b.lap);
@@ -196,14 +208,15 @@ function showDetails(runner) {
     popupContent.innerHTML += `
       <tr class="border-t">
         <td class="p-2 text-center">${rec.lap + 1}</td>
-        <td class="p-2 text-center">${rec.start_time ? new Date(rec.start_time).toLocaleTimeString("th-TH") : "-"}</td>
-        <td class="p-2 text-center">${rec.finish_time ? new Date(rec.finish_time).toLocaleTimeString("th-TH") : "-"}</td>
+        <td class="p-2 text-center">${formatThaiTime(rec.start_time)}</td>
+        <td class="p-2 text-center">${formatThaiTime(rec.finish_time)}</td>
         <td class="p-2 text-center">${rec.start_time && rec.finish_time ? formatDuration(new Date(rec.finish_time) - new Date(rec.start_time)) : "-"}</td>
       </tr>`;
   });
   avgTime.textContent = count > 0 ? `⏱ เวลาต่อรอบเฉลี่ย: ${formatDuration(totalLapTime / count)} (จาก ${count} รอบ)` : "";
 }
 
+// Tabs
 typeTabs.forEach(tab => {
   tab.addEventListener("click", () => {
     typeTabs.forEach(t => t.classList.remove("active-tab"));
@@ -213,6 +226,7 @@ typeTabs.forEach(tab => {
   });
 });
 
+// Search
 let searchTimeout = null;
 searchInput.addEventListener("input", () => {
   if (searchTimeout) clearTimeout(searchTimeout);
