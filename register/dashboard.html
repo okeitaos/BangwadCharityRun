@@ -102,13 +102,27 @@ closePopup.onclick = () => {
 };
 
 // 🕒 แสดงเวลา “ตรงกับฐานข้อมูล” โดยไม่แปลงโซน
-function formatThaiTime(localString) {
-  if (!localString) return "-";
-  const [datePart, timePart] = localString.split("T");
-  if (!timePart) return localString;
-  const [h, m, s] = timePart.replace("Z", "").split(":");
-  return `${h.padStart(2,"0")}:${m.padStart(2,"0")}:${s ? s.split(".")[0] : "00"}`;
+// function formatThaiTime(localString) {
+//   if (!localString) return "-";
+//   const [datePart, timePart] = localString.split("T");
+//   if (!timePart) return localString;
+//   const [h, m, s] = timePart.replace("Z", "").split(":");
+//   return `${h.padStart(2,"0")}:${m.padStart(2,"0")}:${s ? s.split(".")[0] : "00"}`;
+// }
+  function formatThaiTime(timeString) {
+  if (!timeString) return "-";
+  // ตัดส่วน +00:00 หรือ Z ทิ้ง
+  timeString = timeString.replace("Z", "").replace("+00:00", "").trim();
+  
+  // แยกเอาเฉพาะเวลา (หลัง T)
+  const [datePart, timePart] = timeString.split("T");
+  if (!timePart) return timeString;
+  
+  // ดึงเฉพาะ HH:mm:ss
+  const [h, m, s] = timePart.split(":");
+  return `${h.padStart(2, "0")}:${m.padStart(2, "0")}:${(s || "00").split(".")[0]}`;
 }
+
 
 // แปลงเวลารวม (ms → HH:mm:ss)
 function formatDuration(ms) {
