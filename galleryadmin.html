@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin | Face Sync Control</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
+  </head>
+
+  <body
+    class="bg-slate-900 text-white flex flex-col items-center min-h-screen p-6"
+  >
+    <h1 class="text-3xl font-bold mb-6 text-center">
+      🧩 Admin Dashboard | Face Sync
+    </h1>
+
+    <div
+      class="bg-slate-800 p-6 rounded-xl shadow-lg w-full max-w-md text-center mb-8"
+    >
+      <h2 class="text-lg font-semibold mb-2">🔄 Auto Sync Gallery</h2>
+      <p id="syncStatus" class="text-gray-400 text-sm mb-3">⏳ Waiting...</p>
+      <button
+        id="manualSyncBtn"
+        class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg"
+      >
+        🔁 ซิงค์ทันที
+      </button>
+    </div>
+
+    <div
+      class="bg-slate-800 p-4 rounded-xl shadow-lg w-full max-w-md text-center"
+    >
+      <h2 class="text-lg font-semibold mb-2">🧠 Model Status</h2>
+      <p id="status" class="text-gray-300 text-sm">⏳ Initializing...</p>
+    </div>
+
+    <script>
+      const SUPABASE_URL = 'https://xjdjurdflowiwdxgkvfr.supabase.co';
+      const SUPABASE_ANON_KEY =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics';
+      const supabase = window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY
+      );
+      const BUCKET = 'gallery';
+
+      const CONF_THRESHOLD = 0.9;
+      let isSyncing = false;
+
+      function normalize(desc) {
+        const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
+        return desc.map((x) => x / norm);
+      }
+
+      async function listRecursive(path = '') {
+        const { data, error } = await supabase.storage
+          .from(BUCKET)
+          .list(path, { limit: 1000 });
+        if (error) return [];
+        let files = [];
+        for (const item of data) {
+          if (!item.metadata) {
+            const sub = await listRecursive(
+              path ? `${path}/${item.name}` : item.name
+            );
+            files = files.concat(sub);
+          } else files.push(path ? `${path}/${item.name}` : item.name);
+        }
+        return files;
+      }
+
+      async function autoSync() {
+        if (isSyncing) return;
+        isSyncing = true;
+        const syncStatus = document.getElementById('syncStatus');
+        syncStatus.textContent = '🔄 กำลังซิงค์...';
+        const files = await listRecursive('');
+        let count = 0;
+
+        for (const path of files) {
+          const { data: exists } = await supabase
+            .from('faces')
+            .select('id')
+            .eq('image_url', path)
+            .maybeSingle();
+          if (exists) continue;
+          const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
+          try {
+            const img = await faceapi.fetchImage(imgUrl);
+            const det = await faceapi
+              .detectSingleFace(img)
+              .withFaceLandmarks()
+              .withFaceDescriptor();
+            if (!det || det.detection.score < CONF_THRESHOLD) continue;
+            const embedding = normalize(Array.from(det.descriptor));
+            if (embedding.length !== 128) continue;
+            const name = path.split('/').pop().split('.')[0];
+            await supabase.rpc('insert_face_vector', {
+              p_name: name,
+              p_image_url: path,
+              p_embedding: embedding,
+            });
+            count++;
+            if (count % 10 === 0)
+              syncStatus.textContent = `✅ ซิงค์แล้ว ${count}/${files.length}`;
+          } catch (e) {
+            console.warn('❌ sync error', e);
+          }
+        }
+
+        const now = new Date().toLocaleTimeString();
+        syncStatus.textContent = `✅ ซิงค์ล่าสุด: ${now}`;
+        isSyncing = false;
+      }
+
+      async function initModels() {
+        const modelURL =
+          'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/';
+        const statusDiv = document.getElementById('status');
+        statusDiv.textContent = '⏳ โหลดโมเดล...';
+        await Promise.all([
+          faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(modelURL),
+        ]);
+        statusDiv.textContent = '✅ พร้อมซิงค์ใบหน้าแล้ว';
+      }
+
+      window.addEventListener('DOMContentLoaded', async () => {
+        await initModels();
+        await autoSync();
+        setInterval(autoSync, 60000);
+      });
+
+      document
+        .getElementById('manualSyncBtn')
+        .addEventListener('click', autoSync);
+    </script>
+  </body>
+</html>
