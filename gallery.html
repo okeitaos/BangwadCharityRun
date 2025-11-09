@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>User | Face Search + Popup + Download</title>
+  <title>User | Face Search + Popup + Instant Download</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
@@ -27,9 +27,9 @@
     <div class="relative">
       <img id="modalImage" src="" alt="Full View" class="max-h-[90vh] max-w-[90vw] rounded-lg shadow-2xl border border-gray-700" />
       <div class="absolute top-2 right-2 flex gap-2">
-        <a id="downloadLink" href="#" download class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg shadow">
+        <button id="downloadModal" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg shadow">
           💾 Download
-        </a>
+        </button>
         <button id="closeModal" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg shadow">
           ✖️ Close
         </button>
@@ -55,7 +55,7 @@
   const imageModal = document.getElementById("imageModal");
   const modalImage = document.getElementById("modalImage");
   const closeModal = document.getElementById("closeModal");
-  const downloadLink = document.getElementById("downloadLink");
+  const downloadModal = document.getElementById("downloadModal");
 
   // 🧠 Normalize descriptor
   function normalize(desc) {
@@ -63,7 +63,7 @@
     return desc.map(x => x / norm);
   }
 
-  // 🧩 Load face-api models
+  // 🧩 โหลดโมเดล FaceAPI
   async function initModels() {
     const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
     statusDiv.textContent = "⏳ โหลดโมเดล...";
@@ -75,7 +75,25 @@
     statusDiv.textContent = "✅ พร้อมค้นหาแล้ว";
   }
 
-  // 🔍 Search function
+  // 💾 ฟังก์ชันดาวน์โหลดทันที
+  async function downloadImage(url, filename) {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename || "download.jpg";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      alert("❌ โหลดไฟล์ไม่สำเร็จ");
+      console.error(err);
+    }
+  }
+
+  // 🔍 Face Search
   async function performSearch() {
     const file = fileInput.files[0];
     if (!file) return alert("เลือกรูปก่อนค้นหา");
@@ -114,34 +132,51 @@
       <div class="grid grid-cols-2 gap-3">
         ${filtered.map(v => {
           const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${v.image_url}`;
+          const filename = v.name + ".jpg";
           return `
-          <div class="bg-slate-700 p-2 rounded-lg cursor-pointer hover:scale-105 transition" data-img="${imgUrl}">
-            <img src="${imgUrl}" class="rounded-lg mb-2 shadow">
+          <div class="bg-slate-700 p-2 rounded-lg hover:scale-105 transition">
+            <img src="${imgUrl}" class="rounded-lg mb-2 shadow cursor-pointer" data-img="${imgUrl}">
             <p class="text-sm">${v.name}</p>
             <p class="text-xs text-gray-400">Sim: ${(v.similarity*100).toFixed(2)}%</p>
-            <a href="${imgUrl}" download class="block text-blue-400 hover:text-blue-300 text-xs mt-1">💾 ดาวน์โหลด</a>
+            <button class="downloadBtn mt-1 text-blue-400 hover:text-blue-200 text-xs" data-url="${imgUrl}" data-name="${filename}">💾 ดาวน์โหลด</button>
           </div>`;
         }).join("")}
       </div>`;
 
-    // 🖼️ Popup click event
+    // 🖼️ คลิกดูภาพแบบ Popup
     document.querySelectorAll("[data-img]").forEach(el => {
-      el.addEventListener("click", e => {
+      el.addEventListener("click", () => {
         const imgUrl = el.dataset.img;
         modalImage.src = imgUrl;
-        downloadLink.href = imgUrl;
+        downloadModal.setAttribute("data-url", imgUrl);
         imageModal.classList.remove("hidden");
+      });
+    });
+
+    // 💾 ปุ่มดาวน์โหลดแต่ละภาพ
+    document.querySelectorAll(".downloadBtn").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        const url = btn.getAttribute("data-url");
+        const name = btn.getAttribute("data-name");
+        downloadImage(url, name);
       });
     });
   }
 
-  // ❌ Close popup
+  // 💾 ปุ่มดาวน์โหลดใน Popup
+  downloadModal.addEventListener("click", () => {
+    const url = downloadModal.getAttribute("data-url");
+    downloadImage(url, "face_result.jpg");
+  });
+
+  // ❌ ปิด Popup
   closeModal.addEventListener("click", () => imageModal.classList.add("hidden"));
   imageModal.addEventListener("click", e => {
     if (e.target === imageModal) imageModal.classList.add("hidden");
   });
 
-  // 🚀 Init
+  // 🚀 เริ่มต้น
   window.addEventListener("DOMContentLoaded", initModels);
   searchBtn.addEventListener("click", performSearch);
   </script>
