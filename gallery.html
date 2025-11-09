@@ -45,7 +45,7 @@
   const BUCKET = "gallery";
   const EDGE_LIMIT = 50;
   const SIM_THRESHOLD = 0.93;
-  const DISPLAY_THRESHOLD = 0.90;
+  const DISPLAY_THRESHOLD = 0.95;
 
   // 📦 DOM
   const fileInput = document.getElementById("fileInput");
@@ -123,12 +123,12 @@
 
     const filtered = matches.filter(m => m.similarity >= DISPLAY_THRESHOLD);
     if (!filtered.length) {
-      resultDiv.innerHTML = "❌ ไม่พบใบหน้าที่เหมือน ≥ 90%";
+      resultDiv.innerHTML = "❌ ไม่พบใบหน้าที่เหมือน ≥ 95%";
       return;
     }
 
     resultDiv.innerHTML = `
-      <p class="text-green-400 font-semibold mb-2">🎯 พบใบหน้าที่เหมือน ≥90% จำนวน ${filtered.length} ภาพ</p>
+      <p class="text-green-400 font-semibold mb-2">🎯 พบใบหน้าที่เหมือน ≥95% จำนวน ${filtered.length} ภาพ</p>
       <div class="grid grid-cols-2 gap-3">
         ${filtered.map(v => {
           const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${v.image_url}`;
