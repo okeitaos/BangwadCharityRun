@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>User | Face Search + Popup View</title>
+  <title>User | Face Search + Popup + Download</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
@@ -26,39 +26,44 @@
   <div id="imageModal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
     <div class="relative">
       <img id="modalImage" src="" alt="Full View" class="max-h-[90vh] max-w-[90vw] rounded-lg shadow-2xl border border-gray-700" />
-      <button id="closeModal" class="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg shadow">
-        ✖️
-      </button>
+      <div class="absolute top-2 right-2 flex gap-2">
+        <a id="downloadLink" href="#" download class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg shadow">
+          💾 Download
+        </a>
+        <button id="closeModal" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg shadow">
+          ✖️ Close
+        </button>
+      </div>
     </div>
   </div>
 
   <script>
-  // 🧩 CONFIG
+  // ⚙️ CONFIG
   const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const BUCKET = "gallery";
   const EDGE_LIMIT = 50;
   const SIM_THRESHOLD = 0.93;
-  const DISPLAY_THRESHOLD = 0.95;
+  const DISPLAY_THRESHOLD = 0.90;
 
   // 📦 DOM
   const fileInput = document.getElementById("fileInput");
   const searchBtn = document.getElementById("searchBtn");
   const statusDiv = document.getElementById("status");
   const resultDiv = document.getElementById("result");
-
   const imageModal = document.getElementById("imageModal");
   const modalImage = document.getElementById("modalImage");
   const closeModal = document.getElementById("closeModal");
+  const downloadLink = document.getElementById("downloadLink");
 
-  // 🧠 Normalize function
+  // 🧠 Normalize descriptor
   function normalize(desc) {
     const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
     return desc.map(x => x / norm);
   }
 
-  // 🧩 Load AI Models
+  // 🧩 Load face-api models
   async function initModels() {
     const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
     statusDiv.textContent = "⏳ โหลดโมเดล...";
@@ -70,7 +75,7 @@
     statusDiv.textContent = "✅ พร้อมค้นหาแล้ว";
   }
 
-  // 🔍 Face Search
+  // 🔍 Search function
   async function performSearch() {
     const file = fileInput.files[0];
     if (!file) return alert("เลือกรูปก่อนค้นหา");
@@ -100,34 +105,38 @@
 
     const filtered = matches.filter(m => m.similarity >= DISPLAY_THRESHOLD);
     if (!filtered.length) {
-      resultDiv.innerHTML = "❌ ไม่พบใบหน้าที่เหมือน ≥ 95%";
+      resultDiv.innerHTML = "❌ ไม่พบใบหน้าที่เหมือน ≥ 90%";
       return;
     }
 
     resultDiv.innerHTML = `
-      <p class="text-green-400 font-semibold mb-2">🎯 พบใบหน้าที่เหมือน ≥95% จำนวน ${filtered.length} ภาพ</p>
+      <p class="text-green-400 font-semibold mb-2">🎯 พบใบหน้าที่เหมือน ≥90% จำนวน ${filtered.length} ภาพ</p>
       <div class="grid grid-cols-2 gap-3">
-        ${filtered.map(v => `
-          <div class="bg-slate-700 p-2 rounded-lg cursor-pointer hover:scale-105 transition" data-img="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${v.image_url}">
-            <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${v.image_url}" class="rounded-lg mb-2 shadow">
+        ${filtered.map(v => {
+          const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${v.image_url}`;
+          return `
+          <div class="bg-slate-700 p-2 rounded-lg cursor-pointer hover:scale-105 transition" data-img="${imgUrl}">
+            <img src="${imgUrl}" class="rounded-lg mb-2 shadow">
             <p class="text-sm">${v.name}</p>
-            <p class="text-xs text-gray-400">Similarity: ${(v.similarity*100).toFixed(2)}%</p>
-          </div>`).join("")}
+            <p class="text-xs text-gray-400">Sim: ${(v.similarity*100).toFixed(2)}%</p>
+            <a href="${imgUrl}" download class="block text-blue-400 hover:text-blue-300 text-xs mt-1">💾 ดาวน์โหลด</a>
+          </div>`;
+        }).join("")}
       </div>`;
 
-    // 🖼️ Add click event for popup
+    // 🖼️ Popup click event
     document.querySelectorAll("[data-img]").forEach(el => {
-      el.addEventListener("click", () => {
-        modalImage.src = el.dataset.img;
+      el.addEventListener("click", e => {
+        const imgUrl = el.dataset.img;
+        modalImage.src = imgUrl;
+        downloadLink.href = imgUrl;
         imageModal.classList.remove("hidden");
       });
     });
   }
 
   // ❌ Close popup
-  closeModal.addEventListener("click", () => {
-    imageModal.classList.add("hidden");
-  });
+  closeModal.addEventListener("click", () => imageModal.classList.add("hidden"));
   imageModal.addEventListener("click", e => {
     if (e.target === imageModal) imageModal.classList.add("hidden");
   });
