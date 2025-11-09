@@ -58,31 +58,6 @@
     .small { width:110px; }
   }
 
-  input, select {
-    width:100%;
-    padding:12px 14px;
-    border-radius:12px;
-    border:1px solid rgba(255,255,255,0.15);
-    background: rgba(255,255,255,0.08);
-    color:#fff;
-    font-size:0.95rem;
-    outline:none;
-    transition: all 0.2s ease;
-    box-sizing:border-box;
-  }
-  input:focus, select:focus {
-    border-color:#facc15;
-    background: rgba(255,255,255,0.12);
-    box-shadow:0 0 0 3px rgba(250,204,21,0.25);
-  }
-  label {
-    font-weight:600;
-    margin-bottom:6px;
-    display:block;
-    font-size:0.92rem;
-    color:#fefefe;
-  }
-
   .doc-row {
     display:flex;
     gap:12px;
@@ -93,16 +68,8 @@
     display:flex;
     flex-direction:column;
   }
-  #idHint {
-    font-size:0.8rem;
-    color:#e0e0a0;
-    margin-top:4px;
-  }
-  #idError {
-    font-size:0.8rem;
-    color:#ff6b6b;
-    margin-top:4px;
-  }
+  #idHint { font-size:0.8rem; color:#e0e0a0; margin-top:4px; }
+  #idError { font-size:0.8rem; color:#ff6b6b; margin-top:4px; }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -195,47 +162,34 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let categoriesData = [];
 let currentLang = "TH";
 
-function isValidThaiId(id){
-  if(!/^\d{13}$/.test(id)) return false;
-  let sum=0;
-  for(let i=0;i<12;i++) sum+=parseInt(id.charAt(i),10)*(13-i);
-  return (11-sum%11)%10===parseInt(id.charAt(12),10);
-}
-function isPassportFormat(val){ if(/^\d{13}$/.test(val)) return false; return /^[A-Za-z0-9]{6,15}$/.test(val);}
-function detectIdTypeByValue(val){ if(isValidThaiId(val))return"thaiid"; if(isPassportFormat(val))return"passport"; return null; }
+function isValidThaiId(id){ if(!/^\d{13}$/.test(id))return false; let s=0;for(let i=0;i<12;i++)s+=parseInt(id[i])*(13-i);return(11-s%11)%10===parseInt(id[12]);}
+function isPassportFormat(v){if(/^\d{13}$/.test(v))return false;return /^[A-Za-z0-9]{6,15}$/.test(v);}
+function detectIdTypeByValue(v){if(isValidThaiId(v))return"thaiid";if(isPassportFormat(v))return"passport";return null;}
+function isValidEmail(e){return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(e);}
 
-/* ✅ เพิ่มฟังก์ชันตรวจสอบอีเมล */
-function isValidEmail(email){
-  const re=/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  return re.test(email);
-}
+const TEXT={TH:{formTitle:"ลงทะเบียนวิ่ง",formSubtitle:"4LAPTOP100",labelFirstName:"ชื่อ",labelLastName:"นามสกุล",labelIdType:"ประเภทเอกสาร",labelNationalId:"เลขบัตรประชาชน / Passport",idHintThai:"บัตรประชาชน: ตัวเลข 13 หลัก",idHintPassport:"Passport: ตัวอักษร/ตัวเลข 6–15 ตัว (ต้องมีตัวอักษรอย่างน้อย 1 ตัว)",idErrorThai:"❌ กรุณากรอกเลขบัตรประชาชน 13 หลักให้ถูกต้อง",idErrorPassport:"❌ กรุณากรอกหมายเลข Passport ให้ถูกต้อง (6–15 ตัว อักษร/ตัวเลข)",idErrorGeneric:"❌ รูปแบบไม่ถูกต้อง",labelPhone:"เบอร์โทรศัพท์",labelEmail:"Email",labelAge:"อายุ",labelCategory:"รุ่นอายุ/เพศ",labelSlip:"แนบสลิปโอนเงิน",submitBtn:"ลงทะเบียน",modalTitle:"การลงทะเบียนสำเร็จ! ✅",duplicateMsg:"เลขบัตร/Passport นี้ลงทะเบียนแล้ว ❌",uploadError:"อัพโหลดสลิปไม่สำเร็จ ❌",saveError:"บันทึกไม่สำเร็จ ❌",fillFields:"กรุณากรอกข้อมูลให้ครบถ้วน"},EN:{formTitle:"Running Registration",formSubtitle:"4LAPTOP100",labelFirstName:"First Name",labelLastName:"Last Name",labelIdType:"Document Type",labelNationalId:"National ID / Passport",idHintThai:"Thai ID: 13 digits",idHintPassport:"Passport: 6–15 alphanumeric (must include a letter)",idErrorThai:"❌ Please enter a valid 13-digit Thai national ID",idErrorPassport:"❌ Please enter a valid passport number (6–15 alphanumeric)",idErrorGeneric:"❌ Invalid format",labelPhone:"Phone Number",labelEmail:"Email",labelAge:"Age",labelCategory:"Category (Age / Gender)",labelSlip:"Upload Payment Slip",submitBtn:"Register",modalTitle:"Registration Completed Successfully! ✅",duplicateMsg:"This National ID / Passport is already registered ❌",uploadError:"Upload slip failed ❌",saveError:"Save failed ❌",fillFields:"Please fill all required fields"}};
 
-/* ...TEXT object และส่วนฟังก์ชันอื่นๆ คงเดิมทั้งหมด... */
+function applyLanguageUI(){const t=TEXT[currentLang];document.getElementById("formTitle").innerText=t.formTitle;document.getElementById("formSubtitle").innerText=t.formSubtitle;document.getElementById("labelFirstName").innerText=t.labelFirstName;document.getElementById("labelLastName").innerText=t.labelLastName;document.getElementById("labelIdType").innerText=t.labelIdType;document.getElementById("labelNationalId").innerText=t.labelNationalId;document.getElementById("labelPhone").innerText=t.labelPhone;document.getElementById("labelEmail").innerText=t.labelEmail;document.getElementById("labelAge").innerText=t.labelAge;document.getElementById("labelCategory").innerText=t.labelCategory;document.getElementById("labelSlip").innerText=t.labelSlip;document.getElementById("submitBtn").innerText=t.submitBtn;document.getElementById("modalTitle").innerText=t.modalTitle;document.getElementById("langText").innerText=currentLang;document.getElementById("langFlag").innerText=currentLang==="TH"?"🇹🇭":"🇬🇧";renderCategories();updateIdHint();}
+function toggleLang(){currentLang=currentLang==="TH"?"EN":"TH";applyLanguageUI();}
+async function loadCategories(){try{const{data,error}=await supabaseClient.from("categories").select("*").eq("is_open",!0).order("id",{ascending:!0});if(!error&&data){categoriesData=data;renderCategories()}}catch(e){console.error("loadCategories:",e)}}
+function renderCategories(){const e=document.getElementById("category"),t=TEXT[currentLang];e.innerHTML=`<option value="">-- ${t.labelCategory} --</option>`;categoriesData.forEach(a=>{const n=document.createElement("option");n.value=a.value||a.id;n.textContent=currentLang==="TH"?a.name_th||a.name_en:a.name_en||a.name_th;e.appendChild(n)})}
+const idTypeSelect=document.getElementById("idType"),nationalIdInput=document.getElementById("nationalId"),idHintElem=document.getElementById("idHint"),idErrorElem=document.getElementById("idError"),submitBtn=document.getElementById("submitBtn"),loadingElem=document.getElementById("loading");
+function updateIdHint(){const t=TEXT[currentLang],e=idTypeSelect.value;"thaiid"===e?idHintElem.innerText=t.idHintThai:"passport"===e?idHintElem.innerText=t.idHintPassport:idHintElem.innerText=t.idHintThai+" / "+t.idHintPassport}
+function showIdError(e){idErrorElem.style.display="block",idErrorElem.innerText=e,nationalIdInput.style.border="2px solid #ff7b7b",submitBtn.disabled=!0}
+function clearIdError(){idErrorElem.style.display="none",idErrorElem.innerText="",nationalIdInput.style.border="",submitBtn.disabled=!1}
+nationalIdInput.addEventListener("input",()=>{const e=nationalIdInput.value.trim(),t=idTypeSelect.value,a=TEXT[currentLang];if(""===e)return clearIdError(),void updateIdHint();"auto"===t?detectIdTypeByValue(e)==="thaiid"?(clearIdError(),idHintElem.innerText=a.idHintThai):detectIdTypeByValue(e)==="passport"?(clearIdError(),idHintElem.innerText=a.idHintPassport):showIdError(a.idErrorGeneric):"thaiid"===t?isValidThaiId(e)?clearIdError():showIdError(a.idErrorThai):"passport"===t&&(isPassportFormat(e)?clearIdError():showIdError(a.idErrorPassport))});
+idTypeSelect.addEventListener("change",()=>{updateIdHint();nationalIdInput.dispatchEvent(new Event("input"))});
+function closeModal(){document.getElementById("resultModal").style.display="none"}
 
-/* ====== Submit handler ====== */
-document.getElementById("registerForm").addEventListener("submit", async (e)=>{
-  e.preventDefault();
-  const firstName=document.getElementById("firstName").value.trim();
-  const lastName=document.getElementById("lastName").value.trim();
-  const rawId=document.getElementById("nationalId").value.trim();
-  const phone=document.getElementById("phone").value.trim();
-  const email=document.getElementById("email").value.trim();
-  const age=document.getElementById("age").value.trim();
-  const shirtSize=document.getElementById("shirtSize").value;
-  const category=document.getElementById("category").value;
-  const slipFile=document.getElementById("slip").files[0];
-  const t=TEXT[currentLang];
-
-  if(!firstName||!lastName||!rawId||!phone||!email||!age||!category||!slipFile){ alert(t.fillFields); return; }
-
-  /* ✅ ตรวจสอบอีเมลก่อนดำเนินการ */
-  if(!isValidEmail(email)){
-    alert(currentLang==="TH"?"กรุณากรอกอีเมลให้ถูกต้อง เช่น example@gmail.com":"Please enter a valid email address (e.g. example@gmail.com)");
-    return;
-  }
-
-  // (ส่วนการเช็กซ้ำ, upload slip, insert Supabase คงเดิมทั้งหมด)
-});
+document.getElementById("registerForm").addEventListener("submit",async e=>{
+e.preventDefault();
+const t=document.getElementById("firstName").value.trim(),n=document.getElementById("lastName").value.trim(),a=nationalIdInput.value.trim(),r=document.getElementById("phone").value.trim(),l=document.getElementById("email").value.trim(),i=document.getElementById("age").value.trim(),d=document.getElementById("shirtSize").value,o=document.getElementById("category").value,s=document.getElementById("slip").files[0],m=TEXT[currentLang];
+if(!(t&&n&&a&&r&&l&&i&&o&&s))return void alert(m.fillFields);
+if(!isValidEmail(l)){alert(currentLang==="TH"?"กรุณากรอกอีเมลให้ถูกต้อง เช่น example@gmail.com":"Please enter a valid email address (e.g. example@gmail.com)");return}
+const u=idTypeSelect.value;let c=!1;if("auto"===u?(isValidThaiId(a)||isPassportFormat(a))&&(c=!0):"thaiid"===u?isValidThaiId(a)&&(c=!0):"passport"===u&&isPassportFormat(a)&&(c=!0),c){submitBtn.disabled=!0,loadingElem.style.display="block";try{const{data:e,error:u}=await supabaseClient.from("bangwad").select("national_id").eq("national_id",a);if(u&&console.error("duplicate check error:",u),e&&e.length>0)return alert(m.duplicateMsg),submitBtn.disabled=!1,void(loadingElem.style.display="none");const c=`slip_${Date.now()}_${(s.name||"").replace(/\s+/g,"_")}`,{error:p}=await supabaseClient.storage.from("slips").upload(c,s);if(p)return console.error("uploadError:",p),alert(m.uploadError),submitBtn.disabled=!1,void(loadingElem.style.display="none");const E=`${SUPABASE_URL}/storage/v1/object/public/slips/${encodeURIComponent(c)}`,{error:g}=await supabaseClient.from("bangwad").insert([{first_name:t,last_name:n,national_id:a,phone:r,email:l,age:i,shirt_size:d,category:o,slip_url:E,status:"pending"}]);if(loadingElem.style.display="none",submitBtn.disabled=!1,g)return console.error("insertError:",g),void alert(m.saveError);document.getElementById("resultText").innerText=`${TEXT[currentLang].labelFirstName}: ${t} ${n}\n${TEXT[currentLang].labelAge}: ${i}\n${TEXT[currentLang].labelCategory}: ${o}\n${TEXT[currentLang].labelPhone}: ${r}\nEmail: ${l}`,document.getElementById("slipPreview").src=E,document.getElementById("resultModal").style.display="flex",document.getElementById("registerForm").reset(),updateIdHint()}catch(e){console.error("submit error:",e),alert(TEXT[currentLang].saveError),submitBtn.disabled=!1,loadingElem.style.display="none"}}else alert(m.idErrorGeneric)});
+document.addEventListener("DOMContentLoaded",async()=>{applyLanguageUI(),await loadCategories(),updateIdHint()});
+document.addEventListener("contextmenu",function(e){e.preventDefault()});
+document.addEventListener("keydown",function(e){("F12"===e.key||e.ctrlKey&&e.shiftKey&&"I"===e.key||e.ctrlKey&&e.shiftKey&&"J"===e.key||e.ctrlKey&&"U"===e.key)&&e.preventDefault()});
 </script>
 </body>
 </html>
