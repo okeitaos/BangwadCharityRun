@@ -18,13 +18,12 @@
     }
     h1 {
       font-size: 1.8rem;
-      margin-bottom: 10px;
       color: #00ffe1;
+      margin-bottom: 10px;
     }
     p {
-      margin-bottom: 25px;
-      font-size: 1rem;
       color: #b0b0b0;
+      margin-bottom: 25px;
     }
     input {
       padding: 10px;
@@ -32,10 +31,10 @@
       border: none;
       font-size: 1rem;
       text-align: center;
-      margin-bottom: 20px;
       width: 260px;
       background: #1a1a1d;
       color: #fff;
+      margin-bottom: 15px;
       outline: none;
     }
     input::placeholder {
@@ -57,44 +56,34 @@
     }
     #status {
       margin-top: 25px;
-      font-weight: 500;
       text-align: center;
+      font-weight: 500;
     }
-    .success {
-      color: #00ffb7;
-    }
-    .error {
-      color: #ff7070;
-    }
-    .loading {
-      color: #ffc107;
-    }
+    .success { color: #00ffb7; }
+    .error { color: #ff7070; }
+    .loading { color: #ffc107; }
   </style>
 </head>
 <body>
   <h1>🧹 Clear Gallery Cache</h1>
-  <p>กดปุ่มเพื่อเคลียร์ Cache ของ Supabase Bucket <strong>gallery</strong></p>
+  <p>กรอกรหัส ADMIN_KEY เพื่อเคลียร์ cache ของ Supabase bucket <b>gallery</b></p>
 
-  <input type="password" id="key" placeholder="ใส่รหัส ADMIN_KEY ที่ถูกต้อง" />
+  <input type="password" id="key" placeholder="กรอกรหัส ADMIN_KEY ที่ถูกต้อง" />
   <button id="clearBtn">Clear Cache</button>
 
   <div id="status"></div>
   <div id="lastCleared"></div>
 
   <script>
-    // ⚙️ ตั้ง URL ของ Edge Function ตรงนี้
     const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.functions.supabase.co/clear-gallery-cache";
-
     const keyInput = document.getElementById("key");
     const clearBtn = document.getElementById("clearBtn");
     const statusDiv = document.getElementById("status");
     const lastClearedDiv = document.getElementById("lastCleared");
 
-    // โหลดเวลาล่าสุดจาก localStorage (ถ้ามี)
+    // โหลดเวลาล่าสุด
     const lastTime = localStorage.getItem("lastCleared");
-    if (lastTime) {
-      lastClearedDiv.innerHTML = `🕓 เคลียร์ล่าสุด: <strong>${lastTime}</strong>`;
-    }
+    if (lastTime) lastClearedDiv.innerHTML = `🕓 เคลียร์ล่าสุด: <strong>${lastTime}</strong>`;
 
     clearBtn.addEventListener("click", async () => {
       const key = keyInput.value.trim();
@@ -112,15 +101,14 @@
         const data = await res.json();
 
         if (res.status === 200) {
-          statusDiv.textContent = "✅ เคลียร์ cache ของ bucket 'gallery' สำเร็จ!";
+          statusDiv.textContent = "✅ เคลียร์ cache สำเร็จ!";
           statusDiv.className = "success";
 
-          // บันทึกเวลาเคลียร์ล่าสุด
-          const clearedTime = new Date(data.cleared_at).toLocaleString("th-TH");
-          localStorage.setItem("lastCleared", clearedTime);
-          lastClearedDiv.innerHTML = `🕓 เคลียร์ล่าสุด: <strong>${clearedTime}</strong>`;
+          const time = new Date(data.cleared_at).toLocaleString("th-TH");
+          localStorage.setItem("lastCleared", time);
+          lastClearedDiv.innerHTML = `🕓 เคลียร์ล่าสุด: <strong>${time}</strong>`;
         } else {
-          statusDiv.textContent = `❌ ล้มเหลว: ${data.error || "ไม่สามารถเคลียร์ได้"}`;
+          statusDiv.textContent = "❌ " + (data.error || "ไม่สามารถเคลียร์ได้");
           statusDiv.className = "error";
         }
       } catch (err) {
