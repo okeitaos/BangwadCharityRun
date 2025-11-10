@@ -74,12 +74,9 @@
     import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
     const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-    const SUPABASE_ANON_KEY =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
     const BUCKET = "gallery";
-    const WATERMARK_URL =
-      "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
-
+    const WATERMARK_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
     let SIM_THRESHOLD = 0.95;
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -98,7 +95,6 @@
     const popup = document.getElementById("popup");
     const popupImg = document.getElementById("popupImg");
     const closePopup = document.getElementById("closePopup");
-
     const previewPopup = document.getElementById("previewPopup");
     const previewCanvas = document.getElementById("previewCanvas");
     const confirmDownload = document.getElementById("confirmDownload");
@@ -152,17 +148,16 @@
 
     langToggle.onclick = () => setLang(currentLang === "th" ? "en" : "th");
 
-    // 🧠 โหลดโมเดล
+    // โหลดโมเดล
     statusDiv.textContent = LANG[currentLang].loading;
     const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
     await Promise.all([
       faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
       faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
-      faceapi.nets.faceRecognitionNet.loadFromUri(modelURL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(modelURL)
     ]);
     statusDiv.textContent = LANG[currentLang].ready;
 
-    // 🧮 Normalize descriptor
     const normalize = (desc) => {
       const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
       return desc.map((x) => x / norm);
@@ -181,55 +176,94 @@
       statusDiv.textContent = LANG[currentLang].ready;
     };
 
-    // 🖼️ Preview ลายน้ำก่อนดาวน์โหลด
+    // ✅ Preview + ดาวน์โหลดลายน้ำ
     async function previewWatermarkedImage(imageUrl, fileName) {
-      try {
-        const [imgRes, watermarkRes] = await Promise.all([fetch(imageUrl), fetch(WATERMARK_URL)]);
-        const [imgBlob, watermarkBlob] = await Promise.all([imgRes.blob(), watermarkRes.blob()]);
-
-        const img = await createImageBitmap(imgBlob);
-        const watermark = await createImageBitmap(watermarkBlob);
-
-        const canvas = previewCanvas;
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, img.width, img.height);
-
-        const watermarkWidth = img.width * 0.25;
-        const scale = watermarkWidth / watermark.width;
-        const watermarkHeight = watermark.height * scale;
-        const margin = 20;
-        const x = img.width - watermarkWidth - margin;
-        const y = img.height - watermarkHeight - margin;
-
-        ctx.drawImage(watermark, x, y, watermarkWidth, watermarkHeight);
-
-        previewPopup.classList.remove("hidden");
-
-        confirmDownload.onclick = () => {
-          canvas.toBlob((blob) => {
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = fileName || "image_watermarked.jpg";
-            link.click();
-            URL.revokeObjectURL(link.href);
-          }, "image/jpeg", 0.95);
-          previewPopup.classList.add("hidden");
-        };
-        cancelPreview.onclick = () => previewPopup.classList.add("hidden");
-      } catch (err) {
-        console.error("❌ Error:", err);
-        alert("เกิดข้อผิดพลาดในการแสดงภาพตัวอย่างลายน้ำ");
-      }
+      const [imgRes, watermarkRes] = await Promise.all([fetch(imageUrl), fetch(WATERMARK_URL)]);
+      const [imgBlob, watermarkBlob] = await Promise.all([imgRes.blob(), watermarkRes.blob()]);
+      const img = await createImageBitmap(imgBlob);
+      const watermark = await createImageBitmap(watermarkBlob);
+      const ctx = previewCanvas.getContext("2d");
+      previewCanvas.width = img.width;
+      previewCanvas.height = img.height;
+      ctx.drawImage(img, 0, 0, img.width, img.height);
+      const w = img.width * 0.25;
+      const s = w / watermark.width;
+      const h = watermark.height * s;
+      const x = img.width - w - 20;
+      const y = img.height - h - 20;
+      ctx.drawImage(watermark, x, y, w, h);
+      previewPopup.classList.remove("hidden");
+      confirmDownload.onclick = () => {
+        previewCanvas.toBlob((b) => {
+          const l = document.createElement("a");
+          l.href = URL.createObjectURL(b);
+          l.download = fileName;
+          l.click();
+        }, "image/jpeg", 0.95);
+        previewPopup.classList.add("hidden");
+      };
+      cancelPreview.onclick = () => previewPopup.classList.add("hidden");
     }
 
-    // ✅ ฟังก์ชันดาวน์โหลด (เรียก popup preview)
+    // ✅ ใช้ฟังก์ชันดาวน์โหลดใหม่
     window.downloadImage = async (url, name) => {
       await previewWatermarkedImage(url, name);
     };
 
-    // ✅ Popup ปกติ
+    // ✅ ฟังก์ชันค้นหาภาพ (คืนกลับมา)
+    searchBtn.onclick = async () => {
+      const langPack = LANG[currentLang];
+      const file = fileInput.files[0];
+      if (!file) return alert(langPack.choose);
+
+      resultDiv.innerHTML = langPack.analyzing;
+      const img = await faceapi.bufferToImage(file);
+      const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+      if (!det) return (resultDiv.innerHTML = langPack.notFound);
+
+      const embedding = normalize(Array.from(det.descriptor));
+      statusDiv.textContent = langPack.searching(Math.round(SIM_THRESHOLD * 100));
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ embedding, threshold: SIM_THRESHOLD, limit: 20 }),
+        });
+        const { matches, error } = await res.json();
+        if (error) throw new Error(error);
+        if (!matches?.length)
+          return (resultDiv.innerHTML = langPack.noMatch(Math.round(SIM_THRESHOLD * 100)));
+
+        resultDiv.innerHTML = `
+          <p class="text-green-400 font-semibold mb-2">${langPack.found(matches.length, Math.round(SIM_THRESHOLD * 100))}</p>
+          <div class="grid grid-cols-2 gap-3">
+            ${matches
+              .map(
+                (m) => `
+              <div class="bg-slate-700 p-2 rounded-lg overflow-hidden">
+                <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}" 
+                     class="rounded-lg mb-2 shadow cursor-pointer hover:scale-105 transition w-full object-cover aspect-[3/4]" 
+                     onclick="openPopup('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}')">
+                <p class="filename text-sm text-gray-200" title="${m.name}">${m.name}</p>
+                <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
+                <button onclick="downloadImage('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}.jpg')" 
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">${langPack.download}</button>
+              </div>
+            `
+              )
+              .join("")}
+          </div>
+        `;
+      } catch (e) {
+        resultDiv.innerHTML = `❌ ${e.message}`;
+      }
+    };
+
+    // ✅ Popup ดูภาพ
     window.openPopup = (src) => {
       popupImg.src = src;
       popup.classList.remove("hidden");
