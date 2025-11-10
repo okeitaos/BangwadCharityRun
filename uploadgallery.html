@@ -103,7 +103,7 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 🔒 ใช้ key แบบ anon
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 🔒 ใส่ anon key ของโปรเจ็กต์คุณ
 const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const LIFF_ID = "2001781240-k2PJ3Ap2";
@@ -177,7 +177,7 @@ async function uploadFilesChecked() {
     const { error: uploadError } = await sb.storage.from(BUCKET).upload(path, f);
     if (!uploadError) {
       success++;
-      // บันทึกลง file_hashes
+
       await sb.from("file_hashes").insert({
         user_id: userId,
         profilename: userName,
@@ -188,10 +188,11 @@ async function uploadFilesChecked() {
 
       // 🔁 ซิงก์อัตโนมัติไป faces
       const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${filename}`;
-      await sb.from("faces").insert({
+      const { error: faceError } = await sb.from("faces").insert({
         name: userName,
         image_url: imageUrl
-      }).catch(e => console.log("faces insert error:", e.message));
+      });
+      if (faceError) console.log("faces insert error:", faceError.message);
     }
   }
 
