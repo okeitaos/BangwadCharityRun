@@ -9,94 +9,92 @@
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 
   <style>
-   /* ✅ ปรับชื่อไฟล์ไม่ให้ล้นกรอบ */
-.filename {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: block;
-  width: 100%;
-  text-align: center;
-}
+    /* ✅ ปรับชื่อไฟล์ไม่ให้ล้นกรอบ */
+    .filename {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+      width: 100%;
+      text-align: center;
+    }
 
-/* ✅ Popup พื้นหลัง */
-#previewPopup {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-  overflow-y: auto;
-  padding: 2rem 1rem;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.35s ease;
-}
+    /* ✅ Popup พื้นหลัง */
+    #previewPopup {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      overflow-y: auto;
+      padding: 2rem 1rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s ease;
+    }
 
-/* ✅ แสดง popup (fade-in) */
-#previewPopup.show {
-  opacity: 1;
-  pointer-events: auto;
-}
+    /* ✅ แสดง popup (fade-in) */
+    #previewPopup.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
 
-/* ✅ กล่อง preview */
-#previewPopup > div {
-  position: relative;
-  background: #1e293b;
-  border-radius: 1rem;
-  box-shadow: 0 0 25px rgba(0, 0, 0, 0.7);
-  text-align: center;
-  max-width: 600px;
-  width: 100%;
-  margin: auto;
-  transform: translateY(20px);
-  transition: transform 0.35s ease;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
+    /* ✅ กล่อง preview */
+    #previewPopup > div {
+      position: relative;
+      background: #1e293b;
+      border-radius: 1rem;
+      box-shadow: 0 0 25px rgba(0, 0, 0, 0.7);
+      text-align: center;
+      max-width: 600px;
+      width: 100%;
+      margin: auto;
+      transform: translateY(20px);
+      transition: transform 0.35s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
 
-/* ✅ เมื่อ popup เปิด */
-#previewPopup.show > div {
-  transform: translateY(0);
-}
+    #previewPopup.show > div {
+      transform: translateY(0);
+    }
 
-/* ✅ แสดงภาพไม่เกินจอ และอยู่กลาง */
-#previewCanvas {
-  max-width: 100%;
-  max-height: 75vh;
-  object-fit: contain;
-  border: 2px solid white;
-  border-radius: 0.75rem;
-  margin-bottom: 1rem;
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-}
+    /* ✅ แสดงภาพไม่เกินจอ และอยู่กลาง */
+    #previewCanvas {
+      max-width: 100%;
+      max-height: 75vh;
+      object-fit: contain;
+      border: 2px solid white;
+      border-radius: 0.75rem;
+      margin-bottom: 1rem;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+    }
 
-/* ✅ ปุ่มดาวน์โหลด/ยกเลิก */
-#confirmDownload, #cancelPreview {
-  transition: transform 0.15s ease, background 0.25s;
-}
+    /* ✅ ปุ่มดาวน์โหลด/ยกเลิก */
+    #confirmDownload, #cancelPreview {
+      transition: transform 0.15s ease, background 0.25s;
+    }
 
-#confirmDownload:hover, #cancelPreview:hover {
-  transform: scale(1.05);
-}
+    #confirmDownload:hover, #cancelPreview:hover {
+      transform: scale(1.05);
+    }
 
-/* ✅ Responsive — มือถือแนวตั้ง */
-@media (max-width: 640px) {
-  #previewPopup > div {
-    width: 95%;
-    padding: 1rem;
-  }
-  #previewCanvas {
-    max-height: 60vh;
-  }
-}
-
+    /* ✅ Responsive — มือถือแนวตั้ง */
+    @media (max-width: 640px) {
+      #previewPopup > div {
+        width: 95%;
+        padding: 1rem;
+      }
+      #previewCanvas {
+        max-height: 60vh;
+      }
+    }
   </style>
 </head>
 
@@ -261,10 +259,18 @@
       previewCanvas.width = img.width;
       previewCanvas.height = img.height;
       ctx.drawImage(img, 0, 0, img.width, img.height);
-      const w = img.width * 0.25;
+
+      // ✅ ปรับขนาดลายน้ำอัตโนมัติ และวางกลางด้านล่าง
+      const aspectRatio = img.width / img.height;
+      let scaleFactor;
+      if (aspectRatio > 1.3) scaleFactor = 0.18;
+      else if (aspectRatio < 0.8) scaleFactor = 0.28;
+      else scaleFactor = 0.22;
+
+      const w = img.width * scaleFactor;
       const s = w / watermark.width;
       const h = watermark.height * s;
-      const x = img.width - w - 20;
+      const x = (img.width - w) / 2; // กลางล่าง
       const y = img.height - h - 20;
       ctx.drawImage(watermark, x, y, w, h);
 
@@ -279,6 +285,7 @@
         }, "image/jpeg", 0.95);
         previewPopup.classList.remove("show");
       };
+
       cancelPreview.onclick = () => previewPopup.classList.remove("show");
     }
 
@@ -325,7 +332,7 @@
          class="rounded-lg mb-2 shadow w-full object-cover aspect-[3/4]" >
     <!-- 🖼️ ลายน้ำ Overlay -->
     <img src="https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png"
-         class="absolute bottom-2 right-2 w-1/4 opacity-100 pointer-events-none select-none">
+         class="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-1/4 opacity-100 pointer-events-none select-none">
   </div>
   <p class="filename text-sm text-gray-200 mt-1" title="${m.name}">${m.name}</p>
   <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
