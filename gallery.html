@@ -9,13 +9,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 
   <style>
-    /* ป้องกันชื่อไฟล์ยาวเกินกรอบ */
+    /* ✅ ปรับชื่อไฟล์ไม่ให้ล้นกรอบ */
     .filename {
-      display: block;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 100%;
+      display: block;
+      width: 100%;
+      text-align: center;
     }
   </style>
 </head>
@@ -204,10 +205,10 @@
             ${matches.map(m => `
               <div class="bg-slate-700 p-2 rounded-lg overflow-hidden">
                 <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}" 
-                     class="rounded-lg mb-2 shadow cursor-pointer hover:scale-105 transition" 
+                     class="rounded-lg mb-2 shadow cursor-pointer hover:scale-105 transition w-full object-cover aspect-[3/4]" 
                      onclick="openPopup('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}')">
-                <p class="filename text-sm" title="${m.name}">${m.name}</p>
-                <p class="text-xs text-gray-400 mb-2">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
+                <p class="filename text-sm text-gray-200" title="${m.name}">${m.name}</p>
+                <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
                 <button onclick="downloadImage('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}.jpg')" 
                         class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">${langPack.download}</button>
               </div>
