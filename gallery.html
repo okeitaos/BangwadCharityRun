@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Face Search v6.6 | Stable + Slider + Watermark Option</title>
+  <title>Face Search | Stable + Popup + Watermark Option</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
@@ -19,9 +19,9 @@
 </head>
 
 <body class="bg-slate-900 text-white flex flex-col items-center min-h-screen p-6">
-  <h1 class="text-3xl font-bold mb-6 text-center">🤖 Face Search v6.6 (Stable + Watermark Option)</h1>
+  <h1 class="text-3xl font-bold mb-6 text-center">🤖 Face Search (Popup + Watermark Option)</h1>
 
-  <!-- 🔍 Search UI -->
+  <!-- 🔍 Search Section -->
   <div class="bg-slate-800 p-6 rounded-xl shadow-lg w-full max-w-md mb-8 text-center">
     <input id="fileInput" type="file" accept="image/*" class="mb-4 w-full text-gray-300" />
     
@@ -105,41 +105,43 @@
     resultDiv.innerHTML = `
       <p class="text-green-400 font-semibold mb-2">🎯 พบใบหน้าที่ตรงกัน ${matches.length} ภาพ</p>
       <div class="grid grid-cols-2 gap-3">
-        ${matches.map(v => `
-          <div class="bg-slate-700 p-2 rounded-lg">
-            <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${v.image_url}" 
-                 class="rounded-lg mb-2 shadow w-full object-cover aspect-[3/4]">
-            <p class="filename text-sm">${v.name}</p>
-            <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(v.similarity*100).toFixed(2)}%</p>
-            <button onclick="chooseDownload('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${v.image_url}','${v.name}')"
-                    class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">ดาวน์โหลด</button>
-          </div>`).join("")}
+        ${matches.map(v => {
+          const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${v.image_url}`;
+          return `
+            <div class="bg-slate-700 p-2 rounded-lg cursor-pointer" onclick="openPopup('${imgUrl}','${v.name}',${(v.similarity*100).toFixed(2)})">
+              <img src="${imgUrl}" class="rounded-lg mb-2 shadow w-full object-cover aspect-[3/4]">
+              <p class="filename text-sm">${v.name}</p>
+              <p class="text-xs text-gray-400 text-center">Similarity: ${(v.similarity*100).toFixed(2)}%</p>
+            </div>`;
+        }).join("")}
       </div>`;
   }
 
-  // ✅ ระบบเลือกดาวน์โหลด
+  // 🧩 Popup Viewer + Download Option
   const WATERMARK = new Image();
   WATERMARK.src = WATERMARK_SRC;
   let downloadQueue = { url: "", name: "" };
 
-  window.chooseDownload = (url, name) => {
+  window.openPopup = (url, name, sim) => {
     downloadQueue = { url, name };
-    const box = document.createElement("div");
-    box.className = "fixed inset-0 bg-black/60 flex items-center justify-center z-50";
-    box.innerHTML = `
-      <div class="bg-slate-800 p-6 rounded-xl shadow-xl text-center max-w-xs">
-        <h2 class="text-lg font-semibold mb-4">เลือกรูปแบบดาวน์โหลด</h2>
-        <div class="flex flex-col gap-3">
-          <button id="dlWith" class="bg-green-600 hover:bg-green-700 py-2 rounded-lg">💧 พร้อมลายน้ำ</button>
-          <button id="dlNo" class="bg-blue-600 hover:bg-blue-700 py-2 rounded-lg">🖼️ ไม่มีลายน้ำ</button>
+    const popup = document.createElement("div");
+    popup.className = "fixed inset-0 bg-black/70 flex items-center justify-center z-50";
+    popup.innerHTML = `
+      <div class="bg-slate-900 rounded-xl p-4 shadow-xl text-center relative max-w-[90%] max-h-[90%] overflow-auto">
+        <button id="closePopup" class="absolute top-2 right-2 text-gray-300 hover:text-white text-xl">✕</button>
+        <img src="${url}" class="rounded-lg max-h-[70vh] mx-auto mb-3 shadow-lg">
+        <p class="font-semibold text-lg mb-1">${name}</p>
+        <p class="text-gray-400 text-sm mb-4">Similarity: ${sim}%</p>
+        <div class="flex gap-3 justify-center">
+          <button id="dlWith" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg">💧 พร้อมลายน้ำ</button>
+          <button id="dlNo" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg">🖼️ ไม่มีลายน้ำ</button>
         </div>
-        <button id="cancelDl" class="mt-4 text-gray-400 hover:text-gray-200 text-sm">ยกเลิก</button>
       </div>`;
-    document.body.appendChild(box);
+    document.body.appendChild(popup);
 
-    box.querySelector("#cancelDl").onclick = () => box.remove();
-    box.querySelector("#dlWith").onclick = () => { downloadImage(true); box.remove(); };
-    box.querySelector("#dlNo").onclick = () => { downloadImage(false); box.remove(); };
+    popup.querySelector("#closePopup").onclick = () => popup.remove();
+    popup.querySelector("#dlWith").onclick = () => { downloadImage(true); popup.remove(); };
+    popup.querySelector("#dlNo").onclick = () => { downloadImage(false); popup.remove(); };
   };
 
   async function downloadImage(withWatermark) {
