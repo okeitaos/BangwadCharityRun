@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Face Search | BANGWAD Charity Run</title>
+  <title>Face Search | Bangwad Charity Run</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
@@ -53,13 +53,25 @@
     </div>
   </div>
 
+  <!-- 💾 Download Option -->
+  <div id="downloadDialog" class="fixed inset-0 bg-black bg-opacity-60 hidden z-50 items-center justify-center">
+    <div class="bg-slate-800 p-6 rounded-xl shadow-xl text-center max-w-xs">
+      <h2 class="text-lg font-semibold mb-4">เลือกรูปแบบดาวน์โหลด</h2>
+      <div class="flex flex-col gap-3">
+        <button id="dlWithWatermark" class="bg-green-600 hover:bg-green-700 py-2 rounded-lg">💧 พร้อมลายน้ำ</button>
+        <button id="dlNoWatermark" class="bg-blue-600 hover:bg-blue-700 py-2 rounded-lg">🖼️ ไม่มีลายน้ำ</button>
+      </div>
+      <button id="dlCancel" class="mt-4 text-gray-400 hover:text-gray-200 text-sm">ยกเลิก</button>
+    </div>
+  </div>
+
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
     const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
     const BUCKET = "gallery";
-    const WATERMARK_SRC = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png"; // ⬅️ โลโก้ลายน้ำ
+    const WATERMARK_SRC = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let SIM_THRESHOLD = 0.95;
 
@@ -75,27 +87,30 @@
     const popupCanvas = document.getElementById("popupCanvas");
     const closePopup = document.getElementById("closePopup");
     const langToggle = document.getElementById("langToggle");
+    const downloadDialog = document.getElementById("downloadDialog");
+    const dlWithWatermark = document.getElementById("dlWithWatermark");
+    const dlNoWatermark = document.getElementById("dlNoWatermark");
+    const dlCancel = document.getElementById("dlCancel");
+
+    let downloadQueue = { url: null, name: null };
 
     const LANG = {
       th: { title: "📸 ค้นหาภาพด้วยใบหน้า", choose: "กรุณาเลือกรูปก่อน", analyzing: "🧠 ตรวจสอบใบหน้า...", notFound: "⚠️ ไม่พบใบหน้า", searching: (v) => `🔍 กำลังค้นหา (≥${v}%)...`, found: (n, v) => `🎯 พบ ${n} ภาพ (≥${v}%)`, noMatch: (v) => `❌ ไม่พบภาพ (≥${v}%)`, ready: "✅ พร้อมใช้งานแล้ว", download: "ดาวน์โหลด" },
       en: { title: "📸 Face Search", choose: "Select an image first.", analyzing: "🧠 Detecting face...", notFound: "⚠️ No face detected", searching: (v) => `🔍 Searching (≥${v}%)...`, found: (n, v) => `🎯 Found ${n} matches (≥${v}%)`, noMatch: (v) => `❌ No matches (≥${v}%)`, ready: "✅ Ready", download: "Download" }
     };
     let currentLang = "th";
-
-    function normalize(d) {
-      const n = Math.sqrt(d.reduce((a, b) => a + b * b, 0));
-      return d.map(x => x / n);
-    }
-
-    function setLang(lang) {
+    const setLang = (lang) => {
       currentLang = lang;
       langToggle.textContent = lang === "th" ? "EN" : "TH";
       document.getElementById("title").textContent = LANG[lang].title;
-    }
-
+    };
     langToggle.onclick = () => setLang(currentLang === "th" ? "en" : "th");
 
-    // 🧠 โหลดโมเดล
+    const normalize = (d) => {
+      const n = Math.sqrt(d.reduce((a, b) => a + b * b, 0));
+      return d.map(x => x / n);
+    };
+
     statusDiv.textContent = LANG[currentLang].analyzing;
     await Promise.all([
       faceapi.nets.ssdMobilenetv1.loadFromUri("https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/"),
@@ -104,7 +119,6 @@
     ]);
     statusDiv.textContent = LANG[currentLang].ready;
 
-    // 🎚 Threshold
     thresholdInput.oninput = (e) => {
       const v = e.target.value;
       SIM_THRESHOLD = v / 100;
@@ -112,45 +126,76 @@
       thresholdValue.textContent = `≥ ${v}%`;
     };
 
-    // 🧹 Clear
     clearBtn.onclick = () => {
       fileInput.value = "";
       resultDiv.innerHTML = "";
       statusDiv.textContent = LANG[currentLang].ready;
     };
 
-    // 💾 ดาวน์โหลดพร้อมลายน้ำโลโก้
-    async function downloadImage(url, name) {
-      const res = await fetch(url);
-      const blob = await res.blob();
-      const img = await createImageBitmap(blob);
-      const logo = new Image();
-      logo.src = WATERMARK_SRC;
-      await logo.decode();
-
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0);
-
-      const w = img.width / 6;
-      const h = (logo.height / logo.width) * w;
-      ctx.globalAlpha = 0.85;
-      ctx.drawImage(logo, img.width - w - 20, img.height - h - 20, w, h);
-      ctx.globalAlpha = 1.0;
-
-      canvas.toBlob((wb) => {
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(wb);
-        a.download = name || "watermarked.jpg";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      }, "image/jpeg", 0.95);
+    // 🖼️ แสดง Popup Download ตัวเลือก
+    function showDownloadOptions(url, name) {
+      downloadQueue = { url, name };
+      downloadDialog.classList.remove("hidden");
+      downloadDialog.classList.add("flex");
     }
 
-    // 📸 Popup Viewer + ลายน้ำโลโก้
+    dlCancel.onclick = () => {
+      downloadDialog.classList.add("hidden");
+      downloadDialog.classList.remove("flex");
+    };
+
+    // 💾 ดาวน์โหลด (เลือกโหมด)
+    dlWithWatermark.onclick = () => { downloadImage(downloadQueue.url, downloadQueue.name, true); hideDialog(); };
+    dlNoWatermark.onclick = () => { downloadImage(downloadQueue.url, downloadQueue.name, false); hideDialog(); };
+    function hideDialog() {
+      downloadDialog.classList.add("hidden");
+      downloadDialog.classList.remove("flex");
+    }
+
+    // 💧 ฟังก์ชันดาวน์โหลดพร้อมตัวเลือก
+    async function downloadImage(url, name, withWatermark) {
+      const safeName = (name || "image").replace(/[/\\?%*:|"<>]/g, "-") + ".jpg";
+      try {
+        const res = await fetch(url, { mode: "cors" });
+        if (!res.ok) throw new Error("Download failed");
+        const blob = await res.blob();
+
+        if (!withWatermark) {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = safeName;
+          a.click();
+          return;
+        }
+
+        const img = await createImageBitmap(blob);
+        const logo = new Image();
+        logo.src = WATERMARK_SRC;
+        await logo.decode();
+
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const w = img.width / 6;
+        const h = (logo.height / logo.width) * w;
+        ctx.globalAlpha = 0.85;
+        ctx.drawImage(logo, img.width - w - 20, img.height - h - 20, w, h);
+        ctx.globalAlpha = 1.0;
+
+        canvas.toBlob((b) => {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(b);
+          a.download = safeName;
+          a.click();
+        }, "image/jpeg", 0.95);
+      } catch (err) {
+        console.error("❌ Download error:", err);
+        alert("⚠️ ไม่สามารถดาวน์โหลดได้");
+      }
+    }
+
     window.openPopup = async (src) => {
       const res = await fetch(src);
       const blob = await res.blob();
@@ -158,33 +203,27 @@
       const logo = new Image();
       logo.src = WATERMARK_SRC;
       await logo.decode();
-
       popupCanvas.width = img.width;
       popupCanvas.height = img.height;
       const ctx = popupCanvas.getContext("2d");
       ctx.drawImage(img, 0, 0);
-
       const w = img.width / 6;
       const h = (logo.height / logo.width) * w;
       ctx.globalAlpha = 0.85;
       ctx.drawImage(logo, img.width - w - 20, img.height - h - 20, w, h);
-      ctx.globalAlpha = 1.0;
-
       popup.classList.remove("hidden");
     };
     closePopup.onclick = () => popup.classList.add("hidden");
 
-    // 🔍 Search
+    // 🔍 ค้นหาใบหน้า
     searchBtn.onclick = async () => {
       const t = LANG[currentLang];
       const f = fileInput.files[0];
       if (!f) return alert(t.choose);
       resultDiv.innerHTML = t.analyzing;
-
       const img = await faceapi.bufferToImage(f);
       const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
       if (!det) return (resultDiv.innerHTML = t.notFound);
-
       const emb = normalize(Array.from(det.descriptor));
       resultDiv.innerHTML = t.searching(Math.round(SIM_THRESHOLD * 100));
 
@@ -193,7 +232,6 @@
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
         body: JSON.stringify({ embedding: emb, threshold: SIM_THRESHOLD, limit: 20 })
       });
-
       const { matches, error } = await r.json();
       if (error || !matches?.length) return (resultDiv.innerHTML = t.noMatch(Math.round(SIM_THRESHOLD * 100)));
 
@@ -207,14 +245,11 @@
                    onclick="openPopup('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}')">
               <p class="filename text-sm text-gray-200" title="${m.name}">${m.name}</p>
               <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
-              <button onclick="downloadImage('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}.jpg')"
+              <button onclick="showDownloadOptions('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}')"
                       class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">${t.download}</button>
-            </div>
-          `).join("")}
+            </div>`).join("")}
         </div>`;
     };
-
-    window.downloadImage = downloadImage;
   </script>
 </body>
 </html>
