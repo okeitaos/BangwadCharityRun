@@ -7,6 +7,17 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
+
+  <style>
+    /* ป้องกันชื่อไฟล์ยาวเกินกรอบ */
+    .filename {
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+  </style>
 </head>
 
 <body class="bg-slate-900 text-white flex flex-col items-center min-h-screen p-6">
@@ -50,7 +61,7 @@
     const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
     const BUCKET = "gallery";
-    let SIM_THRESHOLD = 0.95; // default 95%
+    let SIM_THRESHOLD = 0.95;
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // 🎨 DOM
@@ -70,7 +81,7 @@
     const popupImg = document.getElementById("popupImg");
     const closePopup = document.getElementById("closePopup");
 
-    // 🌐 Language Pack
+    // 🌐 Languages
     const LANG = {
       th: {
         title: "📸 ค้นหาภาพด้วยใบหน้า",
@@ -129,28 +140,25 @@
     ]);
     statusDiv.textContent = LANG[currentLang].ready;
 
-    // 🧮 Normalize
-    function normalize(desc) {
+    // Normalize
+    const normalize = (desc) => {
       const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
       return desc.map(x => x / norm);
-    }
+    };
 
-    // 🎚 Similarity Slider
-    thresholdInput.addEventListener("input", (e) => {
+    thresholdInput.oninput = (e) => {
       const v = e.target.value;
       SIM_THRESHOLD = v / 100;
       thresholdLabel.textContent = LANG[currentLang].level(v);
       thresholdValue.textContent = `≥ ${v}%`;
-    });
+    };
 
-    // 🧹 Clear
     clearBtn.onclick = () => {
       fileInput.value = "";
       resultDiv.innerHTML = "";
       statusDiv.textContent = LANG[currentLang].ready;
     };
 
-    // 💾 Download Helper
     async function downloadImage(url, name) {
       const res = await fetch(url);
       const blob = await res.blob();
@@ -159,11 +167,10 @@
       link.download = name || "image.jpg";
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       URL.revokeObjectURL(link.href);
     }
 
-    // 🔍 Search
     searchBtn.onclick = async () => {
       const langPack = LANG[currentLang];
       const file = fileInput.files[0];
@@ -172,17 +179,13 @@
       resultDiv.innerHTML = langPack.analyzing;
       const img = await faceapi.bufferToImage(file);
       const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-
-      if (!det) {
-        resultDiv.innerHTML = langPack.notFound;
-        return;
-      }
+      if (!det) return (resultDiv.innerHTML = langPack.notFound);
 
       const embedding = normalize(Array.from(det.descriptor));
       statusDiv.textContent = langPack.searching(Math.round(SIM_THRESHOLD * 100));
 
       try {
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -191,23 +194,19 @@
           body: JSON.stringify({ embedding, threshold: SIM_THRESHOLD, limit: 20 })
         });
 
-        const { matches, error } = await response.json();
+        const { matches, error } = await res.json();
         if (error) throw new Error(error);
-        if (!matches?.length) {
-          resultDiv.innerHTML = langPack.noMatch(Math.round(SIM_THRESHOLD * 100));
-          return;
-        }
+        if (!matches?.length) return (resultDiv.innerHTML = langPack.noMatch(Math.round(SIM_THRESHOLD * 100)));
 
-        // ✅ Show Results
         resultDiv.innerHTML = `
           <p class="text-green-400 font-semibold mb-2">${langPack.found(matches.length, Math.round(SIM_THRESHOLD * 100))}</p>
           <div class="grid grid-cols-2 gap-3">
-            ${matches.map((m, i) => `
-              <div class="bg-slate-700 p-2 rounded-lg">
+            ${matches.map(m => `
+              <div class="bg-slate-700 p-2 rounded-lg overflow-hidden">
                 <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}" 
                      class="rounded-lg mb-2 shadow cursor-pointer hover:scale-105 transition" 
                      onclick="openPopup('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}')">
-                <p class="text-sm">${m.name}</p>
+                <p class="filename text-sm" title="${m.name}">${m.name}</p>
                 <p class="text-xs text-gray-400 mb-2">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
                 <button onclick="downloadImage('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}.jpg')" 
                         class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">${langPack.download}</button>
@@ -220,14 +219,9 @@
       }
     };
 
-    // 📸 Popup
-    window.openPopup = (src) => {
-      popupImg.src = src;
-      popup.classList.remove("hidden");
-    };
+    window.openPopup = (src) => { popupImg.src = src; popup.classList.remove("hidden"); };
     closePopup.onclick = () => popup.classList.add("hidden");
 
-    // 🌍 เริ่มภาษาไทย
     setLang("th");
     window.downloadImage = downloadImage;
   </script>
