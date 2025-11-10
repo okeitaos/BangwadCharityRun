@@ -1,188 +1,232 @@
+หน้า face search.html
+
 <!DOCTYPE html>
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Face Search | Stable + Popup + Watermark Option</title>
+  <title>Face Search | ค้นหาภาพด้วยใบหน้า</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
+
   <style>
+    /* ✅ ปรับชื่อไฟล์ไม่ให้ล้นกรอบ */
     .filename {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       display: block;
+      width: 100%;
       text-align: center;
     }
   </style>
 </head>
 
 <body class="bg-slate-900 text-white flex flex-col items-center min-h-screen p-6">
-  <h1 class="text-3xl font-bold mb-6 text-center">🤖 Face Search (Popup + Watermark Option)</h1>
+  <div class="w-full max-w-md">
+    <div class="flex justify-between items-center mb-4">
+      <h1 id="title" class="text-2xl font-bold">📸 ค้นหาภาพด้วยใบหน้า</h1>
+      <button id="langToggle" class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">EN</button>
+    </div>
 
-  <!-- 🔍 Search Section -->
-  <div class="bg-slate-800 p-6 rounded-xl shadow-lg w-full max-w-md mb-8 text-center">
-    <input id="fileInput" type="file" accept="image/*" class="mb-4 w-full text-gray-300" />
-    
-    <label class="block text-sm text-gray-400 mb-2">ระดับความเหมือน (Threshold)</label>
-    <input type="range" id="thresholdSlider" min="0.4" max="0.99" step="0.01" value="0.95" class="w-full mb-2">
-    <p id="thresholdValue" class="text-gray-400 text-sm mb-4 text-center">0.95</p>
+    <!-- 🔍 Search Box -->
+    <div class="bg-slate-800 p-6 rounded-xl shadow-lg text-center">
+      <input id="fileInput" type="file" accept="image/*" class="mb-4 w-full text-gray-300" />
+      <div class="flex gap-2 mb-4">
+        <button id="searchBtn" class="flex-1 bg-green-500 hover:bg-green-600 py-2 rounded-lg">🔎 <span id="btnSearchText">ค้นหาภาพ</span></button>
+        <button id="clearBtn" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg">🧹 <span id="btnClearText">เคลียร์</span></button>
+      </div>
 
-    <button id="searchBtn" class="w-full bg-green-500 hover:bg-green-600 py-2 rounded-lg mb-4">
-      🔎 ค้นหาใบหน้า
-    </button>
+      <div class="mb-4 text-left">
+        <label for="threshold" id="thresholdLabel" class="block text-sm text-gray-300 mb-1">ระดับความเหมือน (95%)</label>
+        <input id="threshold" type="range" min="80" max="99" value="95" class="w-full accent-green-500">
+        <p id="thresholdValue" class="text-xs text-gray-400 mt-1 text-center">≥ 95%</p>
+      </div>
 
-    <div id="status" class="text-sm text-gray-300 mb-2">⏳ Initializing...</div>
-    <div id="result" class="text-sm text-gray-200"></div>
+      <p id="status" class="text-gray-400 text-sm mb-3">⏳ กำลังโหลดโมเดล...</p>
+      <div id="result" class="text-sm text-gray-200"></div>
+    </div>
   </div>
 
-  <script>
-  const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const BUCKET = "gallery";
-  const WATERMARK_SRC = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
+  <!-- 📸 Popup Viewer -->
+  <div id="popup" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center hidden z-50">
+    <div class="relative">
+      <img id="popupImg" src="" class="max-h-[80vh] rounded-lg shadow-lg border-4 border-white" />
+      <button id="closePopup" class="absolute top-2 right-2 bg-white text-black px-3 py-1 rounded-lg">✕</button>
+    </div>
+  </div>
 
-  const CONF_THRESHOLD = 0.9;
-  const EDGE_LIMIT = 50;
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-  const fileInput = document.getElementById("fileInput");
-  const searchBtn = document.getElementById("searchBtn");
-  const statusDiv = document.getElementById("status");
-  const resultDiv = document.getElementById("result");
-  const thresholdSlider = document.getElementById("thresholdSlider");
-  const thresholdValue = document.getElementById("thresholdValue");
+    // ⚙️ CONFIG
+    const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+    const BUCKET = "gallery";
+    let SIM_THRESHOLD = 0.95;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  thresholdSlider.oninput = () => {
-    thresholdValue.textContent = parseFloat(thresholdSlider.value).toFixed(2);
-  };
+    // 🎨 DOM
+    const fileInput = document.getElementById("fileInput");
+    const searchBtn = document.getElementById("searchBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const statusDiv = document.getElementById("status");
+    const resultDiv = document.getElementById("result");
+    const langToggle = document.getElementById("langToggle");
+    const thresholdInput = document.getElementById("threshold");
+    const thresholdLabel = document.getElementById("thresholdLabel");
+    const thresholdValue = document.getElementById("thresholdValue");
+    const title = document.getElementById("title");
+    const btnSearchText = document.getElementById("btnSearchText");
+    const btnClearText = document.getElementById("btnClearText");
+    const popup = document.getElementById("popup");
+    const popupImg = document.getElementById("popupImg");
+    const closePopup = document.getElementById("closePopup");
 
-  function normalize(desc) {
-    const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
-    return desc.map(x => x / norm);
-  }
+    // 🌐 Languages
+    const LANG = {
+      th: {
+        title: "📸 ค้นหาภาพด้วยใบหน้า",
+        choose: "กรุณาเลือกรูปภาพก่อน",
+        analyzing: "🧠 กำลังตรวจสอบใบหน้า...",
+        notFound: "⚠️ ไม่พบใบหน้าในภาพนี้",
+        searching: (v) => `🔍 กำลังค้นหาภาพที่เหมือนกัน (≥${v}%)...`,
+        noMatch: (v) => `❌ ไม่พบภาพที่ตรงกัน (≥${v}%)`,
+        found: (n, v) => `🎯 พบภาพที่เหมือน ≥${v}% จำนวน ${n} ภาพ`,
+        btnSearch: "ค้นหาภาพ",
+        btnClear: "เคลียร์",
+        level: (v) => `ระดับความเหมือน (${v}%)`,
+        ready: "✅ พร้อมใช้งานแล้ว",
+        loading: "⏳ กำลังโหลดโมเดล...",
+        download: "ดาวน์โหลด"
+      },
+      en: {
+        title: "📸 Face Search",
+        choose: "Please select an image first.",
+        analyzing: "🧠 Detecting face...",
+        notFound: "⚠️ No face detected in this image.",
+        searching: (v) => `🔍 Searching for similar faces (≥${v}%)...`,
+        noMatch: (v) => `❌ No similar faces found (≥${v}%)`,
+        found: (n, v) => `🎯 Found ${n} similar faces (≥${v}%)`,
+        btnSearch: "Search",
+        btnClear: "Clear",
+        level: (v) => `Similarity Level (${v}%)`,
+        ready: "✅ Ready to use",
+        loading: "⏳ Loading model...",
+        download: "Download"
+      }
+    };
 
-  async function initModels() {
+    let currentLang = "th";
+    function setLang(lang) {
+      currentLang = lang;
+      const t = LANG[lang];
+      title.textContent = t.title;
+      btnSearchText.textContent = t.btnSearch;
+      btnClearText.textContent = t.btnClear;
+      thresholdLabel.textContent = t.level(Math.round(SIM_THRESHOLD * 100));
+      thresholdValue.textContent = `≥ ${Math.round(SIM_THRESHOLD * 100)}%`;
+      langToggle.textContent = lang === "th" ? "EN" : "TH";
+      statusDiv.textContent = t.ready;
+    }
+
+    langToggle.onclick = () => setLang(currentLang === "th" ? "en" : "th");
+
+    // 🧠 โหลดโมเดล
+    statusDiv.textContent = LANG[currentLang].loading;
     const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
-    statusDiv.textContent = "⏳ โหลดโมเดล...";
     await Promise.all([
       faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
       faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
       faceapi.nets.faceRecognitionNet.loadFromUri(modelURL)
     ]);
-    statusDiv.textContent = "✅ พร้อมใช้งานแล้ว";
-  }
+    statusDiv.textContent = LANG[currentLang].ready;
 
-  async function performSearch() {
-    const file = fileInput.files[0];
-    if (!file) return alert("เลือกรูปก่อนค้นหา");
-    resultDiv.innerHTML = "🧠 กำลังตรวจใบหน้า...";
+    // Normalize
+    const normalize = (desc) => {
+      const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
+      return desc.map(x => x / norm);
+    };
 
-    const img = await faceapi.bufferToImage(file);
-    const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-    if (!det) return resultDiv.innerHTML = "⚠️ ไม่พบใบหน้า";
+    thresholdInput.oninput = (e) => {
+      const v = e.target.value;
+      SIM_THRESHOLD = v / 100;
+      thresholdLabel.textContent = LANG[currentLang].level(v);
+      thresholdValue.textContent = `≥ ${v}%`;
+    };
 
-    const SIM_THRESHOLD = parseFloat(thresholdSlider.value);
-    const queryEmbedding = normalize(Array.from(det.descriptor));
+    clearBtn.onclick = () => {
+      fileInput.value = "";
+      resultDiv.innerHTML = "";
+      statusDiv.textContent = LANG[currentLang].ready;
+    };
 
-    resultDiv.innerHTML = "🔍 กำลังค้นหา...";
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
-      },
-      body: JSON.stringify({ embedding: queryEmbedding, threshold: SIM_THRESHOLD, limit: EDGE_LIMIT })
-    });
-
-    const { matches, error } = await resp.json();
-    if (error || !matches?.length) {
-      resultDiv.innerHTML = "❌ ไม่พบใบหน้าที่คล้ายกัน";
-      return;
+    async function downloadImage(url, name) {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = name || "image.jpg";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
     }
 
-    resultDiv.innerHTML = `
-      <p class="text-green-400 font-semibold mb-2">🎯 พบใบหน้าที่ตรงกัน ${matches.length} ภาพ</p>
-      <div class="grid grid-cols-2 gap-3">
-        ${matches.map(v => {
-          const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${v.image_url}`;
-          return `
-            <div class="bg-slate-700 p-2 rounded-lg cursor-pointer" onclick="openPopup('${imgUrl}','${v.name}',${(v.similarity*100).toFixed(2)})">
-              <img src="${imgUrl}" class="rounded-lg mb-2 shadow w-full object-cover aspect-[3/4]">
-              <p class="filename text-sm">${v.name}</p>
-              <p class="text-xs text-gray-400 text-center">Similarity: ${(v.similarity*100).toFixed(2)}%</p>
-            </div>`;
-        }).join("")}
-      </div>`;
-  }
+    searchBtn.onclick = async () => {
+      const langPack = LANG[currentLang];
+      const file = fileInput.files[0];
+      if (!file) return alert(langPack.choose);
 
-  // 🧩 Popup Viewer + Download Option
-  const WATERMARK = new Image();
-  WATERMARK.src = WATERMARK_SRC;
-  let downloadQueue = { url: "", name: "" };
+      resultDiv.innerHTML = langPack.analyzing;
+      const img = await faceapi.bufferToImage(file);
+      const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+      if (!det) return (resultDiv.innerHTML = langPack.notFound);
 
-  window.openPopup = (url, name, sim) => {
-    downloadQueue = { url, name };
-    const popup = document.createElement("div");
-    popup.className = "fixed inset-0 bg-black/70 flex items-center justify-center z-50";
-    popup.innerHTML = `
-      <div class="bg-slate-900 rounded-xl p-4 shadow-xl text-center relative max-w-[90%] max-h-[90%] overflow-auto">
-        <button id="closePopup" class="absolute top-2 right-2 text-gray-300 hover:text-white text-xl">✕</button>
-        <img src="${url}" class="rounded-lg max-h-[70vh] mx-auto mb-3 shadow-lg">
-        <p class="font-semibold text-lg mb-1">${name}</p>
-        <p class="text-gray-400 text-sm mb-4">Similarity: ${sim}%</p>
-        <div class="flex gap-3 justify-center">
-          <button id="dlWith" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg">💧 พร้อมลายน้ำ</button>
-          <button id="dlNo" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg">🖼️ ไม่มีลายน้ำ</button>
-        </div>
-      </div>`;
-    document.body.appendChild(popup);
+      const embedding = normalize(Array.from(det.descriptor));
+      statusDiv.textContent = langPack.searching(Math.round(SIM_THRESHOLD * 100));
 
-    popup.querySelector("#closePopup").onclick = () => popup.remove();
-    popup.querySelector("#dlWith").onclick = () => { downloadImage(true); popup.remove(); };
-    popup.querySelector("#dlNo").onclick = () => { downloadImage(false); popup.remove(); };
-  };
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({ embedding, threshold: SIM_THRESHOLD, limit: 20 })
+        });
 
-  async function downloadImage(withWatermark) {
-    const { url, name } = downloadQueue;
-    const safeName = (name || "image").replace(/[/\\?%*:|"<>]/g, "-") + ".jpg";
-    const res = await fetch(url, { mode: "cors" });
-    const blob = await res.blob();
+        const { matches, error } = await res.json();
+        if (error) throw new Error(error);
+        if (!matches?.length) return (resultDiv.innerHTML = langPack.noMatch(Math.round(SIM_THRESHOLD * 100)));
 
-    if (!withWatermark) {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = safeName;
-      a.click();
-      return;
-    }
+        resultDiv.innerHTML = `
+          <p class="text-green-400 font-semibold mb-2">${langPack.found(matches.length, Math.round(SIM_THRESHOLD * 100))}</p>
+          <div class="grid grid-cols-2 gap-3">
+            ${matches.map(m => `
+              <div class="bg-slate-700 p-2 rounded-lg overflow-hidden">
+                <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}" 
+                     class="rounded-lg mb-2 shadow cursor-pointer hover:scale-105 transition w-full object-cover aspect-[3/4]" 
+                     onclick="openPopup('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}')">
+                <p class="filename text-sm text-gray-200" title="${m.name}">${m.name}</p>
+                <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
+                <button onclick="downloadImage('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}.jpg')" 
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">${langPack.download}</button>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      } catch (e) {
+        resultDiv.innerHTML = `❌ ${e.message}`;
+      }
+    };
 
-    const img = await createImageBitmap(blob);
-    await WATERMARK.decode();
+    window.openPopup = (src) => { popupImg.src = src; popup.classList.remove("hidden"); };
+    closePopup.onclick = () => popup.classList.add("hidden");
 
-    const canvas = document.createElement("canvas");
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0);
-
-    const w = img.width / 6;
-    const h = (WATERMARK.height / WATERMARK.width) * w;
-    ctx.globalAlpha = 0.85;
-    ctx.drawImage(WATERMARK, img.width - w - 20, img.height - h - 20, w, h);
-    ctx.globalAlpha = 1.0;
-
-    canvas.toBlob((b) => {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(b);
-      a.download = safeName;
-      a.click();
-    }, "image/jpeg", 0.95);
-  }
-
-  window.addEventListener("DOMContentLoaded", initModels);
-  searchBtn.addEventListener("click", performSearch);
+    setLang("th");
+    window.downloadImage = downloadImage;
   </script>
 </body>
 </html>
