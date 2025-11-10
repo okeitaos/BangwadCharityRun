@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Face Search v6.6 | Final Stable + Watermark Option</title>
+  <title>Face Search v6.6 | Stable + Slider + Watermark Option</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
@@ -13,32 +13,28 @@
       overflow: hidden;
       text-overflow: ellipsis;
       display: block;
-      width: 100%;
       text-align: center;
     }
   </style>
 </head>
 
 <body class="bg-slate-900 text-white flex flex-col items-center min-h-screen p-6">
-  <h1 class="text-3xl font-bold mb-6 text-center">🤖 Face Search v6.6 (Final Stable + Watermark Option)</h1>
+  <h1 class="text-3xl font-bold mb-6 text-center">🤖 Face Search v6.6 (Stable + Watermark Option)</h1>
 
-  <!-- ค้นหาใบหน้า -->
+  <!-- 🔍 Search UI -->
   <div class="bg-slate-800 p-6 rounded-xl shadow-lg w-full max-w-md mb-8 text-center">
     <input id="fileInput" type="file" accept="image/*" class="mb-4 w-full text-gray-300" />
+    
+    <label class="block text-sm text-gray-400 mb-2">ระดับความเหมือน (Threshold)</label>
+    <input type="range" id="thresholdSlider" min="0.4" max="0.99" step="0.01" value="0.95" class="w-full mb-2">
+    <p id="thresholdValue" class="text-gray-400 text-sm mb-4 text-center">0.95</p>
+
     <button id="searchBtn" class="w-full bg-green-500 hover:bg-green-600 py-2 rounded-lg mb-4">
       🔎 ค้นหาใบหน้า
     </button>
+
     <div id="status" class="text-sm text-gray-300 mb-2">⏳ Initializing...</div>
     <div id="result" class="text-sm text-gray-200"></div>
-  </div>
-
-  <!-- Auto Sync -->
-  <div class="bg-slate-800 p-4 rounded-xl shadow-lg w-full max-w-md text-center">
-    <h2 class="text-lg font-semibold mb-1">🔄 Auto Sync Gallery</h2>
-    <p id="syncStatus" class="text-gray-400 text-sm mb-2">⏳ Waiting...</p>
-    <button id="manualSyncBtn" class="bg-blue-500 hover:bg-blue-600 px-4 py-1 rounded-lg">
-      🔁 ซิงค์ทันที
-    </button>
   </div>
 
   <script>
@@ -48,63 +44,23 @@
   const BUCKET = "gallery";
   const WATERMARK_SRC = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
 
-  const EDGE_LIMIT = 50;
-  const SIM_THRESHOLD = 0.95;
   const CONF_THRESHOLD = 0.9;
+  const EDGE_LIMIT = 50;
 
   const fileInput = document.getElementById("fileInput");
   const searchBtn = document.getElementById("searchBtn");
   const statusDiv = document.getElementById("status");
   const resultDiv = document.getElementById("result");
-  const syncStatus = document.getElementById("syncStatus");
-  const manualSyncBtn = document.getElementById("manualSyncBtn");
+  const thresholdSlider = document.getElementById("thresholdSlider");
+  const thresholdValue = document.getElementById("thresholdValue");
+
+  thresholdSlider.oninput = () => {
+    thresholdValue.textContent = parseFloat(thresholdSlider.value).toFixed(2);
+  };
 
   function normalize(desc) {
     const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
     return desc.map(x => x / norm);
-  }
-
-  async function listRecursive(path = "") {
-    const { data, error } = await supabase.storage.from(BUCKET).list(path, { limit: 1000 });
-    if (error) return [];
-    let files = [];
-    for (const item of data) {
-      if (!item.metadata) {
-        const sub = await listRecursive(path ? `${path}/${item.name}` : item.name);
-        files = files.concat(sub);
-      } else files.push(path ? `${path}/${item.name}` : item.name);
-    }
-    return files;
-  }
-
-  async function autoSync() {
-    syncStatus.textContent = "🔄 กำลังซิงค์...";
-    const files = await listRecursive("");
-    let count = 0;
-    for (const path of files) {
-      const { data: exists } = await supabase.from("faces").select("id").eq("image_url", path).maybeSingle();
-      if (exists) continue;
-
-      const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
-      try {
-        const img = await faceapi.fetchImage(imgUrl);
-        const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-        if (!det || det.detection.score < CONF_THRESHOLD) continue;
-        const embedding = normalize(Array.from(det.descriptor));
-        if (embedding.length !== 128) continue;
-        const name = path.split("/").pop().split(".")[0];
-
-        await supabase.rpc("insert_face_vector", {
-          p_name: name,
-          p_image_url: path,
-          p_embedding: embedding
-        });
-
-        count++;
-        if (count % 10 === 0) syncStatus.textContent = `✅ ซิงค์แล้ว ${count}/${files.length}`;
-      } catch (e) { console.warn("❌ sync error", e); }
-    }
-    syncStatus.textContent = `✅ ซิงค์เสร็จ (${new Date().toLocaleTimeString()})`;
   }
 
   async function initModels() {
@@ -118,18 +74,19 @@
     statusDiv.textContent = "✅ พร้อมใช้งานแล้ว";
   }
 
-  // 🔍 ค้นหาใบหน้า
   async function performSearch() {
     const file = fileInput.files[0];
     if (!file) return alert("เลือกรูปก่อนค้นหา");
     resultDiv.innerHTML = "🧠 กำลังตรวจใบหน้า...";
+
     const img = await faceapi.bufferToImage(file);
     const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
     if (!det) return resultDiv.innerHTML = "⚠️ ไม่พบใบหน้า";
 
+    const SIM_THRESHOLD = parseFloat(thresholdSlider.value);
     const queryEmbedding = normalize(Array.from(det.descriptor));
-    resultDiv.innerHTML = "🔍 กำลังค้นหา...";
 
+    resultDiv.innerHTML = "🔍 กำลังค้นหา...";
     const resp = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
       method: "POST",
       headers: {
@@ -150,7 +107,7 @@
       <div class="grid grid-cols-2 gap-3">
         ${matches.map(v => `
           <div class="bg-slate-700 p-2 rounded-lg">
-            <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${v.image_url}"
+            <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${v.image_url}" 
                  class="rounded-lg mb-2 shadow w-full object-cover aspect-[3/4]">
             <p class="filename text-sm">${v.name}</p>
             <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(v.similarity*100).toFixed(2)}%</p>
@@ -160,16 +117,7 @@
       </div>`;
   }
 
-  // 🧩 เริ่มระบบ
-  window.addEventListener("DOMContentLoaded", async () => {
-    await initModels();
-    await autoSync();
-    setInterval(autoSync, 60000);
-  });
-  searchBtn.addEventListener("click", performSearch);
-  manualSyncBtn.addEventListener("click", autoSync);
-
-  // 💾 ระบบเลือกดาวน์โหลด (เพิ่มใหม่)
+  // ✅ ระบบเลือกดาวน์โหลด
   const WATERMARK = new Image();
   WATERMARK.src = WATERMARK_SRC;
   let downloadQueue = { url: "", name: "" };
@@ -230,6 +178,9 @@
       a.click();
     }, "image/jpeg", 0.95);
   }
+
+  window.addEventListener("DOMContentLoaded", initModels);
+  searchBtn.addEventListener("click", performSearch);
   </script>
 </body>
 </html>
