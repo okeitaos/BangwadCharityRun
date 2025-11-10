@@ -7,7 +7,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
-
   <style>
     .filename {
       white-space: nowrap;
@@ -27,7 +26,6 @@
       <button id="langToggle" class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">EN</button>
     </div>
 
-    <!-- 🔍 Search Box -->
     <div class="bg-slate-800 p-6 rounded-xl shadow-lg text-center">
       <input id="fileInput" type="file" accept="image/*" class="mb-4 w-full text-gray-300" />
       <div class="flex gap-2 mb-4">
@@ -50,26 +48,12 @@
     </div>
   </div>
 
-  <!-- 🆕 Popup Preview ลายน้ำก่อนดาวน์โหลด -->
-  <div id="previewPopup" class="fixed inset-0 bg-black bg-opacity-90 flex flex-col items-center justify-center hidden z-50">
-    <div class="bg-slate-800 p-4 rounded-xl shadow-xl text-center max-w-lg w-[90%]">
-      <h2 class="text-lg font-semibold mb-3">🖼️ Preview ก่อนดาวน์โหลด</h2>
-      <canvas id="previewCanvas" class="max-w-full rounded-lg shadow-lg border-2 border-white mb-3"></canvas>
-      <div class="flex justify-center gap-3">
-        <button id="confirmDownload" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">✅ ดาวน์โหลด</button>
-        <button id="cancelPreview" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">❌ ยกเลิก</button>
-      </div>
-    </div>
-  </div>
-
   <script type="module">
     import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
     const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
     const BUCKET = "gallery";
-    const WATERMARK_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
-    let SIM_THRESHOLD = 0.95;
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const fileInput = document.getElementById("fileInput");
@@ -84,10 +68,6 @@
     const title = document.getElementById("title");
     const btnSearchText = document.getElementById("btnSearchText");
     const btnClearText = document.getElementById("btnClearText");
-    const previewPopup = document.getElementById("previewPopup");
-    const previewCanvas = document.getElementById("previewCanvas");
-    const confirmDownload = document.getElementById("confirmDownload");
-    const cancelPreview = document.getElementById("cancelPreview");
 
     const LANG = {
       th: {
@@ -122,6 +102,7 @@
       },
     };
 
+    let SIM_THRESHOLD = 0.95;
     let currentLang = "th";
     function setLang(lang) {
       currentLang = lang;
@@ -164,38 +145,7 @@
       statusDiv.textContent = LANG[currentLang].ready;
     };
 
-    async function previewWatermarkedImage(imageUrl, fileName) {
-      const [imgRes, watermarkRes] = await Promise.all([fetch(imageUrl), fetch(WATERMARK_URL)]);
-      const [imgBlob, watermarkBlob] = await Promise.all([imgRes.blob(), watermarkRes.blob()]);
-      const img = await createImageBitmap(imgBlob);
-      const watermark = await createImageBitmap(watermarkBlob);
-      const ctx = previewCanvas.getContext("2d");
-      previewCanvas.width = img.width;
-      previewCanvas.height = img.height;
-      ctx.drawImage(img, 0, 0, img.width, img.height);
-      const w = img.width * 0.25;
-      const s = w / watermark.width;
-      const h = watermark.height * s;
-      const x = img.width - w - 20;
-      const y = img.height - h - 20;
-      ctx.drawImage(watermark, x, y, w, h);
-      previewPopup.classList.remove("hidden");
-      confirmDownload.onclick = () => {
-        previewCanvas.toBlob((b) => {
-          const l = document.createElement("a");
-          l.href = URL.createObjectURL(b);
-          l.download = fileName;
-          l.click();
-        }, "image/jpeg", 0.95);
-        previewPopup.classList.add("hidden");
-      };
-      cancelPreview.onclick = () => previewPopup.classList.add("hidden");
-    }
-
-    window.downloadImage = async (url, name) => {
-      await previewWatermarkedImage(url, name);
-    };
-
+    // ✅ ค้นหาภาพและแสดงผล
     searchBtn.onclick = async () => {
       const langPack = LANG[currentLang];
       const file = fileInput.files[0];
@@ -218,6 +168,7 @@
           },
           body: JSON.stringify({ embedding, threshold: SIM_THRESHOLD, limit: 20 }),
         });
+
         const { matches, error } = await res.json();
         if (error) throw new Error(error);
         if (!matches?.length)
@@ -226,26 +177,20 @@
         resultDiv.innerHTML = `
           <p class="text-green-400 font-semibold mb-2">${langPack.found(matches.length, Math.round(SIM_THRESHOLD * 100))}</p>
           <div class="grid grid-cols-2 gap-3">
-            ${matches
-              .map(
-                (m) => `
-             <div class="bg-slate-700 p-2 rounded-lg overflow-hidden relative">
-  <div class="relative">
-    <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}" 
-         class="rounded-lg mb-2 shadow w-full object-cover aspect-[3/4]" >
-    <!-- 🖼️ ลายน้ำ Overlay -->
-    <img src="https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png"
-         class="absolute bottom-2 right-2 w-1/4 opacity-100 pointer-events-none select-none">
-  </div>
-  <p class="filename text-sm text-gray-200 mt-1" title="${m.name}">${m.name}</p>
-  <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
-  <button onclick="downloadImage('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}.jpg')" 
-          class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">${langPack.download}</button>
-</div>
-
-            `
-              )
-              .join("")}
+            ${matches.map(m => `
+              <div class="bg-slate-700 p-2 rounded-lg overflow-hidden relative">
+                <div class="relative">
+                  <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}?t=${Date.now()}" 
+                       class="rounded-lg mb-2 shadow w-full object-cover aspect-[3/4]">
+                  <img src="https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png"
+                       class="absolute bottom-2 right-2 w-1/4 opacity-100 pointer-events-none select-none">
+                </div>
+                <p class="filename text-sm text-gray-200 mt-1" title="${m.name}">${m.name}</p>
+                <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
+                <button onclick="downloadViaServer('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}.jpg')" 
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">${langPack.download}</button>
+              </div>
+            `).join("")}
           </div>
         `;
       } catch (e) {
@@ -253,12 +198,36 @@
       }
     };
 
-    setLang("th");
-    
-    // 🚫 ป้องกันการคลิกขวาและการลากภาพ
-document.addEventListener("contextmenu", (e) => e.preventDefault());
-document.addEventListener("dragstart", (e) => e.preventDefault());
+    // ✅ ดาวน์โหลดผ่าน Edge Function (Server Render)
+    window.downloadViaServer = async (url, name) => {
+      try {
+        const res = await fetch("https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/watermark", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            image_url: `${url}?t=${Date.now()}`,
+            format: "jpg",
+          }),
+        });
 
+        if (!res.ok) throw new Error("Server error");
+
+        const blob = await res.blob();
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = name || "watermarked.jpg";
+        link.click();
+        URL.revokeObjectURL(link.href);
+      } catch (err) {
+        alert("❌ ดาวน์โหลดไม่สำเร็จ: " + err.message);
+      }
+    };
+
+    // 🚫 ป้องกันคลิกขวา / ลากภาพ
+    document.addEventListener("contextmenu", (e) => e.preventDefault());
+    document.addEventListener("dragstart", (e) => e.preventDefault());
+
+    setLang("th");
   </script>
 </body>
 </html>
