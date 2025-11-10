@@ -3,13 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Face Search | ค้นหาภาพด้วยใบหน้า</title>
+  <title>Face Search | BANGWAD Charity Run</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
-
   <style>
-    /* ✅ ปรับชื่อไฟล์ไม่ให้ล้นกรอบ */
     .filename {
       white-space: nowrap;
       overflow: hidden;
@@ -50,7 +48,7 @@
   <!-- 📸 Popup Viewer -->
   <div id="popup" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center hidden z-50">
     <div class="relative">
-      <img id="popupImg" src="" class="max-h-[80vh] rounded-lg shadow-lg border-4 border-white" />
+      <canvas id="popupCanvas" class="max-h-[80vh] rounded-lg shadow-lg border-4 border-white"></canvas>
       <button id="closePopup" class="absolute top-2 right-2 bg-white text-black px-3 py-1 rounded-lg">✕</button>
     </div>
   </div>
@@ -58,172 +56,164 @@
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-    // ⚙️ CONFIG
     const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
     const BUCKET = "gallery";
-    let SIM_THRESHOLD = 0.95;
+    const WATERMARK_SRC = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png"; // ⬅️ โลโก้ลายน้ำ
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let SIM_THRESHOLD = 0.95;
 
-    // 🎨 DOM
     const fileInput = document.getElementById("fileInput");
     const searchBtn = document.getElementById("searchBtn");
     const clearBtn = document.getElementById("clearBtn");
-    const statusDiv = document.getElementById("status");
     const resultDiv = document.getElementById("result");
-    const langToggle = document.getElementById("langToggle");
+    const statusDiv = document.getElementById("status");
     const thresholdInput = document.getElementById("threshold");
     const thresholdLabel = document.getElementById("thresholdLabel");
     const thresholdValue = document.getElementById("thresholdValue");
-    const title = document.getElementById("title");
-    const btnSearchText = document.getElementById("btnSearchText");
-    const btnClearText = document.getElementById("btnClearText");
     const popup = document.getElementById("popup");
-    const popupImg = document.getElementById("popupImg");
+    const popupCanvas = document.getElementById("popupCanvas");
     const closePopup = document.getElementById("closePopup");
+    const langToggle = document.getElementById("langToggle");
 
-    // 🌐 Languages
     const LANG = {
-      th: {
-        title: "📸 ค้นหาภาพด้วยใบหน้า",
-        choose: "กรุณาเลือกรูปภาพก่อน",
-        analyzing: "🧠 กำลังตรวจสอบใบหน้า...",
-        notFound: "⚠️ ไม่พบใบหน้าในภาพนี้",
-        searching: (v) => `🔍 กำลังค้นหาภาพที่เหมือนกัน (≥${v}%)...`,
-        noMatch: (v) => `❌ ไม่พบภาพที่ตรงกัน (≥${v}%)`,
-        found: (n, v) => `🎯 พบภาพที่เหมือน ≥${v}% จำนวน ${n} ภาพ`,
-        btnSearch: "ค้นหาภาพ",
-        btnClear: "เคลียร์",
-        level: (v) => `ระดับความเหมือน (${v}%)`,
-        ready: "✅ พร้อมใช้งานแล้ว",
-        loading: "⏳ กำลังโหลดโมเดล...",
-        download: "ดาวน์โหลด"
-      },
-      en: {
-        title: "📸 Face Search",
-        choose: "Please select an image first.",
-        analyzing: "🧠 Detecting face...",
-        notFound: "⚠️ No face detected in this image.",
-        searching: (v) => `🔍 Searching for similar faces (≥${v}%)...`,
-        noMatch: (v) => `❌ No similar faces found (≥${v}%)`,
-        found: (n, v) => `🎯 Found ${n} similar faces (≥${v}%)`,
-        btnSearch: "Search",
-        btnClear: "Clear",
-        level: (v) => `Similarity Level (${v}%)`,
-        ready: "✅ Ready to use",
-        loading: "⏳ Loading model...",
-        download: "Download"
-      }
+      th: { title: "📸 ค้นหาภาพด้วยใบหน้า", choose: "กรุณาเลือกรูปก่อน", analyzing: "🧠 ตรวจสอบใบหน้า...", notFound: "⚠️ ไม่พบใบหน้า", searching: (v) => `🔍 กำลังค้นหา (≥${v}%)...`, found: (n, v) => `🎯 พบ ${n} ภาพ (≥${v}%)`, noMatch: (v) => `❌ ไม่พบภาพ (≥${v}%)`, ready: "✅ พร้อมใช้งานแล้ว", download: "ดาวน์โหลด" },
+      en: { title: "📸 Face Search", choose: "Select an image first.", analyzing: "🧠 Detecting face...", notFound: "⚠️ No face detected", searching: (v) => `🔍 Searching (≥${v}%)...`, found: (n, v) => `🎯 Found ${n} matches (≥${v}%)`, noMatch: (v) => `❌ No matches (≥${v}%)`, ready: "✅ Ready", download: "Download" }
     };
-
     let currentLang = "th";
+
+    function normalize(d) {
+      const n = Math.sqrt(d.reduce((a, b) => a + b * b, 0));
+      return d.map(x => x / n);
+    }
+
     function setLang(lang) {
       currentLang = lang;
-      const t = LANG[lang];
-      title.textContent = t.title;
-      btnSearchText.textContent = t.btnSearch;
-      btnClearText.textContent = t.btnClear;
-      thresholdLabel.textContent = t.level(Math.round(SIM_THRESHOLD * 100));
-      thresholdValue.textContent = `≥ ${Math.round(SIM_THRESHOLD * 100)}%`;
       langToggle.textContent = lang === "th" ? "EN" : "TH";
-      statusDiv.textContent = t.ready;
+      document.getElementById("title").textContent = LANG[lang].title;
     }
 
     langToggle.onclick = () => setLang(currentLang === "th" ? "en" : "th");
 
     // 🧠 โหลดโมเดล
-    statusDiv.textContent = LANG[currentLang].loading;
-    const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
+    statusDiv.textContent = LANG[currentLang].analyzing;
     await Promise.all([
-      faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
-      faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
-      faceapi.nets.faceRecognitionNet.loadFromUri(modelURL)
+      faceapi.nets.ssdMobilenetv1.loadFromUri("https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/"),
+      faceapi.nets.faceLandmark68Net.loadFromUri("https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/"),
+      faceapi.nets.faceRecognitionNet.loadFromUri("https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/")
     ]);
     statusDiv.textContent = LANG[currentLang].ready;
 
-    // Normalize
-    const normalize = (desc) => {
-      const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
-      return desc.map(x => x / norm);
-    };
-
+    // 🎚 Threshold
     thresholdInput.oninput = (e) => {
       const v = e.target.value;
       SIM_THRESHOLD = v / 100;
-      thresholdLabel.textContent = LANG[currentLang].level(v);
+      thresholdLabel.textContent = `ระดับความเหมือน (${v}%)`;
       thresholdValue.textContent = `≥ ${v}%`;
     };
 
+    // 🧹 Clear
     clearBtn.onclick = () => {
       fileInput.value = "";
       resultDiv.innerHTML = "";
       statusDiv.textContent = LANG[currentLang].ready;
     };
 
+    // 💾 ดาวน์โหลดพร้อมลายน้ำโลโก้
     async function downloadImage(url, name) {
       const res = await fetch(url);
       const blob = await res.blob();
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = name || "image.jpg";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(link.href);
+      const img = await createImageBitmap(blob);
+      const logo = new Image();
+      logo.src = WATERMARK_SRC;
+      await logo.decode();
+
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+
+      const w = img.width / 6;
+      const h = (logo.height / logo.width) * w;
+      ctx.globalAlpha = 0.85;
+      ctx.drawImage(logo, img.width - w - 20, img.height - h - 20, w, h);
+      ctx.globalAlpha = 1.0;
+
+      canvas.toBlob((wb) => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(wb);
+        a.download = name || "watermarked.jpg";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }, "image/jpeg", 0.95);
     }
 
-    searchBtn.onclick = async () => {
-      const langPack = LANG[currentLang];
-      const file = fileInput.files[0];
-      if (!file) return alert(langPack.choose);
+    // 📸 Popup Viewer + ลายน้ำโลโก้
+    window.openPopup = async (src) => {
+      const res = await fetch(src);
+      const blob = await res.blob();
+      const img = await createImageBitmap(blob);
+      const logo = new Image();
+      logo.src = WATERMARK_SRC;
+      await logo.decode();
 
-      resultDiv.innerHTML = langPack.analyzing;
-      const img = await faceapi.bufferToImage(file);
-      const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-      if (!det) return (resultDiv.innerHTML = langPack.notFound);
+      popupCanvas.width = img.width;
+      popupCanvas.height = img.height;
+      const ctx = popupCanvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
 
-      const embedding = normalize(Array.from(det.descriptor));
-      statusDiv.textContent = langPack.searching(Math.round(SIM_THRESHOLD * 100));
+      const w = img.width / 6;
+      const h = (logo.height / logo.width) * w;
+      ctx.globalAlpha = 0.85;
+      ctx.drawImage(logo, img.width - w - 20, img.height - h - 20, w, h);
+      ctx.globalAlpha = 1.0;
 
-      try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({ embedding, threshold: SIM_THRESHOLD, limit: 20 })
-        });
-
-        const { matches, error } = await res.json();
-        if (error) throw new Error(error);
-        if (!matches?.length) return (resultDiv.innerHTML = langPack.noMatch(Math.round(SIM_THRESHOLD * 100)));
-
-        resultDiv.innerHTML = `
-          <p class="text-green-400 font-semibold mb-2">${langPack.found(matches.length, Math.round(SIM_THRESHOLD * 100))}</p>
-          <div class="grid grid-cols-2 gap-3">
-            ${matches.map(m => `
-              <div class="bg-slate-700 p-2 rounded-lg overflow-hidden">
-                <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}" 
-                     class="rounded-lg mb-2 shadow cursor-pointer hover:scale-105 transition w-full object-cover aspect-[3/4]" 
-                     onclick="openPopup('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}')">
-                <p class="filename text-sm text-gray-200" title="${m.name}">${m.name}</p>
-                <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
-                <button onclick="downloadImage('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}.jpg')" 
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">${langPack.download}</button>
-              </div>
-            `).join("")}
-          </div>
-        `;
-      } catch (e) {
-        resultDiv.innerHTML = `❌ ${e.message}`;
-      }
+      popup.classList.remove("hidden");
     };
-
-    window.openPopup = (src) => { popupImg.src = src; popup.classList.remove("hidden"); };
     closePopup.onclick = () => popup.classList.add("hidden");
 
-    setLang("th");
+    // 🔍 Search
+    searchBtn.onclick = async () => {
+      const t = LANG[currentLang];
+      const f = fileInput.files[0];
+      if (!f) return alert(t.choose);
+      resultDiv.innerHTML = t.analyzing;
+
+      const img = await faceapi.bufferToImage(f);
+      const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+      if (!det) return (resultDiv.innerHTML = t.notFound);
+
+      const emb = normalize(Array.from(det.descriptor));
+      resultDiv.innerHTML = t.searching(Math.round(SIM_THRESHOLD * 100));
+
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ embedding: emb, threshold: SIM_THRESHOLD, limit: 20 })
+      });
+
+      const { matches, error } = await r.json();
+      if (error || !matches?.length) return (resultDiv.innerHTML = t.noMatch(Math.round(SIM_THRESHOLD * 100)));
+
+      resultDiv.innerHTML = `
+        <p class="text-green-400 font-semibold mb-2">${t.found(matches.length, Math.round(SIM_THRESHOLD * 100))}</p>
+        <div class="grid grid-cols-2 gap-3">
+          ${matches.map(m => `
+            <div class="bg-slate-700 p-2 rounded-lg overflow-hidden">
+              <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}"
+                   class="rounded-lg mb-2 shadow cursor-pointer hover:scale-105 transition w-full object-cover aspect-[3/4]"
+                   onclick="openPopup('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}')">
+              <p class="filename text-sm text-gray-200" title="${m.name}">${m.name}</p>
+              <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
+              <button onclick="downloadImage('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}.jpg')"
+                      class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">${t.download}</button>
+            </div>
+          `).join("")}
+        </div>`;
+    };
+
     window.downloadImage = downloadImage;
   </script>
 </body>
