@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clear Cache | Supabase Gallery</title>
+  <style>
+    body {
+      background: #0e0e10;
+      color: #fff;
+      font-family: "Poppins", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    h1 {
+      margin-bottom: 20px;
+      font-size: 1.8rem;
+    }
+    input {
+      padding: 10px;
+      font-size: 1rem;
+      border-radius: 8px;
+      border: none;
+      margin-bottom: 20px;
+      width: 250px;
+      text-align: center;
+    }
+    button {
+      background: #ff4d4f;
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    button:hover {
+      background: #ff6b6d;
+    }
+    #status {
+      margin-top: 20px;
+      color: #00ffb7;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧹 Clear Supabase Gallery Cache</h1>
+  <input type="password" id="key" placeholder="Enter Admin Key" />
+  <button id="clearBtn">Clear Cache</button>
+  <div id="status"></div>
+
+  <script>
+    const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.functions.supabase.co/clear-gallery-cache"; // 👈 เปลี่ยน URL ของคุณ
+
+    document.getElementById("clearBtn").addEventListener("click", async () => {
+      const key = document.getElementById("key").value.trim();
+      const status = document.getElementById("status");
+
+      if (!key) {
+        status.textContent = "❌ กรุณาใส่รหัสก่อน";
+        status.style.color = "#ff6b6d";
+        return;
+      }
+
+      status.textContent = "⏳ กำลังเคลียร์ cache ...";
+      status.style.color = "#ffc107";
+
+      try {
+        const res = await fetch(`${FUNCTION_URL}?key=${key}`);
+        const data = await res.json();
+
+        if (res.status === 200) {
+          status.textContent = "✅ เคลียร์ cache ของ bucket 'gallery' เรียบร้อยแล้ว!";
+          status.style.color = "#00ffb7";
+        } else {
+          status.textContent = "❌ " + (data.error || "ไม่สามารถเคลียร์ได้");
+          status.style.color = "#ff6b6d";
+        }
+      } catch (err) {
+        status.textContent = "⚠️ Error: " + err.message;
+        status.style.color = "#ff6b6d";
+      }
+    });
+  </script>
+</body>
+</html>
