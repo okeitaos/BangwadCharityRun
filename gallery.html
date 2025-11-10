@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🔎 Face Search | Gallery</title>
+  <title>User | Face Search + Popup + Instant Download</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 </head>
 
 <body class="bg-slate-900 text-white flex flex-col items-center min-h-screen p-6 relative">
-  <h1 class="text-3xl font-bold mb-6 text-center">🔍 Face Search | Gallery v2</h1>
+  <h1 class="text-3xl font-bold mb-6 text-center">🔎 Face Search | User Mode</h1>
 
   <!-- 🔍 Search UI -->
   <div class="bg-slate-800 p-6 rounded-xl shadow-lg w-full max-w-md mb-8 text-center">
     <input id="fileInput" type="file" accept="image/*" class="mb-4 w-full text-gray-300" />
     <button id="searchBtn" class="w-full bg-green-500 hover:bg-green-600 py-2 rounded-lg mb-4">
-      🔎 ค้นหาใบหน้า
+      🔍 ค้นหาใบหน้า
     </button>
     <div id="status" class="text-sm text-gray-300 mb-2">⏳ Initializing...</div>
     <div id="result" class="text-sm text-gray-200"></div>
@@ -40,7 +40,7 @@
   <script>
   // ⚙️ CONFIG
   const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 🔒 ใส่ของจริงก่อนใช้งาน
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const BUCKET = "gallery";
   const EDGE_LIMIT = 50;
@@ -112,11 +112,7 @@
         "Content-Type": "application/json",
         "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
       },
-      body: JSON.stringify({
-        embedding: queryEmbedding,
-        threshold: SIM_THRESHOLD,
-        limit: EDGE_LIMIT
-      })
+      body: JSON.stringify({ embedding: queryEmbedding, threshold: SIM_THRESHOLD, limit: EDGE_LIMIT })
     });
 
     const { matches, error } = await resp.json();
@@ -135,16 +131,14 @@
       <p class="text-green-400 font-semibold mb-2">🎯 พบใบหน้าที่เหมือน ≥95% จำนวน ${filtered.length} ภาพ</p>
       <div class="grid grid-cols-2 gap-3">
         ${filtered.map(v => {
-          const imgUrl = `${v.image_url}`;
-          const fileName = v.name || "face.jpg";
-          const owner = v.owner_name || "ไม่ทราบผู้ใช้";
+          const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${v.image_url}`;
+          const filename = v.name + ".jpg";
           return `
           <div class="bg-slate-700 p-2 rounded-lg hover:scale-105 transition">
             <img src="${imgUrl}" class="rounded-lg mb-2 shadow cursor-pointer" data-img="${imgUrl}">
-            <p class="text-sm truncate">${fileName}</p>
-            <p class="text-xs text-gray-400">${owner}</p>
-            <p class="text-xs text-gray-500">Sim: ${(v.similarity*100).toFixed(2)}%</p>
-            <button class="downloadBtn mt-1 text-blue-400 hover:text-blue-200 text-xs" data-url="${imgUrl}" data-name="${fileName}">💾 ดาวน์โหลด</button>
+            <p class="text-sm">${v.name}</p>
+            <p class="text-xs text-gray-400">Sim: ${(v.similarity*100).toFixed(2)}%</p>
+            <button class="downloadBtn mt-1 text-blue-400 hover:text-blue-200 text-xs" data-url="${imgUrl}" data-name="${filename}">💾 ดาวน์โหลด</button>
           </div>`;
         }).join("")}
       </div>`;
