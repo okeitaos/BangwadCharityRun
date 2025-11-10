@@ -229,14 +229,20 @@
             ${matches
               .map(
                 (m) => `
-              <div class="bg-slate-700 p-2 rounded-lg overflow-hidden">
-                <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}" 
-                     class="rounded-lg mb-2 shadow w-full object-cover aspect-[3/4]" >
-                <p class="filename text-sm text-gray-200" title="${m.name}">${m.name}</p>
-                <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
-                <button onclick="downloadImage('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}.jpg')" 
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">${langPack.download}</button>
-              </div>
+             <div class="bg-slate-700 p-2 rounded-lg overflow-hidden relative">
+  <div class="relative">
+    <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}" 
+         class="rounded-lg mb-2 shadow w-full object-cover aspect-[3/4]" >
+    <!-- 🖼️ ลายน้ำ Overlay -->
+    <img src="https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png"
+         class="absolute bottom-2 right-2 w-1/4 opacity-100 pointer-events-none select-none">
+  </div>
+  <p class="filename text-sm text-gray-200 mt-1" title="${m.name}">${m.name}</p>
+  <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
+  <button onclick="downloadImage('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}.jpg')" 
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">${langPack.download}</button>
+</div>
+
             `
               )
               .join("")}
