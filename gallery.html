@@ -77,6 +77,24 @@
     #confirmDownload:hover, #cancelPreview:hover {
       transform: scale(1.05);
     }
+    
+    /* ✅ จัดภาพใน popup ให้อยู่กึ่งกลางแนวตั้งเสมอ */
+#previewPopup > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ✅ ปรับให้ข้อความหัวเรื่องและปุ่มไม่ชนขอบ */
+#previewPopup h2 {
+  margin-top: 0.5rem;
+}
+
+#previewPopup .flex.justify-center {
+  margin-bottom: 0.5rem;
+}
+
   </style>
 </head>
 
