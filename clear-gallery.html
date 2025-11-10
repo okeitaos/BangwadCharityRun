@@ -3,88 +3,129 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Clear Cache | Supabase Gallery</title>
+  <title>🧹 Clear Gallery Cache | Supabase</title>
   <style>
     body {
-      background: #0e0e10;
-      color: #fff;
+      background: #0f0f11;
+      color: #e0e0e0;
       font-family: "Poppins", sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100vh;
+      min-height: 100vh;
       margin: 0;
     }
     h1 {
-      margin-bottom: 20px;
       font-size: 1.8rem;
+      margin-bottom: 10px;
+      color: #00ffe1;
+    }
+    p {
+      margin-bottom: 25px;
+      font-size: 1rem;
+      color: #b0b0b0;
     }
     input {
       padding: 10px;
-      font-size: 1rem;
       border-radius: 8px;
       border: none;
-      margin-bottom: 20px;
-      width: 250px;
+      font-size: 1rem;
       text-align: center;
+      margin-bottom: 20px;
+      width: 260px;
+      background: #1a1a1d;
+      color: #fff;
+      outline: none;
+    }
+    input::placeholder {
+      color: #888;
     }
     button {
-      background: #ff4d4f;
+      background: linear-gradient(90deg, #ff4d4f, #ff6b6d);
       color: white;
-      padding: 12px 24px;
+      padding: 12px 26px;
       border: none;
-      border-radius: 10px;
+      border-radius: 12px;
       font-size: 1rem;
       cursor: pointer;
-      transition: 0.2s;
+      transition: 0.3s;
+      font-weight: 500;
     }
     button:hover {
-      background: #ff6b6d;
+      background: linear-gradient(90deg, #ff6b6d, #ff4d4f);
     }
     #status {
-      margin-top: 20px;
-      color: #00ffb7;
+      margin-top: 25px;
       font-weight: 500;
+      text-align: center;
+    }
+    .success {
+      color: #00ffb7;
+    }
+    .error {
+      color: #ff7070;
+    }
+    .loading {
+      color: #ffc107;
     }
   </style>
 </head>
 <body>
-  <h1>🧹 Clear Supabase Gallery Cache</h1>
-  <input type="password" id="key" placeholder="Enter Admin Key" />
+  <h1>🧹 Clear Gallery Cache</h1>
+  <p>กดปุ่มเพื่อเคลียร์ Cache ของ Supabase Bucket <strong>gallery</strong></p>
+
+  <input type="password" id="key" placeholder="ใส่รหัส ADMIN_KEY ที่ถูกต้อง" />
   <button id="clearBtn">Clear Cache</button>
+
   <div id="status"></div>
+  <div id="lastCleared"></div>
 
   <script>
-    const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.functions.supabase.co/clear-gallery-cache"; // 👈 เปลี่ยน URL ของคุณ
- 
-    document.getElementById("clearBtn").addEventListener("click", async () => {
-      const key = document.getElementById("key").value.trim();
-      const status = document.getElementById("status");
+    // ⚙️ ตั้ง URL ของ Edge Function ตรงนี้
+    const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.functions.supabase.co/clear-gallery-cache";
 
+    const keyInput = document.getElementById("key");
+    const clearBtn = document.getElementById("clearBtn");
+    const statusDiv = document.getElementById("status");
+    const lastClearedDiv = document.getElementById("lastCleared");
+
+    // โหลดเวลาล่าสุดจาก localStorage (ถ้ามี)
+    const lastTime = localStorage.getItem("lastCleared");
+    if (lastTime) {
+      lastClearedDiv.innerHTML = `🕓 เคลียร์ล่าสุด: <strong>${lastTime}</strong>`;
+    }
+
+    clearBtn.addEventListener("click", async () => {
+      const key = keyInput.value.trim();
       if (!key) {
-        status.textContent = "❌ กรุณาใส่รหัสก่อน";
-        status.style.color = "#ff6b6d";
+        statusDiv.textContent = "❌ กรุณาใส่รหัสก่อน";
+        statusDiv.className = "error";
         return;
       }
 
-      status.textContent = "⏳ กำลังเคลียร์ cache ...";
-      status.style.color = "#ffc107";
+      statusDiv.textContent = "⏳ กำลังเคลียร์ cache ...";
+      statusDiv.className = "loading";
 
       try {
-        const res = await fetch(`${FUNCTION_URL}?key=${key}`);
+        const res = await fetch(`${FUNCTION_URL}?key=${encodeURIComponent(key)}`);
         const data = await res.json();
 
         if (res.status === 200) {
-          status.textContent = "✅ เคลียร์ cache ของ bucket 'gallery' เรียบร้อยแล้ว!";
-          status.style.color = "#00ffb7";
+          statusDiv.textContent = "✅ เคลียร์ cache ของ bucket 'gallery' สำเร็จ!";
+          statusDiv.className = "success";
+
+          // บันทึกเวลาเคลียร์ล่าสุด
+          const clearedTime = new Date(data.cleared_at).toLocaleString("th-TH");
+          localStorage.setItem("lastCleared", clearedTime);
+          lastClearedDiv.innerHTML = `🕓 เคลียร์ล่าสุด: <strong>${clearedTime}</strong>`;
         } else {
-          status.textContent = "❌ " + (data.error || "ไม่สามารถเคลียร์ได้");
-          status.style.color = "#ff6b6d";
+          statusDiv.textContent = `❌ ล้มเหลว: ${data.error || "ไม่สามารถเคลียร์ได้"}`;
+          statusDiv.className = "error";
         }
       } catch (err) {
-        status.textContent = "⚠️ Error: " + err.message;
-        status.style.color = "#ff6b6d";
+        statusDiv.textContent = "⚠️ Error: " + err.message;
+        statusDiv.className = "error";
       }
     });
   </script>
