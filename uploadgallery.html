@@ -1,29 +1,4 @@
-Table faces create table public.faces (
-  id bigserial not null,
-  name text null,
-  image_url text null,
-  embedding public.vector null,
-  created_at timestamp without time zone null default now(),
-  constraint faces_pkey primary key (id)
-) TABLESPACE pg_default;
-
-Table file_hashes
-create table public.file_hashes (
-  id uuid not null default gen_random_uuid (),
-  user_id text not null,
-  filename text null,
-  hash text not null,
-  created_at timestamp with time zone null default now(),
-  profilename text null,
-  profile_pic text null,
-  constraint file_hashes_pkey primary key (id),
-  constraint file_hashes_user_id_hash_key unique (user_id, hash)
-) TABLESPACE pg_default;
-
-create unique INDEX IF not exists file_hashes_user_hash_idx on public.file_hashes using btree (user_id, hash) TABLESPACE pg_default;
-
-
-หน้า uploadgallery.html <!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="th">
 <head>
 <meta charset="UTF-8">
