@@ -9,7 +9,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 
   <style>
-    /* ✅ ปรับชื่อไฟล์ไม่ให้ล้นกรอบ */
     .filename {
       white-space: nowrap;
       overflow: hidden;
@@ -160,16 +159,49 @@
       statusDiv.textContent = LANG[currentLang].ready;
     };
 
+    // ✅ ปล่อยฟังก์ชันดาวน์โหลดภาพพร้อมลายน้ำ
+    async function addWatermarkAndDownload(imageUrl, fileName) {
+      try {
+        const watermarkUrl = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
+        const [imgRes, watermarkRes] = await Promise.all([fetch(imageUrl), fetch(watermarkUrl)]);
+        const [imgBlob, watermarkBlob] = await Promise.all([imgRes.blob(), watermarkRes.blob()]);
+
+        const img = await createImageBitmap(imgBlob);
+        const watermark = await createImageBitmap(watermarkBlob);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+
+        const watermarkWidth = img.width * 0.25;
+        const scale = watermarkWidth / watermark.width;
+        const watermarkHeight = watermark.height * scale;
+        const margin = 20;
+        const x = img.width - watermarkWidth - margin;
+        const y = img.height - watermarkHeight - margin;
+
+        ctx.drawImage(watermark, x, y, watermarkWidth, watermarkHeight);
+
+        canvas.toBlob((blob) => {
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = fileName || "image_watermarked.jpg";
+          link.click();
+          URL.revokeObjectURL(link.href);
+        }, "image/jpeg", 0.95);
+
+      } catch (err) {
+        console.error("❌ Error adding watermark:", err);
+        alert("เกิดข้อผิดพลาดในการสร้างลายน้ำ");
+      }
+    }
+
     async function downloadImage(url, name) {
-      const res = await fetch(url);
-      const blob = await res.blob();
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = name || "image.jpg";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(link.href);
+      // ✅ แทนที่การดาวน์โหลดแบบเดิม ด้วยฟังก์ชันลายน้ำ
+      await addWatermarkAndDownload(url, name);
     }
 
     searchBtn.onclick = async () => {
@@ -188,10 +220,7 @@
       try {
         const res = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
-          },
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
           body: JSON.stringify({ embedding, threshold: SIM_THRESHOLD, limit: 20 })
         });
 
@@ -220,11 +249,11 @@
       }
     };
 
+    // ✅ Popup viewer ยังคงอยู่ครบ
     window.openPopup = (src) => { popupImg.src = src; popup.classList.remove("hidden"); };
     closePopup.onclick = () => popup.classList.add("hidden");
 
     setLang("th");
-    window.downloadImage = downloadImage;
   </script>
 </body>
 </html>
