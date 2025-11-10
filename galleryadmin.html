@@ -1,142 +1,181 @@
 <!DOCTYPE html>
 <html lang="th">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Admin | Face Sync Control</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
-  </head>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin | Face Sync Dashboard (Realtime Chart)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
 
-  <body
-    class="bg-slate-900 text-white flex flex-col items-center min-h-screen p-6"
-  >
-    <h1 class="text-3xl font-bold mb-6 text-center">
-      🧩 Admin Dashboard | Face Sync
-    </h1>
+<body class="bg-slate-900 text-white flex flex-col items-center min-h-screen p-6">
+  <h1 class="text-3xl font-bold mb-6 text-center">🧠 Face Sync Dashboard (Admin + Realtime Chart)</h1>
 
-    <div
-      class="bg-slate-800 p-6 rounded-xl shadow-lg w-full max-w-md text-center mb-8"
-    >
-      <h2 class="text-lg font-semibold mb-2">🔄 Auto Sync Gallery</h2>
-      <p id="syncStatus" class="text-gray-400 text-sm mb-3">⏳ Waiting...</p>
-      <button
-        id="manualSyncBtn"
-        class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg"
-      >
-        🔁 ซิงค์ทันที
+  <!-- 🔄 Control Panel -->
+  <div class="bg-slate-800 p-6 rounded-xl shadow-lg w-full max-w-2xl mb-6 text-center">
+    <h2 class="text-lg font-semibold mb-2">🔁 ระบบซิงค์ภาพจาก Gallery</h2>
+    <p id="status" class="text-gray-400 mb-2">⏳ กำลังโหลดโมเดล...</p>
+    <div class="flex justify-center gap-3 mb-4">
+      <button id="syncBtn" class="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-lg">
+        🔄 ซิงค์ตอนนี้
+      </button>
+      <button id="clearLogBtn" class="bg-red-500 hover:bg-red-600 px-6 py-2 rounded-lg">
+        🧹 ล้าง Log
       </button>
     </div>
 
-    <div
-      class="bg-slate-800 p-4 rounded-xl shadow-lg w-full max-w-md text-center"
-    >
-      <h2 class="text-lg font-semibold mb-2">🧠 Model Status</h2>
-      <p id="status" class="text-gray-300 text-sm">⏳ Initializing...</p>
+    <!-- 📊 Realtime Chart -->
+    <div class="bg-slate-700 p-4 rounded-lg mb-4">
+      <canvas id="syncChart" height="100"></canvas>
     </div>
 
-    <script>
-      const SUPABASE_URL = 'https://xjdjurdflowiwdxgkvfr.supabase.co';
-      const SUPABASE_ANON_KEY =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics';
-      const supabase = window.supabase.createClient(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY
-      );
-      const BUCKET = 'gallery';
+    <!-- 📜 Log Section -->
+    <div id="log" class="text-sm text-left bg-slate-700 p-3 rounded-lg h-64 overflow-y-auto font-mono"></div>
+  </div>
 
-      const CONF_THRESHOLD = 0.9;
-      let isSyncing = false;
+  <script>
+  // ⚙️ CONFIG
+  const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+  const BUCKET = "gallery";
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-      function normalize(desc) {
-        const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
-        return desc.map((x) => x / norm);
-      }
+  const CONF_THRESHOLD = 0.9;
+  const MIN_FACE_SIZE = 100;
 
-      async function listRecursive(path = '') {
-        const { data, error } = await supabase.storage
-          .from(BUCKET)
-          .list(path, { limit: 1000 });
-        if (error) return [];
-        let files = [];
-        for (const item of data) {
-          if (!item.metadata) {
-            const sub = await listRecursive(
-              path ? `${path}/${item.name}` : item.name
-            );
-            files = files.concat(sub);
-          } else files.push(path ? `${path}/${item.name}` : item.name);
+  // 📦 DOM
+  const statusDiv = document.getElementById("status");
+  const syncBtn = document.getElementById("syncBtn");
+  const clearLogBtn = document.getElementById("clearLogBtn");
+  const logDiv = document.getElementById("log");
+  const ctx = document.getElementById("syncChart");
+
+  // 📊 Chart setup
+  const chart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: ["สำเร็จ", "ข้าม", "ล้มเหลว"],
+      datasets: [
+        {
+          label: "จำนวนภาพ",
+          data: [0, 0, 0],
+          backgroundColor: ["#22c55e", "#3b82f6", "#ef4444"]
         }
-        return files;
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: { y: { beginAtZero: true } },
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  // 🧠 โหลดโมเดล face-api
+  async function loadModels() {
+    const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
+    statusDiv.textContent = "⏳ กำลังโหลดโมเดลตรวจจับใบหน้า...";
+    await Promise.all([
+      faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
+      faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(modelURL)
+    ]);
+    statusDiv.textContent = "✅ พร้อมซิงค์ข้อมูลแล้ว";
+  }
+
+  // 🧩 Normalize descriptor
+  function normalize(desc) {
+    const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
+    return desc.map(x => x / norm);
+  }
+
+  // 📁 ดึงไฟล์จากทุกโฟลเดอร์
+  async function listRecursive(path = "") {
+    const { data, error } = await supabase.storage.from(BUCKET).list(path, { limit: 1000 });
+    if (error) return [];
+    let files = [];
+    for (const item of data) {
+      if (!item.metadata) {
+        const sub = await listRecursive(path ? `${path}/${item.name}` : item.name);
+        files = files.concat(sub);
+      } else {
+        files.push(path ? `${path}/${item.name}` : item.name);
       }
+    }
+    return files;
+  }
 
-      async function autoSync() {
-        if (isSyncing) return;
-        isSyncing = true;
-        const syncStatus = document.getElementById('syncStatus');
-        syncStatus.textContent = '🔄 กำลังซิงค์...';
-        const files = await listRecursive('');
-        let count = 0;
+  // 🧠 ฟังก์ชัน Sync
+  async function syncGallery() {
+    statusDiv.textContent = "🔄 กำลังซิงค์ภาพจาก Gallery...";
+    logDiv.innerHTML = "";
+    let success = 0, skipped = 0, failed = 0;
 
-        for (const path of files) {
-          const { data: exists } = await supabase
-            .from('faces')
-            .select('id')
-            .eq('image_url', path)
-            .maybeSingle();
-          if (exists) continue;
-          const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
-          try {
-            const img = await faceapi.fetchImage(imgUrl);
-            const det = await faceapi
-              .detectSingleFace(img)
-              .withFaceLandmarks()
-              .withFaceDescriptor();
-            if (!det || det.detection.score < CONF_THRESHOLD) continue;
-            const embedding = normalize(Array.from(det.descriptor));
-            if (embedding.length !== 128) continue;
-            const name = path.split('/').pop().split('.')[0];
-            await supabase.rpc('insert_face_vector', {
-              p_name: name,
-              p_image_url: path,
-              p_embedding: embedding,
-            });
-            count++;
-            if (count % 10 === 0)
-              syncStatus.textContent = `✅ ซิงค์แล้ว ${count}/${files.length}`;
-          } catch (e) {
-            console.warn('❌ sync error', e);
-          }
+    const files = await listRecursive("");
+    for (const path of files) {
+      try {
+        const { data: exists } = await supabase.from("faces").select("id").eq("image_url", path).maybeSingle();
+        if (exists) {
+          skipped++;
+          logDiv.innerHTML += `⚙️ ข้ามภาพ (มีอยู่แล้ว): ${path}<br>`;
+          continue;
         }
 
-        const now = new Date().toLocaleTimeString();
-        syncStatus.textContent = `✅ ซิงค์ล่าสุด: ${now}`;
-        isSyncing = false;
+        const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
+        const img = await faceapi.fetchImage(imgUrl);
+        const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+
+        if (!det || det.detection.score < CONF_THRESHOLD) {
+          failed++;
+          logDiv.innerHTML += `⚠️ ตรวจไม่พบใบหน้า: ${path}<br>`;
+          continue;
+        }
+
+        if (det.detection.box.width < MIN_FACE_SIZE || det.detection.box.height < MIN_FACE_SIZE) {
+          failed++;
+          logDiv.innerHTML += `⚠️ ใบหน้าเล็กเกินไป: ${path}<br>`;
+          continue;
+        }
+
+        const embedding = normalize(Array.from(det.descriptor));
+        const name = path.split("/").pop().split(".")[0];
+
+        const { error: insertError } = await supabase.rpc("insert_face_vector", {
+          p_name: name,
+          p_image_url: path,
+          p_embedding: embedding
+        });
+
+        if (insertError) {
+          failed++;
+          logDiv.innerHTML += `❌ Error บันทึก ${path}: ${insertError.message}<br>`;
+        } else {
+          success++;
+          logDiv.innerHTML += `✅ ซิงค์สำเร็จ: ${path}<br>`;
+        }
+      } catch (e) {
+        failed++;
+        logDiv.innerHTML += `💥 Error ประมวลผล ${path}: ${e.message}<br>`;
       }
 
-      async function initModels() {
-        const modelURL =
-          'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/';
-        const statusDiv = document.getElementById('status');
-        statusDiv.textContent = '⏳ โหลดโมเดล...';
-        await Promise.all([
-          faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
-          faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(modelURL),
-        ]);
-        statusDiv.textContent = '✅ พร้อมซิงค์ใบหน้าแล้ว';
-      }
+      // 🔢 อัปเดตกราฟทุกครั้งที่ซิงค์เสร็จ
+      chart.data.datasets[0].data = [success, skipped, failed];
+      chart.update();
+    }
 
-      window.addEventListener('DOMContentLoaded', async () => {
-        await initModels();
-        await autoSync();
-        setInterval(autoSync, 60000);
-      });
+    statusDiv.textContent = `✅ ซิงค์เสร็จแล้ว (สำเร็จ ${success}, ข้าม ${skipped}, ล้มเหลว ${failed})`;
+    logDiv.innerHTML += `<hr><b>🎯 สรุป:</b> สำเร็จ ${success}, ข้าม ${skipped}, ล้มเหลว ${failed}<br>`;
+  }
 
-      document
-        .getElementById('manualSyncBtn')
-        .addEventListener('click', autoSync);
-    </script>
-  </body>
+  // 🚀 เริ่มต้นทำงาน
+  window.addEventListener("DOMContentLoaded", async () => {
+    await loadModels();
+    setInterval(syncGallery, 60000); // Auto sync ทุก 1 นาที
+  });
+
+  syncBtn.addEventListener("click", syncGallery);
+  clearLogBtn.addEventListener("click", () => (logDiv.innerHTML = ""));
+  </script>
+</body>
 </html>
