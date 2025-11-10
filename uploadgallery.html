@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📤 LINE Upload Gallery (v3 - Auto Sync + Upsert)</title>
+<title>📤 LINE Upload Gallery</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -23,18 +23,29 @@
     padding: 25px;
     min-height: 100vh;
   }
-  h1 { color: var(--gold); text-shadow: 0 0 10px rgba(250,204,21,0.5); }
+  h1 {
+    color: var(--gold);
+    text-shadow: 0 0 10px rgba(250,204,21,0.5);
+  }
   input[type="file"] {
-    margin: 15px 0; padding: 10px;
-    border-radius: 25px; border: none;
-    background: var(--panel); color: #fff;
-    width: 90%; max-width: 400px;
+    margin: 15px 0;
+    padding: 10px;
+    border-radius: 25px;
+    border: none;
+    background: var(--panel);
+    color: #fff;
+    width: 90%;
+    max-width: 400px;
   }
   button {
-    border: none; padding: 10px 20px;
-    border-radius: 25px; font-weight: bold;
-    color: #fff; cursor: pointer;
-    margin: 6px; transition: 0.3s;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-weight: bold;
+    color: #fff;
+    cursor: pointer;
+    margin: 6px;
+    transition: 0.3s;
     box-shadow: 0 4px 15px rgba(0,0,0,0.3);
   }
   .btn-green { background: linear-gradient(90deg, #06C755, #00B900); }
@@ -52,20 +63,24 @@
     width: 0%; transition: width 0.2s;
   }
   #progressText {
-    position: absolute; top: 0; left: 0;
-    width: 100%; height: 100%;
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     display: flex; justify-content: center; align-items: center;
     font-size: 0.9rem; color: #fff;
   }
   .file-list {
-    background: var(--panel); border-radius: 15px;
-    padding: 20px; margin: 25px auto; max-width: 700px;
-    box-shadow: 0 0 20px rgba(0,0,0,0.3); text-align: left;
+    background: var(--panel);
+    border-radius: 15px;
+    padding: 20px;
+    margin: 25px auto;
+    max-width: 700px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    text-align: left;
   }
   ul { list-style: none; padding: 0; margin: 0; }
   li {
     display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 1px solid var(--border); padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 0;
   }
   li img.thumb { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; }
   .info { flex: 1; margin-left: 10px; overflow: hidden; }
@@ -75,7 +90,6 @@
   .user img { width: 22px; height: 22px; border-radius: 50%; }
 </style>
 </head>
-
 <body>
   <h1>📤 LINE Upload Gallery</h1>
   <div id="loginSection">
@@ -103,25 +117,21 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 🔒 ใช้ anon key จริงของคุณ
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 🔑 ใส่ค่า Anon Key จริงของคุณ
 const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const LIFF_ID = "2001781240-k2PJ3Ap2";
-
+let userId = "", userName = "", userPic = "";
 const MAX_SIZE = 5 * 1024 * 1024;
 const MAX_FILES = 1000;
-
-let userId = "", userName = "", userPic = "";
 
 async function main() {
   await liff.init({ liffId: LIFF_ID });
   if (!liff.isLoggedIn()) return document.getElementById("loginSection").style.display = "block";
-
   const profile = await liff.getProfile();
   userId = profile.userId.replace(/[^a-zA-Z0-9_-]/g, "_");
   userName = profile.displayName;
   userPic = profile.pictureUrl;
-
   document.getElementById("loginSection").style.display = "none";
   document.getElementById("uploadSection").style.display = "block";
   document.getElementById("userProfile").innerHTML = `<img src="${userPic}" style="border-radius:50%;width:80px;"><p>${userName}</p>`;
@@ -158,7 +168,6 @@ async function uploadFilesChecked() {
   const existingHashes = new Set(existing?.map(e => e.hash) || []);
 
   let success = 0, skippedDup = 0, skippedBig = 0;
-
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
     if (f.size > MAX_SIZE) { skippedBig++; continue; }
@@ -174,32 +183,20 @@ async function uploadFilesChecked() {
     progressText.textContent = `${percent}% (${i + 1}/${files.length})`;
     status.innerText = `📤 กำลังอัปโหลด (${i + 1}/${files.length}) ...`;
 
-    const { error: uploadError } = await sb.storage.from(BUCKET).upload(path, f);
-    if (!uploadError) {
+    const { error: uploadErr } = await sb.storage.from(BUCKET).upload(path, f);
+    if (!uploadErr) {
       success++;
-
-      // ✅ บันทึกแบบ upsert เพื่อป้องกัน Conflict
-      await sb.from("file_hashes")
-        .upsert({
-          user_id: userId,
-          profilename: userName,
-          profile_pic: userPic,
-          hash,
-          filename
-        }, { onConflict: ['user_id', 'hash'] });
-
-      // ✅ ซิงก์อัตโนมัติไป faces (ใช้ upsert เช่นกัน)
-      const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${filename}`;
-      await sb.from("faces")
-        .upsert({
-          name: filename,
-          owner_name: userName,
-          image_url: imageUrl
-        }, { onConflict: ['image_url'] });
+      await sb.from("file_hashes").insert({
+        user_id: userId,
+        profilename: userName,
+        profile_pic: userPic,
+        hash,
+        filename
+      });
     }
   }
 
-  status.innerText = `✅ อัปโหลดสำเร็จ ${success} | 🔁 ซ้ำ ${skippedDup} | 🚫 เกินขนาด ${skippedBig}`;
+  status.innerText = `✅ สำเร็จ ${success} | 🔁 ซ้ำ ${skippedDup} | 🚫 เกินขนาด ${skippedBig}`;
   input.value = "";
   setTimeout(() => { progress.style.width = "0%"; progressText.textContent = "0%"; }, 1500);
   listFiles();
@@ -234,14 +231,15 @@ async function deleteFile(name) {
   if (!confirm(`ต้องการลบ ${name} หรือไม่?`)) return;
   await sb.storage.from(BUCKET).remove([`${userId}/${name}`]);
   await sb.from("file_hashes").delete().eq("user_id", userId).eq("filename", name);
-  await sb.from("faces").delete().eq("image_url", `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${name}`);
   listFiles();
 }
 
 async function deleteAllFiles() {
   if (!confirm("⚠️ ต้องการลบรูปทั้งหมดของคุณหรือไม่?")) return;
+  const { data } = await sb.from("file_hashes").select("filename").eq("user_id", userId);
+  const paths = data.map(f => `${userId}/${f.filename}`);
+  await sb.storage.from(BUCKET).remove(paths);
   await sb.from("file_hashes").delete().eq("user_id", userId);
-  await sb.from("faces").delete().ilike("image_url", `%${userId}/%`);
   listFiles();
 }
 
