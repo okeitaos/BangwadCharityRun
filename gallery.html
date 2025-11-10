@@ -1,178 +1,235 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Face Search | Bangwad Charity Run</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
-<style>
-  .filename {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: block;
-    width: 100%;
-    text-align: center;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Face Search v6.6 | Final Stable + Watermark Option</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
+  <style>
+    .filename {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+      width: 100%;
+      text-align: center;
+    }
+  </style>
 </head>
+
 <body class="bg-slate-900 text-white flex flex-col items-center min-h-screen p-6">
-  <h1 class="text-2xl font-bold mb-4">📸 Face Search</h1>
+  <h1 class="text-3xl font-bold mb-6 text-center">🤖 Face Search v6.6 (Final Stable + Watermark Option)</h1>
 
-  <div class="bg-slate-800 p-6 rounded-xl shadow-lg w-full max-w-md text-center">
-    <input id="fileInput" type="file" accept="image/*" class="mb-4 w-full text-gray-300">
-    <button id="searchBtn" class="w-full bg-green-500 hover:bg-green-600 py-2 rounded-lg mb-3">🔎 ค้นหาใบหน้า</button>
-    <div id="status" class="text-gray-400 text-sm mb-2">⏳ โหลดโมเดล...</div>
-    <div id="result"></div>
+  <!-- ค้นหาใบหน้า -->
+  <div class="bg-slate-800 p-6 rounded-xl shadow-lg w-full max-w-md mb-8 text-center">
+    <input id="fileInput" type="file" accept="image/*" class="mb-4 w-full text-gray-300" />
+    <button id="searchBtn" class="w-full bg-green-500 hover:bg-green-600 py-2 rounded-lg mb-4">
+      🔎 ค้นหาใบหน้า
+    </button>
+    <div id="status" class="text-sm text-gray-300 mb-2">⏳ Initializing...</div>
+    <div id="result" class="text-sm text-gray-200"></div>
   </div>
 
-  <!-- Popup Viewer -->
-  <div id="popup" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center hidden z-50">
-    <div class="relative">
-      <img id="popupImg" class="max-h-[85vh] rounded-lg shadow-lg border-4 border-white">
-      <button id="closePopup" class="absolute top-2 right-2 bg-white text-black px-3 py-1 rounded-lg">✕</button>
-    </div>
+  <!-- Auto Sync -->
+  <div class="bg-slate-800 p-4 rounded-xl shadow-lg w-full max-w-md text-center">
+    <h2 class="text-lg font-semibold mb-1">🔄 Auto Sync Gallery</h2>
+    <p id="syncStatus" class="text-gray-400 text-sm mb-2">⏳ Waiting...</p>
+    <button id="manualSyncBtn" class="bg-blue-500 hover:bg-blue-600 px-4 py-1 rounded-lg">
+      🔁 ซิงค์ทันที
+    </button>
   </div>
 
-  <!-- Download Option -->
-  <div id="downloadDialog" class="fixed inset-0 bg-black bg-opacity-60 hidden z-50 items-center justify-center">
-    <div class="bg-slate-800 p-6 rounded-xl shadow-xl text-center max-w-xs">
-      <h2 class="text-lg font-semibold mb-4">เลือกรูปแบบดาวน์โหลด</h2>
-      <div class="flex flex-col gap-3">
-        <button id="dlWith" class="bg-green-600 hover:bg-green-700 py-2 rounded-lg">💧 พร้อมลายน้ำ</button>
-        <button id="dlNo" class="bg-blue-600 hover:bg-blue-700 py-2 rounded-lg">🖼️ ไม่มีลายน้ำ</button>
-      </div>
-      <button id="cancelDl" class="mt-4 text-gray-400 hover:text-gray-200 text-sm">ยกเลิก</button>
-    </div>
-  </div>
+  <script>
+  const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const BUCKET = "gallery";
+  const WATERMARK_SRC = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
 
-<script type="module">
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+  const EDGE_LIMIT = 50;
+  const SIM_THRESHOLD = 0.95;
+  const CONF_THRESHOLD = 0.9;
 
-// 🔧 CONFIG
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"
-const BUCKET = "gallery"
-const WATERMARK_SRC = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png"
+  const fileInput = document.getElementById("fileInput");
+  const searchBtn = document.getElementById("searchBtn");
+  const statusDiv = document.getElementById("status");
+  const resultDiv = document.getElementById("result");
+  const syncStatus = document.getElementById("syncStatus");
+  const manualSyncBtn = document.getElementById("manualSyncBtn");
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-const fileInput = document.getElementById("fileInput")
-const searchBtn = document.getElementById("searchBtn")
-const resultDiv = document.getElementById("result")
-const statusDiv = document.getElementById("status")
-const popup = document.getElementById("popup")
-const popupImg = document.getElementById("popupImg")
-const closePopup = document.getElementById("closePopup")
-const downloadDialog = document.getElementById("downloadDialog")
-const dlWith = document.getElementById("dlWith")
-const dlNo = document.getElementById("dlNo")
-const cancelDl = document.getElementById("cancelDl")
-
-let downloadQueue = { url: null, name: null }
-
-function normalize(d){const n=Math.sqrt(d.reduce((a,b)=>a+b*b,0));return d.map(x=>x/n)}
-
-statusDiv.textContent="⏳ โหลดโมเดล..."
-await Promise.all([
-  faceapi.nets.ssdMobilenetv1.loadFromUri("https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/"),
-  faceapi.nets.faceLandmark68Net.loadFromUri("https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/"),
-  faceapi.nets.faceRecognitionNet.loadFromUri("https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/")
-])
-statusDiv.textContent="✅ พร้อมใช้งานแล้ว"
-
-// 📸 ค้นหาใบหน้า
-searchBtn.onclick = async () => {
-  const f = fileInput.files[0]
-  if (!f) return alert("กรุณาเลือกรูปก่อน")
-  resultDiv.innerHTML = "🧠 กำลังวิเคราะห์ใบหน้า..."
-  const img = await faceapi.bufferToImage(f)
-  const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor()
-  if (!det) return (resultDiv.innerHTML = "⚠️ ไม่พบใบหน้า")
-
-  const emb = normalize(Array.from(det.descriptor))
-  resultDiv.innerHTML = "🔍 กำลังค้นหา..."
-  const r = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
-    body: JSON.stringify({ embedding: emb, threshold: 0.95, limit: 20 })
-  })
-  const { matches, error } = await r.json()
-  if (error || !matches?.length) return (resultDiv.innerHTML = "❌ ไม่พบภาพที่คล้ายกัน")
-
-  resultDiv.innerHTML = `
-    <p class="text-green-400 font-semibold mb-2">🎯 พบใบหน้าที่ตรงกัน ${matches.length} ภาพ</p>
-    <div class="grid grid-cols-2 gap-3">
-      ${matches.map(m => `
-        <div class="bg-slate-700 p-2 rounded-lg overflow-hidden">
-          <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}"
-               class="rounded-lg mb-2 shadow cursor-pointer hover:scale-105 transition w-full object-cover aspect-[3/4]"
-               onclick="openPopup('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}')">
-          <p class="filename text-sm text-gray-200" title="${m.name}">${m.name}</p>
-          <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity*100).toFixed(2)}%</p>
-          <button onclick="chooseDownload('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}')"
-                  class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">ดาวน์โหลด</button>
-        </div>`).join("")}
-    </div>`
-}
-
-// 🖼️ popup viewer
-window.openPopup = (src) => {
-  popupImg.src = src
-  popup.classList.remove("hidden")
-}
-closePopup.onclick = () => popup.classList.add("hidden")
-
-// 💾 เลือกโหลดแบบมี/ไม่มีลายน้ำ
-window.chooseDownload = (url, name) => {
-  downloadQueue = { url, name }
-  downloadDialog.classList.remove("hidden")
-  downloadDialog.classList.add("flex")
-}
-cancelDl.onclick = () => downloadDialog.classList.add("hidden")
-dlWith.onclick = () => { downloadImage(true); }
-dlNo.onclick = () => { downloadImage(false); }
-
-async function downloadImage(withWatermark) {
-  const { url, name } = downloadQueue
-  downloadDialog.classList.add("hidden")
-
-  const response = await fetch(url, { mode: "cors" })
-  const blob = await response.blob()
-  const safeName = name.replace(/[/\\?%*:|"<>]/g, "-") + ".jpg"
-
-  if (!withWatermark) {
-    const a = document.createElement("a")
-    a.href = URL.createObjectURL(blob)
-    a.download = safeName
-    a.click()
-    return
+  function normalize(desc) {
+    const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
+    return desc.map(x => x / norm);
   }
 
-  const img = await createImageBitmap(blob)
-  const logo = new Image()
-  logo.src = WATERMARK_SRC
-  await logo.decode()
+  async function listRecursive(path = "") {
+    const { data, error } = await supabase.storage.from(BUCKET).list(path, { limit: 1000 });
+    if (error) return [];
+    let files = [];
+    for (const item of data) {
+      if (!item.metadata) {
+        const sub = await listRecursive(path ? `${path}/${item.name}` : item.name);
+        files = files.concat(sub);
+      } else files.push(path ? `${path}/${item.name}` : item.name);
+    }
+    return files;
+  }
 
-  const canvas = document.createElement("canvas")
-  canvas.width = img.width
-  canvas.height = img.height
-  const ctx = canvas.getContext("2d")
-  ctx.drawImage(img, 0, 0)
-  const w = img.width / 6
-  const h = (logo.height / logo.width) * w
-  ctx.globalAlpha = 0.85
-  ctx.drawImage(logo, img.width - w - 20, img.height - h - 20, w, h)
-  ctx.globalAlpha = 1
+  async function autoSync() {
+    syncStatus.textContent = "🔄 กำลังซิงค์...";
+    const files = await listRecursive("");
+    let count = 0;
+    for (const path of files) {
+      const { data: exists } = await supabase.from("faces").select("id").eq("image_url", path).maybeSingle();
+      if (exists) continue;
 
-  canvas.toBlob((b) => {
-    const a = document.createElement("a")
-    a.href = URL.createObjectURL(b)
-    a.download = safeName
-    a.click()
-  }, "image/jpeg", 0.95)
-}
-</script>
+      const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
+      try {
+        const img = await faceapi.fetchImage(imgUrl);
+        const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+        if (!det || det.detection.score < CONF_THRESHOLD) continue;
+        const embedding = normalize(Array.from(det.descriptor));
+        if (embedding.length !== 128) continue;
+        const name = path.split("/").pop().split(".")[0];
+
+        await supabase.rpc("insert_face_vector", {
+          p_name: name,
+          p_image_url: path,
+          p_embedding: embedding
+        });
+
+        count++;
+        if (count % 10 === 0) syncStatus.textContent = `✅ ซิงค์แล้ว ${count}/${files.length}`;
+      } catch (e) { console.warn("❌ sync error", e); }
+    }
+    syncStatus.textContent = `✅ ซิงค์เสร็จ (${new Date().toLocaleTimeString()})`;
+  }
+
+  async function initModels() {
+    const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
+    statusDiv.textContent = "⏳ โหลดโมเดล...";
+    await Promise.all([
+      faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
+      faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(modelURL)
+    ]);
+    statusDiv.textContent = "✅ พร้อมใช้งานแล้ว";
+  }
+
+  // 🔍 ค้นหาใบหน้า
+  async function performSearch() {
+    const file = fileInput.files[0];
+    if (!file) return alert("เลือกรูปก่อนค้นหา");
+    resultDiv.innerHTML = "🧠 กำลังตรวจใบหน้า...";
+    const img = await faceapi.bufferToImage(file);
+    const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+    if (!det) return resultDiv.innerHTML = "⚠️ ไม่พบใบหน้า";
+
+    const queryEmbedding = normalize(Array.from(det.descriptor));
+    resultDiv.innerHTML = "🔍 กำลังค้นหา...";
+
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({ embedding: queryEmbedding, threshold: SIM_THRESHOLD, limit: EDGE_LIMIT })
+    });
+
+    const { matches, error } = await resp.json();
+    if (error || !matches?.length) {
+      resultDiv.innerHTML = "❌ ไม่พบใบหน้าที่คล้ายกัน";
+      return;
+    }
+
+    resultDiv.innerHTML = `
+      <p class="text-green-400 font-semibold mb-2">🎯 พบใบหน้าที่ตรงกัน ${matches.length} ภาพ</p>
+      <div class="grid grid-cols-2 gap-3">
+        ${matches.map(v => `
+          <div class="bg-slate-700 p-2 rounded-lg">
+            <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${v.image_url}"
+                 class="rounded-lg mb-2 shadow w-full object-cover aspect-[3/4]">
+            <p class="filename text-sm">${v.name}</p>
+            <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(v.similarity*100).toFixed(2)}%</p>
+            <button onclick="chooseDownload('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${v.image_url}','${v.name}')"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">ดาวน์โหลด</button>
+          </div>`).join("")}
+      </div>`;
+  }
+
+  // 🧩 เริ่มระบบ
+  window.addEventListener("DOMContentLoaded", async () => {
+    await initModels();
+    await autoSync();
+    setInterval(autoSync, 60000);
+  });
+  searchBtn.addEventListener("click", performSearch);
+  manualSyncBtn.addEventListener("click", autoSync);
+
+  // 💾 ระบบเลือกดาวน์โหลด (เพิ่มใหม่)
+  const WATERMARK = new Image();
+  WATERMARK.src = WATERMARK_SRC;
+  let downloadQueue = { url: "", name: "" };
+
+  window.chooseDownload = (url, name) => {
+    downloadQueue = { url, name };
+    const box = document.createElement("div");
+    box.className = "fixed inset-0 bg-black/60 flex items-center justify-center z-50";
+    box.innerHTML = `
+      <div class="bg-slate-800 p-6 rounded-xl shadow-xl text-center max-w-xs">
+        <h2 class="text-lg font-semibold mb-4">เลือกรูปแบบดาวน์โหลด</h2>
+        <div class="flex flex-col gap-3">
+          <button id="dlWith" class="bg-green-600 hover:bg-green-700 py-2 rounded-lg">💧 พร้อมลายน้ำ</button>
+          <button id="dlNo" class="bg-blue-600 hover:bg-blue-700 py-2 rounded-lg">🖼️ ไม่มีลายน้ำ</button>
+        </div>
+        <button id="cancelDl" class="mt-4 text-gray-400 hover:text-gray-200 text-sm">ยกเลิก</button>
+      </div>`;
+    document.body.appendChild(box);
+
+    box.querySelector("#cancelDl").onclick = () => box.remove();
+    box.querySelector("#dlWith").onclick = () => { downloadImage(true); box.remove(); };
+    box.querySelector("#dlNo").onclick = () => { downloadImage(false); box.remove(); };
+  };
+
+  async function downloadImage(withWatermark) {
+    const { url, name } = downloadQueue;
+    const safeName = (name || "image").replace(/[/\\?%*:|"<>]/g, "-") + ".jpg";
+    const res = await fetch(url, { mode: "cors" });
+    const blob = await res.blob();
+
+    if (!withWatermark) {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = safeName;
+      a.click();
+      return;
+    }
+
+    const img = await createImageBitmap(blob);
+    await WATERMARK.decode();
+
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+
+    const w = img.width / 6;
+    const h = (WATERMARK.height / WATERMARK.width) * w;
+    ctx.globalAlpha = 0.85;
+    ctx.drawImage(WATERMARK, img.width - w - 20, img.height - h - 20, w, h);
+    ctx.globalAlpha = 1.0;
+
+    canvas.toBlob((b) => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(b);
+      a.download = safeName;
+      a.click();
+    }, "image/jpeg", 0.95);
+  }
+  </script>
 </body>
 </html>
