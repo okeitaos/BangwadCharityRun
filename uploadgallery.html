@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📤 LINE Upload Gallery (Auto Sync to Faces)</title>
+<title>📤 LINE Upload Gallery (v2 - Auto Sync to Faces)</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -103,7 +103,7 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 🔒 ใส่ anon key ของโปรเจ็กต์คุณ
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 🔒 ใส่ anon key ของคุณ
 const BUCKET = "gallery";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const LIFF_ID = "2001781240-k2PJ3Ap2";
@@ -189,7 +189,8 @@ async function uploadFilesChecked() {
       // 🔁 ซิงก์อัตโนมัติไป faces
       const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${filename}`;
       const { error: faceError } = await sb.from("faces").insert({
-        name: userName,
+        name: filename,      // ✅ ใช้ชื่อไฟล์แทนชื่อ LINE
+        owner_name: userName, // ✅ เก็บชื่อโปรไฟล์แยกต่างหาก
         image_url: imageUrl
       });
       if (faceError) console.log("faces insert error:", faceError.message);
