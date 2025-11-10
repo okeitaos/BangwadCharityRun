@@ -57,7 +57,7 @@
 
   <script>
     const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.functions.supabase.co/clear-gallery-cache"; // 👈 เปลี่ยน URL ของคุณ
-
+    const res = await fetch(`${FUNCTION_URL}?key=${key}`);
     document.getElementById("clearBtn").addEventListener("click", async () => {
       const key = document.getElementById("key").value.trim();
       const status = document.getElementById("status");
