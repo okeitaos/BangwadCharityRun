@@ -9,7 +9,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 
   <style>
-    /* ✅ ปรับชื่อไฟล์ไม่ให้ล้นกรอบ */
     .filename {
       white-space: nowrap;
       overflow: hidden;
@@ -35,7 +34,6 @@
       transition: opacity 0.35s ease;
     }
 
-    /* ✅ แสดง popup (fade-in) */
     #previewPopup.show {
       opacity: 1;
       pointer-events: auto;
@@ -63,7 +61,6 @@
       transform: translateY(0);
     }
 
-    /* ✅ แสดงภาพไม่เกินจอ และอยู่กลาง */
     #previewCanvas {
       max-width: 100%;
       max-height: 75vh;
@@ -76,7 +73,6 @@
       margin-right: auto;
     }
 
-    /* ✅ ปุ่มดาวน์โหลด/ยกเลิก */
     #confirmDownload, #cancelPreview {
       transition: transform 0.15s ease, background 0.25s;
     }
@@ -85,7 +81,6 @@
       transform: scale(1.05);
     }
 
-    /* ✅ Responsive — มือถือแนวตั้ง */
     @media (max-width: 640px) {
       #previewPopup > div {
         width: 95%;
@@ -105,7 +100,6 @@
       <button id="langToggle" class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">EN</button>
     </div>
 
-    <!-- 🔍 Search Box -->
     <div class="bg-slate-800 p-6 rounded-xl shadow-lg text-center">
       <input id="fileInput" type="file" accept="image/*" class="mb-4 w-full text-gray-300" />
       <div class="flex gap-2 mb-4">
@@ -260,7 +254,7 @@
       previewCanvas.height = img.height;
       ctx.drawImage(img, 0, 0, img.width, img.height);
 
-      // ✅ ปรับขนาดลายน้ำอัตโนมัติ และวางกลางด้านล่าง
+      // ✅ โลโก้ขวาล่าง + ข้อความกลางล่าง
       const aspectRatio = img.width / img.height;
       let scaleFactor;
       if (aspectRatio > 1.3) scaleFactor = 0.18;
@@ -270,9 +264,19 @@
       const w = img.width * scaleFactor;
       const s = w / watermark.width;
       const h = watermark.height * s;
-      const x = (img.width - w) / 2; // กลางล่าง
+      const x = img.width - w - 20;
       const y = img.height - h - 20;
       ctx.drawImage(watermark, x, y, w, h);
+
+      // 🏁 ข้อความกลางล่างสุด
+      const text = "BANGWAD CHARITY RUN 2025 | OFFICIAL";
+      ctx.font = `${Math.floor(img.width * 0.03)}px 'Poppins', sans-serif`;
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.shadowColor = "rgba(0,0,0,0.7)";
+      ctx.shadowBlur = 8;
+      ctx.fillText(text, img.width / 2, img.height - 10);
 
       previewPopup.classList.add("show");
 
@@ -330,9 +334,8 @@
   <div class="relative">
     <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}" 
          class="rounded-lg mb-2 shadow w-full object-cover aspect-[3/4]" >
-    <!-- 🖼️ ลายน้ำ Overlay -->
     <img src="https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png"
-         class="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-1/4 opacity-100 pointer-events-none select-none">
+         class="absolute bottom-2 right-2 w-1/4 opacity-100 pointer-events-none select-none">
   </div>
   <p class="filename text-sm text-gray-200 mt-1" title="${m.name}">${m.name}</p>
   <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
@@ -351,15 +354,11 @@
 
     setLang("th");
 
-    // 🚫 ป้องกันคลิกขวาและลากภาพ
     document.addEventListener("contextmenu", (e) => e.preventDefault());
     document.addEventListener("dragstart", (e) => e.preventDefault());
 
-    // ✅ ปิด popup เมื่อคลิกพื้นหลัง
     previewPopup.addEventListener("click", (e) => {
-      if (e.target === previewPopup) {
-        previewPopup.classList.remove("show");
-      }
+      if (e.target === previewPopup) previewPopup.classList.remove("show");
     });
   </script>
 </body>
