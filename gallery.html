@@ -254,6 +254,11 @@
     };
 
     setLang("th");
+    
+    // 🚫 ป้องกันการคลิกขวาและการลากภาพ
+document.addEventListener("contextmenu", (e) => e.preventDefault());
+document.addEventListener("dragstart", (e) => e.preventDefault());
+
   </script>
 </body>
 </html>
