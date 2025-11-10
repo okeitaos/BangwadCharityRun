@@ -1,181 +1,407 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin | Face Sync Dashboard (Realtime Chart)</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin v2 | Face Sync (Smart & Progress)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+<body class="bg-slate-900 text-white min-h-screen p-6">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-bold mb-4 text-center">🧠 Admin v2 — Face Sync Dashboard (Smart)</h1>
 
-<body class="bg-slate-900 text-white flex flex-col items-center min-h-screen p-6">
-  <h1 class="text-3xl font-bold mb-6 text-center">🧠 Face Sync Dashboard (Admin + Realtime Chart)</h1>
+    <!-- Control panel -->
+    <div class="bg-slate-800 rounded-xl p-5 mb-4 shadow">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <p id="status" class="text-gray-300">⏳ Loading models...</p>
+          <p id="lastSync" class="text-gray-400 text-sm mt-1">ยังไม่ได้ซิงค์</p>
+        </div>
 
-  <!-- 🔄 Control Panel -->
-  <div class="bg-slate-800 p-6 rounded-xl shadow-lg w-full max-w-2xl mb-6 text-center">
-    <h2 class="text-lg font-semibold mb-2">🔁 ระบบซิงค์ภาพจาก Gallery</h2>
-    <p id="status" class="text-gray-400 mb-2">⏳ กำลังโหลดโมเดล...</p>
-    <div class="flex justify-center gap-3 mb-4">
-      <button id="syncBtn" class="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-lg">
-        🔄 ซิงค์ตอนนี้
-      </button>
-      <button id="clearLogBtn" class="bg-red-500 hover:bg-red-600 px-6 py-2 rounded-lg">
-        🧹 ล้าง Log
-      </button>
+        <div class="flex gap-2 items-center">
+          <label class="text-sm text-gray-300 mr-2">MIN FACE (px)</label>
+          <input id="minFaceSize" type="number" value="50" min="20" max="1000" class="w-24 px-2 py-1 rounded bg-slate-700 text-white"/>
+          <label class="ml-4 text-sm text-gray-300">Auto Sync</label>
+          <input id="autoSyncToggle" type="checkbox" class="h-5 w-5 ml-2" />
+          <label class="ml-2 text-sm text-gray-300">Interval (s)</label>
+          <input id="autoInterval" type="number" value="60" min="10" step="5" class="w-20 px-2 py-1 rounded bg-slate-700 text-white ml-2"/>
+        </div>
+      </div>
+
+      <div class="mt-4 flex gap-2">
+        <button id="syncNow" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">🔁 Sync Now</button>
+        <button id="stopAuto" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded">⏸️ Stop Auto</button>
+        <button id="clearLog" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">🧹 Clear Log</button>
+      </div>
     </div>
 
-    <!-- 📊 Realtime Chart -->
-    <div class="bg-slate-700 p-4 rounded-lg mb-4">
-      <canvas id="syncChart" height="100"></canvas>
+    <!-- Progress / Stats -->
+    <div class="bg-slate-800 rounded-xl p-5 mb-4 shadow">
+      <div class="mb-3">
+        <div class="flex justify-between">
+          <div class="text-sm text-gray-300">Processed: <span id="processed">0</span>/<span id="total">0</span></div>
+          <div class="text-sm text-gray-300">Elapsed: <span id="elapsed">0s</span></div>
+        </div>
+        <div class="w-full bg-slate-700 rounded h-4 mt-2 overflow-hidden">
+          <div id="progressBar" class="h-4 bg-green-500 w-0 transition-all"></div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-3 text-center">
+        <div class="bg-slate-700 p-3 rounded">
+          <div class="text-sm text-gray-300">✅ Success</div>
+          <div id="countSuccess" class="text-2xl font-bold text-green-400">0</div>
+        </div>
+        <div class="bg-slate-700 p-3 rounded">
+          <div class="text-sm text-gray-300">⚙️ Skipped</div>
+          <div id="countSkipped" class="text-2xl font-bold text-blue-300">0</div>
+        </div>
+        <div class="bg-slate-700 p-3 rounded">
+          <div class="text-sm text-gray-300">❌ Failed</div>
+          <div id="countFailed" class="text-2xl font-bold text-red-400">0</div>
+        </div>
+      </div>
     </div>
 
-    <!-- 📜 Log Section -->
-    <div id="log" class="text-sm text-left bg-slate-700 p-3 rounded-lg h-64 overflow-y-auto font-mono"></div>
+    <!-- Log -->
+    <div class="bg-slate-800 rounded-xl p-4 shadow mb-6">
+      <h2 class="text-lg font-semibold mb-2">📜 Log</h2>
+      <div id="log" class="h-72 overflow-y-auto bg-slate-900/30 p-3 rounded text-xs font-mono"></div>
+    </div>
+
+    <!-- Footer / Help -->
+    <div class="text-sm text-gray-400">
+      <p>หมายเหตุ: ระบบจะข้ามไฟล์ที่ไม่ใช่ภาพอัตโนมัติ (jpg, jpeg, png, webp, gif) และข้าม `.emptyFolderPlaceholder`</p>
+      <p class="mt-1">หากต้องการยอมรับใบหน้าเล็ก ให้ปรับค่า MIN FACE เป็นค่าต่ำลง (เช่น 40 หรือ 30)</p>
+    </div>
   </div>
 
-  <script>
-  // ⚙️ CONFIG
-  const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-  const BUCKET = "gallery";
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 
-  const CONF_THRESHOLD = 0.9;
-  const MIN_FACE_SIZE = 100;
+    // -------------------------
+    // CONFIG - เปลี่ยนเป็นของคุณ
+    // -------------------------
+    const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+    const BUCKET = "gallery";
 
-  // 📦 DOM
-  const statusDiv = document.getElementById("status");
-  const syncBtn = document.getElementById("syncBtn");
-  const clearLogBtn = document.getElementById("clearLogBtn");
-  const logDiv = document.getElementById("log");
-  const ctx = document.getElementById("syncChart");
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // 📊 Chart setup
-  const chart = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels: ["สำเร็จ", "ข้าม", "ล้มเหลว"],
-      datasets: [
-        {
-          label: "จำนวนภาพ",
-          data: [0, 0, 0],
-          backgroundColor: ["#22c55e", "#3b82f6", "#ef4444"]
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      scales: { y: { beginAtZero: true } },
-      plugins: { legend: { display: false } }
+    // -------------------------
+    // DOM
+    // -------------------------
+    const statusEl = document.getElementById('status');
+    const lastSyncEl = document.getElementById('lastSync');
+    const syncNowBtn = document.getElementById('syncNow');
+    const stopAutoBtn = document.getElementById('stopAuto');
+    const clearLogBtn = document.getElementById('clearLog');
+    const logEl = document.getElementById('log');
+
+    const processedEl = document.getElementById('processed');
+    const totalEl = document.getElementById('total');
+    const progressBar = document.getElementById('progressBar');
+    const elapsedEl = document.getElementById('elapsed');
+    const minFaceSizeInput = document.getElementById('minFaceSize');
+    const autoSyncToggle = document.getElementById('autoSyncToggle');
+    const autoIntervalInput = document.getElementById('autoInterval');
+
+    const countSuccessEl = document.getElementById('countSuccess');
+    const countSkippedEl = document.getElementById('countSkipped');
+    const countFailedEl = document.getElementById('countFailed');
+
+    // -------------------------
+    // state
+    // -------------------------
+    let isSyncing = false;
+    let stopRequested = false;
+    let autoSyncId = null;
+    let stats = { success: 0, skipped: 0, failed: 0, processed: 0, total: 0 };
+    let startTime = null;
+
+    // -------------------------
+    // helper log
+    // -------------------------
+    function log(type, text) {
+      const time = new Date().toLocaleTimeString();
+      const color = type === 'error' ? 'text-red-300' : type === 'warn' ? 'text-yellow-300' : 'text-green-300';
+      const p = document.createElement('div');
+      p.className = `${color} mb-1`;
+      p.innerHTML = `<span class="text-gray-400">[${time}]</span> ${text}`;
+      logEl.prepend(p);
     }
-  });
 
-  // 🧠 โหลดโมเดล face-api
-  async function loadModels() {
-    const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
-    statusDiv.textContent = "⏳ กำลังโหลดโมเดลตรวจจับใบหน้า...";
-    await Promise.all([
-      faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
-      faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
-      faceapi.nets.faceRecognitionNet.loadFromUri(modelURL)
-    ]);
-    statusDiv.textContent = "✅ พร้อมซิงค์ข้อมูลแล้ว";
-  }
+    function resetStats() {
+      stats = { success: 0, skipped: 0, failed: 0, processed: 0, total: 0 };
+      updateStatsUI();
+    }
 
-  // 🧩 Normalize descriptor
-  function normalize(desc) {
-    const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
-    return desc.map(x => x / norm);
-  }
+    function updateStatsUI() {
+      countSuccessEl.textContent = stats.success;
+      countSkippedEl.textContent = stats.skipped;
+      countFailedEl.textContent = stats.failed;
+      processedEl.textContent = stats.processed;
+      totalEl.textContent = stats.total;
+      const pct = stats.total ? Math.round((stats.processed / stats.total) * 100) : 0;
+      progressBar.style.width = pct + '%';
+    }
 
-  // 📁 ดึงไฟล์จากทุกโฟลเดอร์
-  async function listRecursive(path = "") {
-    const { data, error } = await supabase.storage.from(BUCKET).list(path, { limit: 1000 });
-    if (error) return [];
-    let files = [];
-    for (const item of data) {
-      if (!item.metadata) {
-        const sub = await listRecursive(path ? `${path}/${item.name}` : item.name);
-        files = files.concat(sub);
-      } else {
-        files.push(path ? `${path}/${item.name}` : item.name);
+    function updateElapsed() {
+      if (!startTime) { elapsedEl.textContent = '0s'; return; }
+      const s = Math.floor((Date.now() - startTime) / 1000);
+      elapsedEl.textContent = s + 's';
+    }
+
+    // -------------------------
+    // face-api load
+    // -------------------------
+    async function loadModels() {
+      statusEl.textContent = '⏳ โหลดโมเดล face-api...';
+      const modelURL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/';
+      await Promise.all([
+        faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(modelURL)
+      ]);
+      statusEl.textContent = '✅ พร้อมซิงค์';
+      log('info','โมเดลพร้อมใช้งาน');
+    }
+
+    // -------------------------
+    // list files recursive
+    // -------------------------
+    async function listRecursive(path = '') {
+      const { data, error } = await supabase.storage.from(BUCKET).list(path, { limit: 1000 });
+      if (error) {
+        log('error', `Storage list error: ${error.message}`);
+        return [];
       }
-    }
-    return files;
-  }
-
-  // 🧠 ฟังก์ชัน Sync
-  async function syncGallery() {
-    statusDiv.textContent = "🔄 กำลังซิงค์ภาพจาก Gallery...";
-    logDiv.innerHTML = "";
-    let success = 0, skipped = 0, failed = 0;
-
-    const files = await listRecursive("");
-    for (const path of files) {
-      try {
-        const { data: exists } = await supabase.from("faces").select("id").eq("image_url", path).maybeSingle();
-        if (exists) {
-          skipped++;
-          logDiv.innerHTML += `⚙️ ข้ามภาพ (มีอยู่แล้ว): ${path}<br>`;
-          continue;
-        }
-
-        const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
-        const img = await faceapi.fetchImage(imgUrl);
-        const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-
-        if (!det || det.detection.score < CONF_THRESHOLD) {
-          failed++;
-          logDiv.innerHTML += `⚠️ ตรวจไม่พบใบหน้า: ${path}<br>`;
-          continue;
-        }
-
-        if (det.detection.box.width < MIN_FACE_SIZE || det.detection.box.height < MIN_FACE_SIZE) {
-          failed++;
-          logDiv.innerHTML += `⚠️ ใบหน้าเล็กเกินไป: ${path}<br>`;
-          continue;
-        }
-
-        const embedding = normalize(Array.from(det.descriptor));
-        const name = path.split("/").pop().split(".")[0];
-
-        const { error: insertError } = await supabase.rpc("insert_face_vector", {
-          p_name: name,
-          p_image_url: path,
-          p_embedding: embedding
-        });
-
-        if (insertError) {
-          failed++;
-          logDiv.innerHTML += `❌ Error บันทึก ${path}: ${insertError.message}<br>`;
+      let files = [];
+      for (const item of data) {
+        // item: {name, id, updated_at, created_at, last_accessed_at, metadata}
+        // if it's a folder -> metadata is null (or absent) ; if file -> has metadata
+        if (!item.metadata) {
+          // skip system placeholders or dot-folders
+          if (item.name && item.name.startsWith('.')) continue;
+          const sub = await listRecursive(path ? `${path}/${item.name}` : item.name);
+          files = files.concat(sub);
         } else {
-          success++;
-          logDiv.innerHTML += `✅ ซิงค์สำเร็จ: ${path}<br>`;
+          const fullPath = path ? `${path}/${item.name}` : item.name;
+          files.push(fullPath);
         }
-      } catch (e) {
-        failed++;
-        logDiv.innerHTML += `💥 Error ประมวลผล ${path}: ${e.message}<br>`;
       }
-
-      // 🔢 อัปเดตกราฟทุกครั้งที่ซิงค์เสร็จ
-      chart.data.datasets[0].data = [success, skipped, failed];
-      chart.update();
+      return files;
     }
 
-    statusDiv.textContent = `✅ ซิงค์เสร็จแล้ว (สำเร็จ ${success}, ข้าม ${skipped}, ล้มเหลว ${failed})`;
-    logDiv.innerHTML += `<hr><b>🎯 สรุป:</b> สำเร็จ ${success}, ข้าม ${skipped}, ล้มเหลว ${failed}<br>`;
-  }
+    // -------------------------
+    // normalize helper
+    // -------------------------
+    function normalize(desc) {
+      const norm = Math.sqrt(desc.reduce((a,b)=>a+b*b,0));
+      return desc.map(x => x / norm);
+    }
 
-  // 🚀 เริ่มต้นทำงาน
-  window.addEventListener("DOMContentLoaded", async () => {
-    await loadModels();
-    setInterval(syncGallery, 60000); // Auto sync ทุก 1 นาที
-  });
+    // -------------------------
+    // validate image path
+    // -------------------------
+    function isImagePath(path) {
+      if (!path) return false;
+      // skip Supabase placeholder file
+      if (path.includes('.emptyFolderPlaceholder')) return false;
+      // basic extension check
+      return !!path.match(/\.(jpg|jpeg|png|webp|gif)$/i);
+    }
 
-  syncBtn.addEventListener("click", syncGallery);
-  clearLogBtn.addEventListener("click", () => (logDiv.innerHTML = ""));
+    // -------------------------
+    // insert RPC wrapper
+    // -------------------------
+    async function insertFace(name, image_url, embedding) {
+      // embedding should be array normalized
+      const { error } = await supabase.rpc('insert_face_vector', {
+        p_name: name,
+        p_image_url: image_url,
+        p_embedding: embedding
+      });
+      return error ? { ok: false, error } : { ok: true };
+    }
+
+    // -------------------------
+    // main sync function
+    // -------------------------
+    async function syncGallery() {
+      if (isSyncing) {
+        log('warn', 'กำลังซิงค์อยู่แล้ว - รอให้เสร็จก่อน');
+        return;
+      }
+      stopRequested = false;
+      isSyncing = true;
+      resetStats();
+      startTime = Date.now();
+      updateElapsed();
+      statusEl.textContent = '🔄 เริ่มซิงค์...';
+
+      try {
+        const allFiles = await listRecursive('');
+        // filter image files only
+        const imageFiles = allFiles.filter(isImagePath);
+        stats.total = imageFiles.length;
+        updateStatsUI();
+
+        if (stats.total === 0) {
+          statusEl.textContent = '⚠️ ไม่พบไฟล์ภาพใน Gallery';
+          log('warn','ไม่พบไฟล์ภาพใน bucket');
+          isSyncing = false;
+          return;
+        }
+
+        log('info', `เริ่มประมวลผล ${stats.total} ไฟล์`);
+
+        for (let i=0; i<imageFiles.length; i++) {
+          if (stopRequested) { log('warn','ผู้ใช้ยกเลิกการซิงค์'); break; }
+          const path = imageFiles[i];
+
+          // update elapsed and progress
+          updateElapsed();
+
+          try {
+            // skip non image again safety
+            if (!isImagePath(path)) {
+              stats.skipped++; stats.processed++;
+              log('warn', `ข้ามไฟล์ไม่ใช่รูป: ${path}`);
+              updateStatsUI();
+              continue;
+            }
+
+            // check exists in faces table
+            const { data: exists, error: qerr } = await supabase.from('faces').select('id').eq('image_url', path).maybeSingle();
+            if (qerr) {
+              log('error', `DB check error ${path}: ${qerr.message}`);
+              stats.failed++; stats.processed++; updateStatsUI();
+              continue;
+            }
+            if (exists) {
+              stats.skipped++; stats.processed++; updateStatsUI();
+              log('info', `ข้าม (มีอยู่แล้ว): ${path}`);
+              continue;
+            }
+
+            // fetch image via CDN url (public)
+            const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`;
+
+            // use faceapi.fetchImage (handles CORS)
+            let img;
+            try {
+              img = await faceapi.fetchImage(imgUrl);
+            } catch (fe) {
+              // if not image or fetch error
+              log('error', `fetchImage failed: ${path} - ${fe.message || fe}`);
+              stats.failed++; stats.processed++; updateStatsUI();
+              continue;
+            }
+
+            // detect single face
+            const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+            if (!det) {
+              stats.failed++; stats.processed++; updateStatsUI();
+              log('warn', `ตรวจไม่พบใบหน้า: ${path}`);
+              continue;
+            }
+
+            // size check
+            const minFaceSize = Number(minFaceSizeInput.value) || 50;
+            if (det.detection.box.width < minFaceSize || det.detection.box.height < minFaceSize) {
+              stats.failed++; stats.processed++; updateStatsUI();
+              log('warn', `ใบหน้าเล็กเกินไป: ${path}`);
+              continue;
+            }
+
+            // create embedding
+            const embedding = normalize(Array.from(det.descriptor));
+            const name = path.split('/').pop().split('.').shift();
+
+            // insert via RPC
+            const res = await insertFace(name, path, embedding);
+            if (!res.ok) {
+              stats.failed++; stats.processed++; updateStatsUI();
+              log('error', `❌ Error บันทึก ${path}: ${res.error.message}`);
+            } else {
+              stats.success++; stats.processed++; updateStatsUI();
+              log('info', `✅ ซิงค์สำเร็จ: ${path}`);
+            }
+
+          } catch (e) {
+            stats.failed++; stats.processed++; updateStatsUI();
+            log('error', `Exception ${path}: ${e.message || e}`);
+          }
+        } // end for
+
+        const now = new Date().toLocaleString();
+        lastSyncEl.textContent = `ซิงค์ล่าสุด: ${now}`;
+        statusEl.textContent = `✅ ซิงค์เสร็จ (สำเร็จ ${stats.success}, ข้าม ${stats.skipped}, ล้มเหลว ${stats.failed})`;
+        log('info', `สรุป: สำเร็จ ${stats.success}, ข้าม ${stats.skipped}, ล้มเหลว ${stats.failed}`);
+
+      } catch (err) {
+        log('error', `Critical sync error: ${err.message || err}`);
+        statusEl.textContent = '❌ เกิดข้อผิดพลาดในการซิงค์';
+      } finally {
+        isSyncing = false;
+      }
+    }
+
+    // -------------------------
+    // auto sync control
+    // -------------------------
+    function startAutoSync() {
+      stopAuto(); // clear existing
+      const intervalSec = Math.max(10, Number(autoIntervalInput.value) || 60);
+      autoSyncId = setInterval(() => {
+        if (!isSyncing) syncGallery();
+      }, intervalSec * 1000);
+      autoSyncToggle.checked = true;
+      log('info', `Auto Sync เริ่ม (ทุก ${intervalSec}s)`);
+    }
+
+    function stopAuto() {
+      if (autoSyncId) {
+        clearInterval(autoSyncId);
+        autoSyncId = null;
+      }
+      autoSyncToggle.checked = false;
+      log('info', 'Auto Sync หยุดแล้ว');
+    }
+
+    // -------------------------
+    // events
+    // -------------------------
+    syncNowBtn.addEventListener('click', () => {
+      syncGallery();
+    });
+    stopAutoBtn.addEventListener('click', () => {
+      stopRequested = true;
+      stopAuto();
+    });
+    clearLogBtn.addEventListener('click', () => {
+      logEl.innerHTML = '';
+      resetStats();
+    });
+
+    autoSyncToggle.addEventListener('change', (e) => {
+      if (e.target.checked) startAutoSync(); else stopAuto();
+    });
+
+    // -------------------------
+    // init
+    // -------------------------
+    window.addEventListener('DOMContentLoaded', async () => {
+      await loadModels();
+      // optionally start auto if toggle is on
+      if (autoSyncToggle.checked) startAutoSync();
+      // small timer to update elapsed display
+      setInterval(updateElapsed, 1000);
+    });
+
   </script>
 </body>
 </html>
