@@ -101,6 +101,13 @@
     <div id="progressBar" class="progress-bar"></div>
     <div id="progressText">0%</div>
   </div>
+  
+<div id="uploadControls" style="margin-top:15px;">
+  <p id="eta" style="color:#facc15;font-size:0.9rem;">🕒 ประมาณเวลา: -</p>
+  <button id="pauseBtn" class="btn-gray" style="display:none;" onclick="pauseUpload()">⏸️ พัก</button>
+  <button id="resumeBtn" class="btn-green" style="display:none;" onclick="resumeUpload()">▶️ ดำเนินต่อ</button>
+  <button id="cancelBtn" class="btn-red" style="display:none;" onclick="cancelUpload()">⏹️ ยกเลิก</button>
+</div>
 
   <div id="status">⏳ รออัปโหลด...</div>
   <p id="totalCount">📸 อัปโหลดทั้งหมด: 0 รูป</p>
@@ -124,6 +131,9 @@ const BUCKET = "gallery";
 const LIFF_ID = "2001781240-k2PJ3Ap2";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+let cancelRequested = false;
+let paused = false;
+let resumePromise = null;
 let userId = "", profileName = "", profilePic = "";
 let existingHashes = new Set();
 let allFiles = [];
@@ -239,18 +249,29 @@ async function loadExistingHashes() {
 // }
 /* 📤 อัปโหลดไฟล์ผ่าน Edge Function (Parallel + Queue UI) */
 async function uploadFiles() {
+  cancelRequested = false;
+  paused = false;
+
   const files = Array.from(document.getElementById("fileInput").files);
   const status = document.getElementById("status");
   const progressBar = document.getElementById("progressBar");
   const progressText = document.getElementById("progressText");
   const queueContainer = document.getElementById("uploadQueue");
+  const etaEl = document.getElementById("eta");
+  const cancelBtn = document.getElementById("cancelBtn");
+  const pauseBtn = document.getElementById("pauseBtn");
+  const resumeBtn = document.getElementById("resumeBtn");
 
   if (!files.length) return alert("กรุณาเลือกไฟล์");
-  if (files.length > 1000) return alert("อัปโหลดได้ไม่เกิน 1,000 รูปต่อครั้ง");
 
-  const MAX_CONCURRENT = 10; // ปรับค่าได้ตามต้องการ
+  cancelBtn.style.display = "inline-block";
+  pauseBtn.style.display = "inline-block";
+  resumeBtn.style.display = "none";
+
+  const MAX_CONCURRENT = 10;
   const total = files.length;
-  let success = 0, skipBig = 0, fail = 0, completed = 0;
+  let success = 0, fail = 0, skipBig = 0, completed = 0;
+  let startTime = Date.now();
 
   queueContainer.innerHTML = files.map(f => `
     <div id="queue-${sha256(f.name)}" style="
@@ -266,11 +287,10 @@ async function uploadFiles() {
     </div>
   `).join("");
 
-  status.innerText = "🚀 เริ่มอัปโหลด...";
-  progressBar.style.width = "0%";
-  progressText.innerText = "0%";
-
   async function uploadSingleFile(f) {
+    if (cancelRequested) return;
+    while (paused) await new Promise(r => resumePromise = r); // ⏸️ รอจน resume
+
     const hash = sha256(f.name);
     const textEl = document.getElementById(`text-${hash}`);
     const barEl = document.getElementById(`bar-${hash}`);
@@ -289,23 +309,16 @@ async function uploadFiles() {
     formData.append("file", f);
 
     textEl.innerText = "📤 กำลังอัปโหลด...";
-
     try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/upload_image`, {
-        method: "POST",
-        body: formData
-      });
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/upload_image`, { method: "POST", body: formData });
       const result = await res.json();
 
       if (result.success) {
         textEl.innerText = "✅ สำเร็จ";
         barEl.style.width = "100%";
-        barEl.style.background = "linear-gradient(90deg,#22c55e,#84cc16)";
-        success++;
       } else {
         textEl.innerText = "❌ ล้มเหลว";
         barEl.style.background = "#ef4444";
-        fail++;
       }
     } catch {
       textEl.innerText = "⚠️ ข้อผิดพลาด";
@@ -317,20 +330,50 @@ async function uploadFiles() {
     const percent = Math.round((completed / total) * 100);
     progressBar.style.width = `${percent}%`;
     progressText.innerText = `${completed}/${total} (${percent}%)`;
+
+    // ⏱️ ETA
+    const elapsed = (Date.now() - startTime) / 1000;
+    const avg = elapsed / completed;
+    const remaining = (total - completed) * avg;
+    etaEl.innerText = `🕒 ประมาณเวลา: ${Math.floor(remaining / 60)} นาที ${Math.floor(remaining % 60)} วินาที`;
   }
 
-  // 🧠 อัปโหลดพร้อมกันเป็น batch ละ MAX_CONCURRENT
   for (let i = 0; i < total; i += MAX_CONCURRENT) {
+    if (cancelRequested) break;
+    while (paused) await new Promise(r => resumePromise = r);
     const batch = files.slice(i, i + MAX_CONCURRENT);
     await Promise.all(batch.map(uploadSingleFile));
   }
 
-  progressBar.style.width = "100%";
-  progressText.innerText = "เสร็จสิ้น ✅";
-  status.innerText = `✅ สำเร็จ ${success}, ❌ ล้มเหลว ${fail}, 📦 เกินขนาด ${skipBig}`;
-
-  await listUserFiles();
+  cancelBtn.style.display = "none";
+  pauseBtn.style.display = "none";
+  resumeBtn.style.display = "none";
+  progressText.innerText = cancelRequested ? "⏹️ ยกเลิกแล้ว" : "✅ เสร็จสิ้น";
 }
+
+/* 🛑 ยกเลิก */
+function cancelUpload() {
+  if (confirm("แน่ใจหรือไม่ที่จะยกเลิกการอัปโหลดทั้งหมด?")) {
+    cancelRequested = true;
+  }
+}
+
+/* ⏸️ พัก */
+function pauseUpload() {
+  paused = true;
+  document.getElementById("pauseBtn").style.display = "none";
+  document.getElementById("resumeBtn").style.display = "inline-block";
+  document.getElementById("eta").innerText = "⏸️ การอัปโหลดถูกพักชั่วคราว";
+}
+
+/* ▶️ ดำเนินต่อ */
+function resumeUpload() {
+  paused = false;
+  if (resumePromise) resumePromise();
+  document.getElementById("pauseBtn").style.display = "inline-block";
+  document.getElementById("resumeBtn").style.display = "none";
+}
+
 
 
 
