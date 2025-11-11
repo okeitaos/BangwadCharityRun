@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin v2 | Face Sync (Smart & Progress)</title>
+  <title>Admin v2.1 | Face Sync (Smart + Fast)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 </head>
 <body class="bg-slate-900 text-white min-h-screen p-6">
   <div class="max-w-4xl mx-auto">
-    <h1 class="text-3xl font-bold mb-4 text-center">🧠 Admin v2 — Face Sync Dashboard (Smart)</h1>
+    <h1 class="text-3xl font-bold mb-4 text-center">🧠 Admin v2.1 — Face Sync Dashboard (Smart + Fast)</h1>
 
     <!-- Control panel -->
     <div class="bg-slate-800 rounded-xl p-5 mb-4 shadow">
@@ -30,10 +30,11 @@
         </div>
       </div>
 
-      <div class="mt-4 flex gap-2">
+      <div class="mt-4 flex flex-wrap gap-2">
         <button id="syncNow" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">🔁 Sync Now</button>
         <button id="stopAuto" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded">⏸️ Stop Auto</button>
         <button id="clearLog" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">🧹 Clear Log</button>
+        <button id="clearCache" class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded">🗑️ Clear Cache</button>
       </div>
     </div>
 
@@ -75,6 +76,7 @@
     <div class="text-sm text-gray-400">
       <p>หมายเหตุ: ระบบจะข้ามไฟล์ที่ไม่ใช่ภาพอัตโนมัติ (jpg, jpeg, png, webp, gif) และข้าม `.emptyFolderPlaceholder`</p>
       <p class="mt-1">หากต้องการยอมรับใบหน้าเล็ก ให้ปรับค่า MIN FACE เป็นค่าต่ำลง (เช่น 40 หรือ 30)</p>
+      <p class="mt-1">✨ ระบบนี้ใช้ Local Cache เพื่อเร่งการซิงค์ครั้งต่อไป (Incremental Sync)</p>
     </div>
   </div>
 
@@ -82,12 +84,11 @@
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 
     // -------------------------
-    // CONFIG - เปลี่ยนเป็นของคุณ
+    // CONFIG
     // -------------------------
     const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
     const BUCKET = "gallery";
-
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // -------------------------
@@ -98,8 +99,8 @@
     const syncNowBtn = document.getElementById('syncNow');
     const stopAutoBtn = document.getElementById('stopAuto');
     const clearLogBtn = document.getElementById('clearLog');
+    const clearCacheBtn = document.getElementById('clearCache');
     const logEl = document.getElementById('log');
-
     const processedEl = document.getElementById('processed');
     const totalEl = document.getElementById('total');
     const progressBar = document.getElementById('progressBar');
@@ -107,14 +108,10 @@
     const minFaceSizeInput = document.getElementById('minFaceSize');
     const autoSyncToggle = document.getElementById('autoSyncToggle');
     const autoIntervalInput = document.getElementById('autoInterval');
-
     const countSuccessEl = document.getElementById('countSuccess');
     const countSkippedEl = document.getElementById('countSkipped');
     const countFailedEl = document.getElementById('countFailed');
 
-    // -------------------------
-    // state
-    // -------------------------
     let isSyncing = false;
     let stopRequested = false;
     let autoSyncId = null;
@@ -122,7 +119,21 @@
     let startTime = null;
 
     // -------------------------
-    // helper log
+    // CACHE HELPERS
+    // -------------------------
+    function loadCache() {
+      return JSON.parse(localStorage.getItem('gallery-cache') || '{}');
+    }
+    function saveCache(cache) {
+      localStorage.setItem('gallery-cache', JSON.stringify(cache));
+    }
+    function clearCache() {
+      localStorage.removeItem('gallery-cache');
+      log('info', '🗑️ ล้าง cache เรียบร้อย');
+    }
+
+    // -------------------------
+    // LOG / UI HELPERS
     // -------------------------
     function log(type, text) {
       const time = new Date().toLocaleTimeString();
@@ -155,7 +166,7 @@
     }
 
     // -------------------------
-    // face-api load
+    // FACE-API
     // -------------------------
     async function loadModels() {
       statusEl.textContent = '⏳ โหลดโมเดล face-api...';
@@ -166,75 +177,53 @@
         faceapi.nets.faceRecognitionNet.loadFromUri(modelURL)
       ]);
       statusEl.textContent = '✅ พร้อมซิงค์';
-      log('info','โมเดลพร้อมใช้งาน');
+      log('info', 'โมเดลพร้อมใช้งาน');
     }
 
     // -------------------------
-    // list files recursive
+    // STORAGE LIST (recursive)
     // -------------------------
-    async function listRecursive(path = '') {
+    async function listRecursive(path = '', map = {}) {
       const { data, error } = await supabase.storage.from(BUCKET).list(path, { limit: 1000 });
       if (error) {
         log('error', `Storage list error: ${error.message}`);
-        return [];
+        return map;
       }
-      let files = [];
       for (const item of data) {
-        // item: {name, id, updated_at, created_at, last_accessed_at, metadata}
-        // if it's a folder -> metadata is null (or absent) ; if file -> has metadata
         if (!item.metadata) {
-          // skip system placeholders or dot-folders
           if (item.name && item.name.startsWith('.')) continue;
-          const sub = await listRecursive(path ? `${path}/${item.name}` : item.name);
-          files = files.concat(sub);
+          await listRecursive(path ? `${path}/${item.name}` : item.name, map);
         } else {
           const fullPath = path ? `${path}/${item.name}` : item.name;
-          files.push(fullPath);
+          map[fullPath] = { updated_at: item.updated_at };
         }
       }
-      return files;
+      return map;
     }
 
-    // -------------------------
-    // normalize helper
-    // -------------------------
     function normalize(desc) {
       const norm = Math.sqrt(desc.reduce((a,b)=>a+b*b,0));
       return desc.map(x => x / norm);
     }
 
-    // -------------------------
-    // validate image path
-    // -------------------------
     function isImagePath(path) {
       if (!path) return false;
-      // skip Supabase placeholder file
       if (path.includes('.emptyFolderPlaceholder')) return false;
-      // basic extension check
       return !!path.match(/\.(jpg|jpeg|png|webp|gif)$/i);
     }
 
-    // -------------------------
-    // insert RPC wrapper
-    // -------------------------
     async function insertFace(name, image_url, embedding) {
-      // embedding should be array normalized
       const { error } = await supabase.rpc('insert_face_vector', {
-        p_name: name,
-        p_image_url: image_url,
-        p_embedding: embedding
+        p_name: name, p_image_url: image_url, p_embedding: embedding
       });
       return error ? { ok: false, error } : { ok: true };
     }
 
     // -------------------------
-    // main sync function
+    // MAIN SYNC (with cache)
     // -------------------------
     async function syncGallery() {
-      if (isSyncing) {
-        log('warn', 'กำลังซิงค์อยู่แล้ว - รอให้เสร็จก่อน');
-        return;
-      }
+      if (isSyncing) return log('warn', 'กำลังซิงค์อยู่แล้ว');
       stopRequested = false;
       isSyncing = true;
       resetStats();
@@ -243,99 +232,86 @@
       statusEl.textContent = '🔄 เริ่มซิงค์...';
 
       try {
-        const allFiles = await listRecursive('');
-        // filter image files only
-        const imageFiles = allFiles.filter(isImagePath);
-        stats.total = imageFiles.length;
-        updateStatsUI();
+        const allFilesMap = await listRecursive('');
+        const allFiles = Object.keys(allFilesMap).filter(isImagePath);
+        const cache = loadCache();
 
+        stats.total = allFiles.length;
+        updateStatsUI();
         if (stats.total === 0) {
-          statusEl.textContent = '⚠️ ไม่พบไฟล์ภาพใน Gallery';
-          log('warn','ไม่พบไฟล์ภาพใน bucket');
+          log('warn', 'ไม่พบไฟล์ภาพใน bucket');
+          statusEl.textContent = '⚠️ ไม่พบไฟล์ภาพ';
           isSyncing = false;
           return;
         }
 
         log('info', `เริ่มประมวลผล ${stats.total} ไฟล์`);
 
-        for (let i=0; i<imageFiles.length; i++) {
-          if (stopRequested) { log('warn','ผู้ใช้ยกเลิกการซิงค์'); break; }
-          const path = imageFiles[i];
-
-          // update elapsed and progress
+        for (const path of allFiles) {
+          if (stopRequested) { log('warn', 'ยกเลิกซิงค์โดยผู้ใช้'); break; }
           updateElapsed();
 
-          try {
-            // skip non image again safety
-            if (!isImagePath(path)) {
-              stats.skipped++; stats.processed++;
-              log('warn', `ข้ามไฟล์ไม่ใช่รูป: ${path}`);
-              updateStatsUI();
-              continue;
-            }
+          const cacheTimestamp = cache[path];
+          const updatedAt = allFilesMap[path].updated_at;
 
-            // check exists in faces table
-            const { data: exists, error: qerr } = await supabase.from('faces').select('id').eq('image_url', path).maybeSingle();
-            if (qerr) {
-              log('error', `DB check error ${path}: ${qerr.message}`);
-              stats.failed++; stats.processed++; updateStatsUI();
-              continue;
-            }
+          if (cacheTimestamp && updatedAt <= cacheTimestamp) {
+            stats.skipped++; stats.processed++;
+            log('info', `⏭️ ข้าม (cache): ${path}`);
+            updateStatsUI();
+            continue;
+          }
+
+          try {
+            const { data: exists } = await supabase.from('faces').select('id').eq('image_url', path).maybeSingle();
             if (exists) {
               stats.skipped++; stats.processed++; updateStatsUI();
+              cache[path] = updatedAt; saveCache(cache);
               log('info', `ข้าม (มีอยู่แล้ว): ${path}`);
               continue;
             }
 
-            // fetch image via CDN url (public)
             const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`;
-
-            // use faceapi.fetchImage (handles CORS)
             let img;
             try {
               img = await faceapi.fetchImage(imgUrl);
-            } catch (fe) {
-              // if not image or fetch error
-              log('error', `fetchImage failed: ${path} - ${fe.message || fe}`);
+            } catch (e) {
+              log('error', `fetchImage failed: ${path} - ${e.message}`);
               stats.failed++; stats.processed++; updateStatsUI();
               continue;
             }
 
-            // detect single face
             const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
             if (!det) {
               stats.failed++; stats.processed++; updateStatsUI();
-              log('warn', `ตรวจไม่พบใบหน้า: ${path}`);
+              log('warn', `ไม่พบใบหน้า: ${path}`);
               continue;
             }
 
-            // size check
-            const minFaceSize = Number(minFaceSizeInput.value) || 50;
-            if (det.detection.box.width < minFaceSize || det.detection.box.height < minFaceSize) {
+            const minFace = Number(minFaceSizeInput.value) || 50;
+            if (det.detection.box.width < minFace || det.detection.box.height < minFace) {
               stats.failed++; stats.processed++; updateStatsUI();
               log('warn', `ใบหน้าเล็กเกินไป: ${path}`);
               continue;
             }
 
-            // create embedding
             const embedding = normalize(Array.from(det.descriptor));
             const name = path.split('/').pop().split('.').shift();
 
-            // insert via RPC
             const res = await insertFace(name, path, embedding);
             if (!res.ok) {
               stats.failed++; stats.processed++; updateStatsUI();
               log('error', `❌ Error บันทึก ${path}: ${res.error.message}`);
             } else {
               stats.success++; stats.processed++; updateStatsUI();
+              cache[path] = updatedAt; saveCache(cache);
               log('info', `✅ ซิงค์สำเร็จ: ${path}`);
             }
 
-          } catch (e) {
+          } catch (err) {
             stats.failed++; stats.processed++; updateStatsUI();
-            log('error', `Exception ${path}: ${e.message || e}`);
+            log('error', `Exception ${path}: ${err.message}`);
           }
-        } // end for
+        }
 
         const now = new Date().toLocaleString();
         lastSyncEl.textContent = `ซิงค์ล่าสุด: ${now}`;
@@ -343,7 +319,7 @@
         log('info', `สรุป: สำเร็จ ${stats.success}, ข้าม ${stats.skipped}, ล้มเหลว ${stats.failed}`);
 
       } catch (err) {
-        log('error', `Critical sync error: ${err.message || err}`);
+        log('error', `Critical sync error: ${err.message}`);
         statusEl.textContent = '❌ เกิดข้อผิดพลาดในการซิงค์';
       } finally {
         isSyncing = false;
@@ -351,10 +327,10 @@
     }
 
     // -------------------------
-    // auto sync control
+    // AUTO SYNC CONTROL
     // -------------------------
     function startAutoSync() {
-      stopAuto(); // clear existing
+      stopAuto();
       const intervalSec = Math.max(10, Number(autoIntervalInput.value) || 60);
       autoSyncId = setInterval(() => {
         if (!isSyncing) syncGallery();
@@ -362,46 +338,31 @@
       autoSyncToggle.checked = true;
       log('info', `Auto Sync เริ่ม (ทุก ${intervalSec}s)`);
     }
-
     function stopAuto() {
-      if (autoSyncId) {
-        clearInterval(autoSyncId);
-        autoSyncId = null;
-      }
+      if (autoSyncId) clearInterval(autoSyncId);
+      autoSyncId = null;
       autoSyncToggle.checked = false;
       log('info', 'Auto Sync หยุดแล้ว');
     }
 
     // -------------------------
-    // events
+    // EVENTS
     // -------------------------
-    syncNowBtn.addEventListener('click', () => {
-      syncGallery();
-    });
-    stopAutoBtn.addEventListener('click', () => {
-      stopRequested = true;
-      stopAuto();
-    });
-    clearLogBtn.addEventListener('click', () => {
-      logEl.innerHTML = '';
-      resetStats();
-    });
-
-    autoSyncToggle.addEventListener('change', (e) => {
-      if (e.target.checked) startAutoSync(); else stopAuto();
-    });
+    syncNowBtn.addEventListener('click', syncGallery);
+    stopAutoBtn.addEventListener('click', () => { stopRequested = true; stopAuto(); });
+    clearLogBtn.addEventListener('click', () => { logEl.innerHTML = ''; resetStats(); });
+    clearCacheBtn.addEventListener('click', clearCache);
+    autoSyncToggle.addEventListener('change', e => e.target.checked ? startAutoSync() : stopAuto());
 
     // -------------------------
-    // init
+    // INIT
     // -------------------------
     window.addEventListener('DOMContentLoaded', async () => {
       await loadModels();
-      // optionally start auto if toggle is on
       if (autoSyncToggle.checked) startAutoSync();
-      // small timer to update elapsed display
       setInterval(updateElapsed, 1000);
     });
-
   </script>
 </body>
-</html>
+</
+
