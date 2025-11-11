@@ -42,6 +42,7 @@
       color: #fff;
       font-size: 1rem;
     }
+    input[readonly] { opacity: 0.8; cursor: not-allowed; }
     button {
       background: linear-gradient(90deg, #06C755, #00B900);
       border: none;
@@ -78,8 +79,8 @@
     <label>นามสกุล</label>
     <input type="text" id="lastName" required>
 
-    <label>อีเมล</label>
-    <input type="email" id="emailInput" required>
+    <label>อีเมล (ดึงจาก LINE)</label>
+    <input type="email" id="emailInput" readonly>
 
     <button type="submit">✅ ลงทะเบียน</button>
   </form>
@@ -99,15 +100,18 @@ async function init() {
   if (!liff.isLoggedIn()) return liff.login();
 
   const profile = await liff.getProfile();
+  const decoded = await liff.getDecodedIDToken();
+
   userId = profile.userId;
   displayName = profile.displayName;
   pictureUrl = profile.pictureUrl || "";
-  email = (await liff.getDecodedIDToken()).email || "";
+  email = decoded.email || "";
 
   document.getElementById("profile").innerHTML = `
     <img src="${pictureUrl}" class="profile">
     <p><strong>${displayName}</strong></p>
   `;
+  document.getElementById("emailInput").value = email || "ไม่พบอีเมลในบัญชี LINE";
 }
 
 document.getElementById("registerForm").addEventListener("submit", async (e) => {
@@ -116,11 +120,6 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
   const firstName = document.getElementById("firstName").value.trim();
   const lastName = document.getElementById("lastName").value.trim();
   const emailInput = document.getElementById("emailInput").value.trim();
-
-  if (!prefix || !firstName || !lastName || !emailInput) {
-    alert("กรุณากรอกข้อมูลให้ครบทุกช่อง");
-    return;
-  }
 
   const status = document.getElementById("status");
   status.innerText = "⏳ กำลังตรวจสอบ...";
