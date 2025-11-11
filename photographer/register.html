@@ -5,8 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>📸 ลงทะเบียนช่างภาพ | BCR RUN 2025</title>
 
+  <!-- LINE LIFF & Supabase -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- FONT -->
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet">
 
   <style>
@@ -18,11 +21,9 @@
       --error: #ef4444;
     }
 
-    * { box-sizing: border-box; }
-
     body {
       font-family: 'Prompt', sans-serif;
-      background: radial-gradient(circle at top, var(--bg-dark), #1a2234);
+      background: linear-gradient(135deg, var(--bg-dark), #1a2234);
       color: #fff;
       margin: 0;
       padding: 2rem;
@@ -60,8 +61,7 @@
 
     select, input {
       width: 100%;
-      height: 50px;
-      padding: 12px 15px;
+      padding: 12px;
       margin-top: 10px;
       border-radius: 10px;
       border: 1px solid #334155;
@@ -69,21 +69,17 @@
       color: #fff;
       font-size: 16px;
       outline: none;
-      transition: 0.25s ease;
+      transition: 0.2s;
     }
 
     select:focus, input:focus {
       border-color: var(--gold);
-      box-shadow: 0 0 8px rgba(250,204,21,0.35);
-    }
-
-    input::placeholder {
-      color: #94a3b8;
+      box-shadow: 0 0 6px rgba(250,204,21,0.3);
     }
 
     button {
       width: 100%;
-      height: 50px;
+      padding: 12px;
       margin-top: 15px;
       border-radius: 10px;
       background: linear-gradient(90deg, #facc15, #eab308);
@@ -97,7 +93,6 @@
 
     button:hover {
       filter: brightness(1.1);
-      transform: translateY(-1px);
     }
 
     .status-box {
@@ -165,9 +160,9 @@
   </div>
 
   <script>
-    const liffId = "2001781240-2Px6N01b"; // ใส่ LIFF ID
+    const liffId = "2001781240-XXXXXX"; // 👈 LIFF ID
     const supabaseUrl = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-    const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+    const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
     const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
 
     async function initLiff() {
@@ -175,7 +170,7 @@
       if (!liff.isLoggedIn()) liff.login();
 
       const profile = await liff.getProfile();
-      const email = (await liff.getDecodedIDToken()).email || "ไม่พบอีเมล";
+      const email = (await liff.getDecodedIDToken()).email;
 
       const { data } = await supabase
         .from("photographer_registration")
@@ -188,6 +183,7 @@
       const statusBox = document.getElementById("statusBox");
 
       if (data) {
+        // ลงทะเบียนแล้ว
         const statusClass =
           data.status === "approved" ? "approved" :
           data.status === "pending" ? "pending" : "rejected";
@@ -207,11 +203,12 @@
           </div>
         `;
       } else {
+        // ยังไม่ลงทะเบียน
         form.style.display = "block";
         profileBox.innerHTML = `
           <img src="${profile.pictureUrl}" class="profile-img">
           <h3>${profile.displayName}</h3>
-          <p class="info-text">${email}</p>
+          <p class="info-text">${email || "ไม่พบอีเมล"}</p>
         `;
 
         form.onsubmit = async (e) => {
@@ -230,7 +227,10 @@
             last_name: last,
           });
 
-          if (error) return alert("❌ ลงทะเบียนไม่สำเร็จ: " + error.message);
+          if (error) {
+            alert("❌ ลงทะเบียนไม่สำเร็จ: " + error.message);
+            return;
+          }
 
           await fetch(`${supabaseUrl}/functions/v1/notify_telegram`, {
             method: "POST",
