@@ -139,8 +139,6 @@ let existingHashes = new Set();
 let allFiles = [];
 let currentPage = 1;
 const PAGE_SIZE = 15;
-
-// ✅ localStorage key สำหรับจำคิว
 const LOCAL_QUEUE_KEY = "uploadQueueState";
 
 /* 🟢 เริ่มต้น LIFF + ตรวจสอบสิทธิ์ */
@@ -188,7 +186,7 @@ async function main() {
   await loadExistingHashes();
   await listUserFiles();
 
-  // ✅ ตรวจสอบว่ามีคิวค้างไว้หรือไม่
+  // ✅ ตรวจสอบคิวค้างไว้
   const savedQueue = loadQueue();
   if (savedQueue && savedQueue.files?.length > 0) {
     if (confirm(`มีการอัปโหลดค้างไว้ (${savedQueue.files.length} ไฟล์) ต้องการดำเนินต่อหรือไม่?`)) {
@@ -202,48 +200,32 @@ async function main() {
 /* ==============================
    📦 ระบบจำคิวอัปโหลด (Queue Memory)
    ============================== */
-
 function saveQueue(state) {
   localStorage.setItem(LOCAL_QUEUE_KEY, JSON.stringify(state));
 }
-
 function loadQueue() {
-  try {
-    return JSON.parse(localStorage.getItem(LOCAL_QUEUE_KEY));
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(localStorage.getItem(LOCAL_QUEUE_KEY)); }
+  catch { return null; }
 }
-
 function clearQueue() {
   localStorage.removeItem(LOCAL_QUEUE_KEY);
 }
-
 async function resumeSavedQueue(saved) {
   document.getElementById("status").innerText = "📦 กำลังโหลดคิวเก่า...";
   const fakeFiles = Array.from(document.getElementById("fileInput").files);
-
-  // ถ้า user ยังไม่เลือกไฟล์ใหม่ ต้องให้เลือกก่อน
-  if (!fakeFiles.length) {
-    alert("กรุณาเลือกไฟล์เดิมที่ยังไม่ได้อัปโหลดเพื่อดำเนินต่อจากคิว");
-    return;
-  }
-
-  // โหลดคิวที่ตรงชื่อไฟล์เท่านั้น
+  if (!fakeFiles.length) return alert("กรุณาเลือกไฟล์เดิมเพื่อดำเนินต่อ");
   const queue = fakeFiles.filter(f => saved.files.includes(f.name));
   if (queue.length === 0) {
     alert("❌ ไม่พบไฟล์ที่ตรงกับคิวที่ค้างไว้");
     clearQueue();
     return;
   }
-
   await uploadFiles(queue, saved.currentIndex);
 }
 
 /* ==============================
-   📤 อัปโหลดไฟล์ (Edge Function + Parallel + Pause + Queue Save)
+   📤 อัปโหลดไฟล์ (Edge Function + Pause + Resume + Queue)
    ============================== */
-
 async function uploadFiles(preSelected = null, startIndex = 0) {
   cancelRequested = false;
   paused = false;
@@ -266,25 +248,19 @@ async function uploadFiles(preSelected = null, startIndex = 0) {
 
   const MAX_CONCURRENT = 10;
   const total = files.length;
-  let success = 0, fail = 0, skipBig = 0, completed = startIndex;
+  let success = 0, fail = 0, skipBig = 0, skipDup = 0, completed = startIndex;
   let startTime = Date.now();
 
-  // สร้าง UI คิว
   queueContainer.innerHTML = files.map(f => `
-    <div id="queue-${sha256(f.name)}" style="
-      background: rgba(255,255,255,0.08);
-      margin:5px 0;padding:8px;border-radius:10px;
-      display:flex;align-items:center;justify-content:space-between;
-    ">
+    <div id="queue-${sha256(f.name)}" style="background:rgba(255,255,255,0.08);margin:5px 0;padding:8px;border-radius:10px;display:flex;align-items:center;justify-content:space-between;">
       <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.name}</span>
       <div style="width:35%;height:8px;background:rgba(255,255,255,0.1);border-radius:5px;overflow:hidden;margin:0 5px;">
         <div id="bar-${sha256(f.name)}" style="height:8px;width:0%;background:linear-gradient(90deg,#22c55e,#84cc16);"></div>
       </div>
-      <small id="text-${sha256(f.name)}" style="color:#facc15;font-size:0.8rem;">${completed > 0 && files.indexOf(f) < startIndex ? "✅ สำเร็จ" : "รอคิว..."}</small>
+      <small id="text-${sha256(f.name)}" style="color:#facc15;font-size:0.8rem;">${completed>0&&files.indexOf(f)<startIndex?"✅ สำเร็จ":"รอคิว..."}</small>
     </div>
   `).join("");
 
-  // บันทึกคิวลง localStorage
   saveQueue({ userId, files: files.map(f => f.name), currentIndex: completed });
 
   async function uploadSingleFile(f, index) {
@@ -295,14 +271,27 @@ async function uploadFiles(preSelected = null, startIndex = 0) {
     const textEl = document.getElementById(`text-${hash}`);
     const barEl = document.getElementById(`bar-${hash}`);
 
+    // 🔍 เช็กไฟล์ซ้ำ
+    const metaHash = sha256(f.name + f.size + f.lastModified);
+    if (existingHashes.has(metaHash)) {
+      skipDup++;
+      textEl.innerText = "⚠️ ซ้ำ (ข้าม)";
+      barEl.style.background = "#facc15";
+      barEl.style.width = "100%";
+      return;
+    }
+
+    // ⚖️ เช็กขนาดเกิน 5MB
     if (f.size > 5 * 1024 * 1024) {
       skipBig++;
       textEl.innerText = "❌ ขนาดเกิน 5MB";
       barEl.style.background = "#ef4444";
+      barEl.style.width = "100%";
       return;
     }
 
     textEl.innerText = "📤 กำลังอัปโหลด...";
+
     try {
       const formData = new FormData();
       formData.append("user_id", userId);
@@ -316,13 +305,24 @@ async function uploadFiles(preSelected = null, startIndex = 0) {
       if (result.success) {
         textEl.innerText = "✅ สำเร็จ";
         barEl.style.width = "100%";
+
+        // 🧾 บันทึก hash ลงฐานข้อมูล
+        await sb.from("file_hashes").insert({
+          user_id: userId,
+          profile_name: profileName,
+          profile_pic: profilePic,
+          file_path: result.path || `${userId}/${f.name}`,
+          hash: metaHash
+        });
+        existingHashes.add(metaHash);
       } else {
         textEl.innerText = "❌ ล้มเหลว";
         barEl.style.background = "#ef4444";
       }
-    } catch {
+    } catch (err) {
       textEl.innerText = "⚠️ ข้อผิดพลาด";
       barEl.style.background = "#ef4444";
+      console.error("Upload error:", err);
       fail++;
     }
 
@@ -354,32 +354,12 @@ async function uploadFiles(preSelected = null, startIndex = 0) {
   if (!cancelRequested) clearQueue();
 }
 
-/* 🛑 ยกเลิก */
-function cancelUpload() {
-  if (confirm("แน่ใจหรือไม่ที่จะยกเลิกการอัปโหลดทั้งหมด?")) {
-    cancelRequested = true;
-    clearQueue();
-  }
-}
+/* 🛑 ยกเลิก / ⏸️ พัก / ▶️ ดำเนินต่อ */
+function cancelUpload() { if (confirm("แน่ใจหรือไม่ที่จะยกเลิกการอัปโหลดทั้งหมด?")) { cancelRequested = true; clearQueue(); } }
+function pauseUpload() { paused = true; document.getElementById("pauseBtn").style.display="none"; document.getElementById("resumeBtn").style.display="inline-block"; document.getElementById("eta").innerText="⏸️ การอัปโหลดถูกพัก"; }
+function resumeUpload() { paused = false; if (resumePromise) resumePromise(); document.getElementById("pauseBtn").style.display="inline-block"; document.getElementById("resumeBtn").style.display="none"; document.getElementById("eta").innerText="▶️ ดำเนินการต่อ..."; }
 
-/* ⏸️ พัก */
-function pauseUpload() {
-  paused = true;
-  document.getElementById("pauseBtn").style.display = "none";
-  document.getElementById("resumeBtn").style.display = "inline-block";
-  document.getElementById("eta").innerText = "⏸️ การอัปโหลดถูกพักชั่วคราว";
-}
-
-/* ▶️ ดำเนินต่อ */
-function resumeUpload() {
-  paused = false;
-  if (resumePromise) resumePromise();
-  document.getElementById("pauseBtn").style.display = "inline-block";
-  document.getElementById("resumeBtn").style.display = "none";
-  document.getElementById("eta").innerText = "▶️ ดำเนินการต่อ...";
-}
-
-/* ====== ฟังก์ชันแสดง / ลบ / ค้นหา เหมือนเดิม ====== */
+/* 📜 แสดงรายการ / ลบไฟล์ */
 async function loadExistingHashes() {
   const { data } = await sb.from("file_hashes").select("hash").eq("user_id", userId);
   existingHashes = new Set(data?.map(x => x.hash));
@@ -415,7 +395,7 @@ async function deleteFile(name) {
   await listUserFiles();
 }
 async function deleteAllFiles() {
-  const confirmText = prompt("⚠️ ต้องการลบรูปทั้งหมดของคุณหรือไม่?\nพิมพ์ CONFIRM เพื่อยืนยัน:");
+  const confirmText = prompt("⚠️ ต้องการลบรูปทั้งหมดหรือไม่?\nพิมพ์ CONFIRM เพื่อยืนยัน:");
   if (confirmText !== "CONFIRM") return alert("❌ ยกเลิกการลบทั้งหมด");
   const { data } = await sb.storage.from(BUCKET).list(`${userId}/`, { limit: 10000 });
   const files = data?.map(f => `${userId}/${f.name}`) || [];
@@ -433,7 +413,6 @@ function refreshProgress() {
 
 main();
 </script>
-
 
 
 </body>
