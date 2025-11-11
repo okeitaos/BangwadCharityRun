@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📤 LINE Upload Gallery</title>ำ
+<title>📤 LINE Upload Gallery</title>
 
 <!-- LINE LIFF & Supabase -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -125,7 +125,92 @@
 </div>
 
 <script>
-  /* 📤 อัปโหลดไฟล์ผ่าน Edge Function (Parallel + Queue UI + ตรวจไฟล์ซ้ำ) */
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const BUCKET = "gallery";
+const LIFF_ID = "2001781240-k2PJ3Ap2";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let cancelRequested = false;
+let paused = false;
+let resumePromise = null;
+let userId = "", profileName = "", profilePic = "";
+let existingHashes = new Set();
+let allFiles = [];
+let currentPage = 1;
+const PAGE_SIZE = 15;
+
+/* 🟢 เริ่มต้น LIFF + ตรวจสอบสิทธิ์ */
+async function main() {
+  await liff.init({ liffId: LIFF_ID });
+
+  if (!liff.isLoggedIn()) {
+    document.getElementById("loginSection").style.display = "block";
+    return;
+  }
+
+  const profile = await liff.getProfile();
+  userId = profile.userId;
+  profileName = profile.displayName;
+  profilePic = profile.pictureUrl;
+
+  const { data, error } = await sb
+    .from("photographer_registration")
+    .select("status, prefix, first_name, last_name")
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !data) {
+    document.body.innerHTML = `
+      <h1 style="color:#ef4444;">🚫 ไม่มีสิทธิ์ใช้งาน</h1>
+      <p>บัญชีนี้ยังไม่ผ่านการลงทะเบียนช่างภาพ</p>
+      <p><a href="https://okeitaos.github.io/BangwadCharityRun/photographer/register.html"
+        style="color:#3b82f6;">คลิกที่นี่เพื่อลงทะเบียน</a></p>`;
+    return;
+  }
+
+  if (data.status !== "approved") {
+    document.body.innerHTML = `
+      <h1 style="color:#facc15;">⏳ รอการอนุมัติ</h1>
+      <p>บัญชีของคุณ (${data.prefix}${data.first_name} ${data.last_name})</p>
+      <p>ยังไม่ได้รับการอนุมัติจากผู้ดูแลระบบ</p>`;
+    return;
+  }
+
+  showUploadSection();
+  await loadExistingHashes();
+  await listUserFiles();
+}
+
+function login() { liff.login(); }
+function logout() { liff.logout(); location.reload(); }
+
+function showUploadSection() {
+  document.getElementById("loginSection").style.display = "none";
+  document.getElementById("uploadSection").style.display = "block";
+  document.getElementById("userProfile").innerHTML = `<img src="${profilePic}" alt=""><p>${profileName}</p>`;
+}
+
+/* 🧩 โหลด hash ที่มีอยู่แล้ว */
+async function loadExistingHashes() {
+  const { data } = await sb.from("file_hashes").select("hash").eq("user_id", userId);
+  existingHashes = new Set(data?.map(x => x.hash));
+}
+
+/* ✅ ตรวจสอบไฟล์ซ้ำก่อนอัปโหลด */
+async function checkDuplicateFiles(files) {
+  const duplicateList = [];
+  for (const f of files) {
+    const buffer = await f.arrayBuffer();
+    const hash = sha256(buffer);
+    if (existingHashes.has(hash)) {
+      duplicateList.push(f.name);
+    }
+  }
+  return duplicateList;
+}
+
+/* 📤 อัปโหลดไฟล์ผ่าน Edge Function */
 async function uploadFiles() {
   cancelRequested = false;
   paused = false;
@@ -141,113 +226,53 @@ async function uploadFiles() {
   const resumeBtn = document.getElementById("resumeBtn");
 
   if (!files.length) return alert("กรุณาเลือกไฟล์");
-  * 🟢 เริ่มต้น LIFF + ตรวจสอบสิทธิ์ */
-async function main() {
-  await liff.init({ liffId: LIFF_ID });
 
-  if (!liff.isLoggedIn()) {
-    document.getElementById("loginSection").style.display = "block";
-    return;
-  }
-
-  const profile = await liff.getProfile();
-  userId = profile.userId;
-  profileName = profile.displayName;
-  profilePic = profile.pictureUrl;
-
-  // ✅ ตรวจสอบสิทธิ์จากตาราง photographer_registration
-  const { data, error } = await sb
-    .from("photographer_registration")
-    .select("status, prefix, first_name, last_name")
-    .eq("user_id", userId)
-    .single();
-
-  if (error || !data) {
-    document.body.innerHTML = `
-      <h1 style="color:#ef4444;">🚫 ไม่มีสิทธิ์ใช้งาน</h1>
-      <p>บัญชีนี้ยังไม่ผ่านการลงทะเบียนช่างภาพ</p>
-      <p><a href="https://okeitaos.github.io/BangwadCharityRun/photographer/register.html"
-        style="color:#3b82f6;">คลิกที่นี่เพื่อลงทะเบียน</a></p>
-    `;
-    return;
-  }
-
-  if (data.status !== "approved") {
-    document.body.innerHTML = `
-      <h1 style="color:#facc15;">⏳ รอการอนุมัติ</h1>
-      <p>บัญชีของคุณ (${data.prefix}${data.first_name} ${data.last_name})</p>
-      <p>ยังไม่ได้รับการอนุมัติจากผู้ดูแลระบบ</p>
-    `;
-    return;
-  }
-
-  // ✅ ผ่านการตรวจสอบแล้ว แสดงหน้า upload
-  showUploadSection();
+  // ✅ ตรวจไฟล์ซ้ำก่อนอัปโหลด
+  status.innerText = "🔍 กำลังตรวจสอบไฟล์ซ้ำ...";
   await loadExistingHashes();
-  await listUserFiles();
-}
-
-/* 👇 ฟังก์ชันทั้งหมดด้านล่างเหมือนเดิม ห้ามแก้ไข */
-function login() { liff.login(); }
-function logout() { liff.logout(); location.reload(); }
-
-function showUploadSection() {
-  document.getElementById("loginSection").style.display = "none";
-  document.getElementById("uploadSection").style.display = "block";
-  document.getElementById("userProfile").innerHTML = `<img src="${profilePic}" alt=""><p>${profileName}</p>`;
-}
-
-  // 🟡 โหลด hash ที่มีอยู่ก่อน
-  await loadExistingHashes();
+  const duplicateFiles = await checkDuplicateFiles(files);
+  if (duplicateFiles.length > 0) {
+    alert(`⛔️ พบไฟล์ซ้ำ ${duplicateFiles.length} ไฟล์\n\n${duplicateFiles.join("\n")}\n\nไฟล์เหล่านี้จะไม่ถูกอัปโหลด`);
+  }
+  const filteredFiles = files.filter(f => !duplicateFiles.includes(f.name));
+  if (filteredFiles.length === 0) {
+    status.innerText = "❌ ไม่มีไฟล์ใหม่ให้อัปโหลด";
+    return;
+  }
 
   cancelBtn.style.display = "inline-block";
   pauseBtn.style.display = "inline-block";
   resumeBtn.style.display = "none";
 
   const MAX_CONCURRENT = 10;
-  const total = files.length;
-  let success = 0, fail = 0, skipBig = 0, skipDup = 0, completed = 0;
+  const total = filteredFiles.length;
+  let success = 0, fail = 0, skipBig = 0, completed = 0;
   let startTime = Date.now();
 
-  queueContainer.innerHTML = files.map(f => `
-    <div id="queue-${sha256(f.name)}" style="
-      background: rgba(255,255,255,0.08);
-      margin:5px 0;padding:8px;border-radius:10px;
-      display:flex;align-items:center;justify-content:space-between;
-    ">
+  queueContainer.innerHTML = filteredFiles.map(f => `
+    <div id="queue-${sha256(f.name)}" style="background:rgba(255,255,255,0.08);margin:5px 0;padding:8px;border-radius:10px;display:flex;align-items:center;justify-content:space-between;">
       <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.name}</span>
       <div style="width:35%;height:8px;background:rgba(255,255,255,0.1);border-radius:5px;overflow:hidden;margin:0 5px;">
         <div id="bar-${sha256(f.name)}" style="height:8px;width:0%;background:linear-gradient(90deg,#22c55e,#84cc16);"></div>
       </div>
       <small id="text-${sha256(f.name)}" style="color:#facc15;font-size:0.8rem;">รอคิว...</small>
-    </div>
-  `).join("");
+    </div>`).join("");
 
   async function uploadSingleFile(f) {
     if (cancelRequested) return;
-    while (paused) await new Promise(r => resumePromise = r); // ⏸️ รอจน resume
+    while (paused) await new Promise(r => resumePromise = r);
 
-    const hash = sha256(f.name + f.size + f.lastModified);
-    const textEl = document.getElementById(`text-${sha256(f.name)}`);
-    const barEl = document.getElementById(`bar-${sha256(f.name)}`);
+    const hash = sha256(f.name);
+    const textEl = document.getElementById(`text-${hash}`);
+    const barEl = document.getElementById(`bar-${hash}`);
 
-    // ✅ ตรวจขนาด
     if (f.size > 5 * 1024 * 1024) {
       skipBig++;
-      textEl.innerText = "❌ เกิน 5MB";
+      textEl.innerText = "❌ ขนาดเกิน 5MB";
       barEl.style.background = "#ef4444";
       return;
     }
 
-    // ✅ ตรวจไฟล์ซ้ำจาก hash
-    if (existingHashes.has(hash)) {
-      skipDup++;
-      textEl.innerText = "⛔️ ไฟล์ซ้ำ";
-      barEl.style.background = "#f87171";
-      return;
-    }
-
-    // ✅ เริ่มอัปโหลด
     const formData = new FormData();
     formData.append("user_id", userId);
     formData.append("profile_name", profileName);
@@ -258,26 +283,12 @@ function showUploadSection() {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/upload_image`, { method: "POST", body: formData });
       const result = await res.json();
-
       if (result.success) {
         textEl.innerText = "✅ สำเร็จ";
         barEl.style.width = "100%";
-        existingHashes.add(hash);
-
-        // ✅ บันทึก hash ลง table
-        await sb.from("file_hashes").insert({
-          user_id: userId,
-          profile_name: profileName,
-          profile_pic: profilePic,
-          file_path: result.path,
-          hash
-        });
-
-        success++;
       } else {
         textEl.innerText = "❌ ล้มเหลว";
         barEl.style.background = "#ef4444";
-        fail++;
       }
     } catch {
       textEl.innerText = "⚠️ ข้อผิดพลาด";
@@ -290,33 +301,94 @@ function showUploadSection() {
     progressBar.style.width = `${percent}%`;
     progressText.innerText = `${completed}/${total} (${percent}%)`;
 
-    // ⏱️ ETA
     const elapsed = (Date.now() - startTime) / 1000;
     const avg = elapsed / completed;
     const remaining = (total - completed) * avg;
     etaEl.innerText = `🕒 ประมาณเวลา: ${Math.floor(remaining / 60)} นาที ${Math.floor(remaining % 60)} วินาที`;
   }
 
-  // ✅ อัปโหลด batch ละ 10 ไฟล์
   for (let i = 0; i < total; i += MAX_CONCURRENT) {
     if (cancelRequested) break;
     while (paused) await new Promise(r => resumePromise = r);
-    const batch = files.slice(i, i + MAX_CONCURRENT);
+    const batch = filteredFiles.slice(i, i + MAX_CONCURRENT);
     await Promise.all(batch.map(uploadSingleFile));
   }
 
-  // ✅ สรุปผล
   cancelBtn.style.display = "none";
   pauseBtn.style.display = "none";
   resumeBtn.style.display = "none";
-
-  const elapsed = Math.round((Date.now() - startTime) / 1000);
-  status.innerText = `✅ เสร็จสิ้นใน ${elapsed}s | สำเร็จ ${success}, ซ้ำ ${skipDup}, เกินขนาด ${skipBig}, ล้มเหลว ${fail}`;
   progressText.innerText = cancelRequested ? "⏹️ ยกเลิกแล้ว" : "✅ เสร็จสิ้น";
+}
+
+function cancelUpload() { if (confirm("แน่ใจหรือไม่ที่จะยกเลิกการอัปโหลดทั้งหมด?")) cancelRequested = true; }
+function pauseUpload() { paused = true; document.getElementById("pauseBtn").style.display = "none"; document.getElementById("resumeBtn").style.display = "inline-block"; document.getElementById("eta").innerText = "⏸️ การอัปโหลดถูกพักชั่วคราว"; }
+function resumeUpload() { paused = false; if (resumePromise) resumePromise(); document.getElementById("pauseBtn").style.display = "inline-block"; document.getElementById("resumeBtn").style.display = "none"; }
+
+async function listUserFiles() {
+  const { data } = await sb.storage.from(BUCKET).list(`${userId}/`, { limit: 10000 });
+  allFiles = data?.filter(f => f.name !== ".emptyFolderPlaceholder") || [];
+  document.getElementById("totalCount").innerText = `📸 อัปโหลดทั้งหมด: ${allFiles.length} รูป`;
+  renderPage(1);
+}
+
+function renderPage(page) {
+  const list = document.getElementById("fileList");
+  const start = (page - 1) * PAGE_SIZE;
+  const end = start + PAGE_SIZE;
+  const files = allFiles.slice(start, end);
+  list.innerHTML = "";
+  files.forEach(f => {
+    const url = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${f.name}`;
+    const li = document.createElement("li");
+    li.innerHTML = `<img src="${url}" alt="thumb"><span>${f.name}</span><button class="btn-red" onclick="deleteFile('${f.name}')">ลบ</button>`;
+    list.appendChild(li);
+  });
+  document.getElementById("prevBtn").disabled = page <= 1;
+  document.getElementById("nextBtn").disabled = end >= allFiles.length;
+  currentPage = page;
+}
+function nextPage() { if ((currentPage * PAGE_SIZE) < allFiles.length) renderPage(++currentPage); }
+function prevPage() { if (currentPage > 1) renderPage(--currentPage); }
+
+document.getElementById("searchInput").addEventListener("input", e => {
+  const keyword = e.target.value.toLowerCase();
+  const filtered = allFiles.filter(f => f.name.toLowerCase().includes(keyword));
+  const list = document.getElementById("fileList");
+  list.innerHTML = "";
+  filtered.slice(0, 15).forEach(f => {
+    const url = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${f.name}`;
+    list.innerHTML += `<li><img src="${url}"><span>${f.name}</span><button class="btn-red" onclick="deleteFile('${f.name}')">ลบ</button></li>`;
+  });
+});
+
+async function deleteFile(name) {
+  if (!confirm(`ลบไฟล์ ${name}?`)) return;
+  const filePath = `${userId}/${name}`;
+  await sb.storage.from(BUCKET).remove([filePath]);
+  await sb.from("file_hashes").delete().eq("file_path", filePath);
   await listUserFiles();
 }
 
-</script>
+async function deleteAllFiles() {
+  const confirmText = prompt("⚠️ ต้องการลบรูปทั้งหมดของคุณหรือไม่?\nพิมพ์ CONFIRM เพื่อยืนยัน:");
+  if (confirmText !== "CONFIRM") return alert("❌ ยกเลิกการลบทั้งหมด");
+  const { data } = await sb.storage.from(BUCKET).list(`${userId}/`, { limit: 10000 });
+  const files = data?.map(f => `${userId}/${f.name}`) || [];
+  if (!files.length) return alert("ไม่มีรูปให้ลบ");
+  await sb.storage.from(BUCKET).remove(files);
+  await sb.from("file_hashes").delete().eq("user_id", userId);
+  alert("✅ ลบรูปทั้งหมดเรียบร้อยแล้ว");
+  await listUserFiles();
+}
 
+function refreshProgress() {
+  document.getElementById("progressBar").style.width = "0%";
+  document.getElementById("progressText").innerText = "0%";
+  document.getElementById("status").innerText = "🔄 พร้อมอัปโหลดใหม่";
+  document.getElementById("fileInput").value = "";
+}
+
+main();
+</script>
 </body>
 </html>
