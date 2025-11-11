@@ -58,12 +58,25 @@
     button:hover { opacity: 0.85; transform: translateY(-2px); }
     #status { margin-top: 15px; color: #facc15; font-weight: bold; }
     img.profile { width: 80px; height: 80px; border-radius: 50%; margin: 15px auto; display: block; border: 3px solid #facc15; }
+    .info-box {
+      margin-top: 20px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 15px;
+      text-align: left;
+      font-size: 1rem;
+    }
+    .info-box p { margin: 6px 0; }
+    .status-pending { color: #facc15; }
+    .status-approved { color: #22c55e; }
+    .status-rejected { color: #ef4444; }
   </style>
 </head>
 <body>
   <h1>📸 ลงทะเบียนช่างภาพ</h1>
 
   <div id="profile"></div>
+
   <form id="registerForm">
     <label>คำนำหน้า</label>
     <select id="prefix" required>
@@ -85,6 +98,7 @@
     <button type="submit">✅ ลงทะเบียน</button>
   </form>
 
+  <div id="infoBox" class="info-box" style="display:none;"></div>
   <div id="status"></div>
 
 <script>
@@ -112,40 +126,71 @@ async function init() {
     <p><strong>${displayName}</strong></p>
   `;
   document.getElementById("emailInput").value = email || "ไม่พบอีเมลในบัญชี LINE";
+
+  checkExistingRegistration();
+}
+
+async function checkExistingRegistration() {
+  const status = document.getElementById("status");
+  const form = document.getElementById("registerForm");
+  const infoBox = document.getElementById("infoBox");
+
+  status.innerText = "⏳ กำลังตรวจสอบข้อมูล...";
+
+  const { data: existing, error } = await sb
+    .from("photographer_registration")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    status.innerText = "❌ ไม่สามารถเชื่อมต่อฐานข้อมูลได้";
+    console.error(error);
+    return;
+  }
+
+  if (existing) {
+    // ซ่อน form ลงทะเบียน
+    form.style.display = "none";
+    infoBox.style.display = "block";
+
+    // แสดงข้อมูลเดิม
+    const statusClass =
+      existing.status === "approved" ? "status-approved" :
+      existing.status === "pending" ? "status-pending" :
+      "status-rejected";
+
+    infoBox.innerHTML = `
+      <p>👤 <strong>${existing.prefix}${existing.first_name} ${existing.last_name}</strong></p>
+      <p>📧 ${existing.email}</p>
+      <p>📱 ${existing.display_name}</p>
+      <p>📅 ลงทะเบียนเมื่อ: ${new Date(existing.created_at).toLocaleString("th-TH")}</p>
+      <p>📌 สถานะ: <span class="${statusClass}">${existing.status}</span></p>
+    `;
+
+    status.innerText =
+      existing.status === "pending" ? "⌛ รอการอนุมัติจากผู้ดูแล" :
+      existing.status === "approved" ? "✅ ได้รับการอนุมัติแล้ว" :
+      "❌ คำขอถูกปฏิเสธ";
+  } else {
+    form.style.display = "block";
+    infoBox.style.display = "none";
+    status.innerText = "";
+  }
 }
 
 document.getElementById("registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
+
   const prefix = document.getElementById("prefix").value.trim();
   const firstName = document.getElementById("firstName").value.trim();
   const lastName = document.getElementById("lastName").value.trim();
   const emailInput = document.getElementById("emailInput").value.trim();
-
   const status = document.getElementById("status");
-  status.innerText = "⏳ กำลังตรวจสอบ...";
+
+  status.innerText = "⏳ กำลังบันทึกข้อมูล...";
 
   try {
-    // ✅ ตรวจสอบว่ามี user นี้อยู่แล้วหรือไม่
-    const { data: existing } = await sb
-      .from("photographer_registration")
-      .select("id, status")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (existing) {
-      if (existing.status === "pending") {
-        status.innerText = "⚠️ คุณได้ลงทะเบียนแล้ว รอการอนุมัติจากผู้ดูแล";
-      } else if (existing.status === "approved") {
-        status.innerText = "✅ คุณได้รับการอนุมัติแล้ว สามารถเข้าสู่ระบบอัปโหลดได้";
-      } else if (existing.status === "rejected") {
-        status.innerText = "❌ คำขอลงทะเบียนของคุณถูกปฏิเสธ";
-      } else {
-        status.innerText = "⚠️ คุณได้ลงทะเบียนแล้ว";
-      }
-      return;
-    }
-
-    // ✅ บันทึกลงตาราง photographer_registration
     const { error } = await sb.from("photographer_registration").insert([{
       user_id: userId,
       display_name: displayName,
@@ -159,7 +204,7 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
 
     if (error) throw error;
 
-    // ✅ แจ้งเตือน Telegram
+    // แจ้ง Telegram
     const message = `
 🆕 *ช่างภาพลงทะเบียนใหม่*
 👤 ${prefix}${firstName} ${lastName}
@@ -169,23 +214,18 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
 ⏰ ${new Date().toLocaleString("th-TH")}
 `;
 
-    console.log("📤 Sending Telegram payload:", { text: message, image_url: pictureUrl });
-
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/notify_telegram`, {
+    await fetch(`${SUPABASE_URL}/functions/v1/notify_telegram`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${SUPABASE_KEY}`,
         "apikey": SUPABASE_KEY
       },
-      body: JSON.stringify({
-        text: message,
-        image_url: pictureUrl
-      })
+      body: JSON.stringify({ text: message, image_url: pictureUrl })
     });
 
-    console.log("📨 Telegram Response:", response.status, await response.text());
     status.innerText = "✅ ลงทะเบียนสำเร็จ! รอการอนุมัติจากผู้ดูแล";
+    checkExistingRegistration();
 
   } catch (err) {
     console.error("❌ Error:", err);
