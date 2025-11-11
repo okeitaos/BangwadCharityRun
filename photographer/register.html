@@ -123,9 +123,29 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
   }
 
   const status = document.getElementById("status");
-  status.innerText = "⏳ กำลังบันทึก...";
+  status.innerText = "⏳ กำลังตรวจสอบ...";
 
   try {
+    // ✅ ตรวจสอบว่ามี user นี้อยู่แล้วหรือไม่
+    const { data: existing } = await sb
+      .from("photographer_registration")
+      .select("id, status")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (existing) {
+      if (existing.status === "pending") {
+        status.innerText = "⚠️ คุณได้ลงทะเบียนแล้ว รอการอนุมัติจากผู้ดูแล";
+      } else if (existing.status === "approved") {
+        status.innerText = "✅ คุณได้รับการอนุมัติแล้ว สามารถเข้าสู่ระบบอัปโหลดได้";
+      } else if (existing.status === "rejected") {
+        status.innerText = "❌ คำขอลงทะเบียนของคุณถูกปฏิเสธ";
+      } else {
+        status.innerText = "⚠️ คุณได้ลงทะเบียนแล้ว";
+      }
+      return;
+    }
+
     // ✅ บันทึกลงตาราง photographer_registration
     const { error } = await sb.from("photographer_registration").insert([{
       user_id: userId,
@@ -166,8 +186,8 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
     });
 
     console.log("📨 Telegram Response:", response.status, await response.text());
-
     status.innerText = "✅ ลงทะเบียนสำเร็จ! รอการอนุมัติจากผู้ดูแล";
+
   } catch (err) {
     console.error("❌ Error:", err);
     status.innerText = "❌ เกิดข้อผิดพลาด: " + err.message;
