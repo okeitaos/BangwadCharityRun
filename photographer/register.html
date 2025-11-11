@@ -1,108 +1,186 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ลงทะเบียนช่างภาพ | BCR RUN 2025</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📸 ลงทะเบียนช่างภาพ | Bangwad Charity Run</title>
+
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
     body {
-      font-family: 'Prompt', sans-serif;
-      background: #0f172a;
+      font-family: "Prompt", sans-serif;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
       color: #fff;
-      margin: 0;
-      padding: 2rem;
       text-align: center;
+      padding: 20px;
+      min-height: 100vh;
     }
-    .container {
-      background: #1e293b;
-      border-radius: 16px;
-      padding: 1.5rem;
-      max-width: 480px;
-      margin: auto;
-      box-shadow: 0 0 15px rgba(255,255,255,0.05);
+
+    h1 {
+      color: #facc15;
+      text-shadow: 0 0 10px rgba(250,204,21,0.4);
     }
+
+    form {
+      background: rgba(255,255,255,0.05);
+      border-radius: 15px;
+      padding: 25px;
+      max-width: 400px;
+      margin: 20px auto;
+      box-shadow: 0 0 15px rgba(0,0,0,0.3);
+    }
+
     input, select, button {
-      width: 100%;
+      width: 90%;
       padding: 10px;
-      margin-top: 10px;
-      border-radius: 8px;
+      margin: 8px 0;
+      border-radius: 10px;
       border: none;
-      font-size: 16px;
+      outline: none;
+      font-size: 1rem;
     }
+
+    input, select {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+
     button {
-      background: #22c55e;
-      color: white;
+      background: linear-gradient(90deg, #06C755, #00B900);
+      color: #fff;
+      font-weight: bold;
       cursor: pointer;
+      transition: 0.3s;
+    }
+
+    button:hover { opacity: 0.9; }
+
+    #status {
+      margin-top: 15px;
+      color: #facc15;
+      font-weight: bold;
+    }
+
+    img {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      border: 3px solid #facc15;
+      margin-bottom: 10px;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>📸 ลงทะเบียนช่างภาพ</h2>
-    <form id="registerForm">
-      <select id="prefix" required>
-        <option value="">-- คำนำหน้า --</option>
-        <option>นาย</option>
-        <option>นาง</option>
-        <option>นางสาว</option>
-      </select>
-      <input id="first_name" placeholder="ชื่อ" required>
-      <input id="last_name" placeholder="นามสกุล" required>
-      <button type="submit">ลงทะเบียน</button>
-    </form>
-    <p id="status"></p>
-  </div>
+  <h1>📸 ลงทะเบียนช่างภาพ</h1>
+
+  <div id="profileSection"></div>
+
+  <form id="registerForm">
+    <select id="prefix" required>
+      <option value="">-- คำนำหน้า --</option>
+      <option value="นาย">นาย</option>
+      <option value="นาง">นาง</option>
+      <option value="นางสาว">นางสาว</option>
+    </select>
+
+    <input type="text" id="firstName" placeholder="ชื่อจริง" required />
+    <input type="text" id="lastName" placeholder="นามสกุล" required />
+    <input type="email" id="email" placeholder="อีเมล" required />
+
+    <button type="submit">📤 ลงทะเบียน</button>
+  </form>
+
+  <div id="status">กำลังโหลด...</div>
 
   <script>
-    const liffId = "2001781240-2Px6N01b"; // LIFF ID ของคุณ
-    const supabaseUrl = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-    const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-    const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+  const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+  const SUPABASE_KEY =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const LIFF_ID = "2001781240-2Px6N01b";
 
-    let userProfile;
+  let userId = "", displayName = "", pictureUrl = "";
 
-    async function initLiff() {
-      await liff.init({ liffId });
-      if (!liff.isLoggedIn()) liff.login();
-      userProfile = await liff.getProfile();
-      const email = (await liff.getDecodedIDToken()).email;
-      document.getElementById("status").innerText = `สวัสดี, ${userProfile.displayName}`;
-      window.profile = { ...userProfile, email };
-    }
+  async function main() {
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) return liff.login();
 
-    initLiff();
+    const profile = await liff.getProfile();
+    userId = profile.userId;
+    displayName = profile.displayName;
+    pictureUrl = profile.pictureUrl;
 
-    document.getElementById("registerForm").onsubmit = async (e) => {
-      e.preventDefault();
-      const prefix = document.getElementById("prefix").value;
-      const first = document.getElementById("first_name").value;
-      const last = document.getElementById("last_name").value;
+    document.getElementById("profileSection").innerHTML = `
+      <img src="${pictureUrl}" alt="Profile">
+      <p><b>${displayName}</b></p>
+    `;
 
-      const data = {
-        user_id: profile.userId,
-        display_name: profile.displayName,
-        picture_url: profile.pictureUrl,
-        email: profile.email,
-        prefix, first_name: first, last_name: last,
-      };
+    document.getElementById("status").innerText = "กรอกข้อมูลเพื่อลงทะเบียน";
+  }
 
-      const { error } = await supabase.from("photographer_registration").upsert(data);
-      if (error) {
-        alert("❌ บันทึกไม่สำเร็จ: " + error.message);
-        return;
-      }
+  main();
 
-      // ✅ แจ้ง Telegram
-      await fetch(`${supabaseUrl}/functions/v1/notify_telegram`, {
+  // ✅ แจ้งเตือน Telegram
+  async function notifyTelegram(data) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/notify_telegram`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_KEY,
+          "Authorization": `Bearer ${SUPABASE_KEY}`,
+        },
         body: JSON.stringify(data),
       });
 
-      document.getElementById("status").innerText = "✅ ลงทะเบียนสำเร็จ! รอการอนุมัติ...";
+      const result = await res.json();
+      console.log("📨 Telegram notify:", result);
+    } catch (err) {
+      console.error("❌ Error notifying Telegram:", err);
+    }
+  }
+
+  // ✅ เมื่อกดปุ่มลงทะเบียน
+  document.getElementById("registerForm").onsubmit = async (e) => {
+    e.preventDefault();
+
+    const prefix = document.getElementById("prefix").value;
+    const first_name = document.getElementById("firstName").value.trim();
+    const last_name = document.getElementById("lastName").value.trim();
+    const email = document.getElementById("email").value.trim();
+
+    const statusBox = document.getElementById("status");
+    statusBox.innerText = "⏳ กำลังลงทะเบียน...";
+
+    const insertData = {
+      user_id: userId,
+      display_name: displayName,
+      picture_url: pictureUrl,
+      email,
+      prefix,
+      first_name,
+      last_name,
+      status: "pending"
     };
+
+    const { error } = await sb
+      .from("photographer_registration")
+      .insert(insertData);
+
+    if (error) {
+      console.error("❌ Insert Error:", error);
+      statusBox.innerText = "❌ ลงทะเบียนไม่สำเร็จ (อาจลงทะเบียนแล้ว)";
+      return;
+    }
+
+    // ✅ ส่งแจ้งเตือน Telegram
+    await notifyTelegram(insertData);
+
+    statusBox.innerText = "✅ ลงทะเบียนสำเร็จ! ระบบจะแจ้งเตือนผู้ดูแลทาง Telegram แล้ว";
+    document.getElementById("registerForm").reset();
+  };
   </script>
 </body>
 </html>
