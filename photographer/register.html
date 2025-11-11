@@ -16,38 +16,51 @@
       text-align: center;
       padding: 20px;
       min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     h1 {
       color: #facc15;
       text-shadow: 0 0 10px rgba(250, 204, 21, 0.4);
+      margin-bottom: 20px;
+    }
+
+    #profileSection {
+      text-align: center;
+      margin-bottom: 10px;
     }
 
     form {
       background: rgba(255, 255, 255, 0.05);
       border-radius: 15px;
-      padding: 25px;
-      max-width: 420px;
-      margin: 20px auto;
+      padding: 25px 30px;
+      max-width: 400px;
+      width: 100%;
       box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
     }
 
-    input, select, button {
-      width: 92%;
-      padding: 12px;
-      margin: 10px 0;
+    select, input, button {
+      width: 100%;
+      padding: 12px 15px;
       border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.15);
-      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.08);
       color: #fff;
       font-size: 1rem;
       outline: none;
       transition: 0.3s;
+      box-sizing: border-box;
     }
 
-    input:focus, select:focus {
+    select:focus, input:focus {
       border-color: #facc15;
-      background: rgba(255,255,255,0.15);
+      background: rgba(255, 255, 255, 0.15);
     }
 
     button {
@@ -78,11 +91,13 @@
     }
 
     .readonly-info {
-      background: rgba(255,255,255,0.1);
-      padding: 15px;
-      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 20px;
+      border-radius: 12px;
       margin-top: 15px;
+      max-width: 400px;
       text-align: left;
+      box-shadow: 0 0 15px rgba(0,0,0,0.3);
     }
 
     .readonly-info p {
