@@ -1,58 +1,142 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>📸 ลงทะเบียนช่างภาพ | BCR RUN 2025</title>
+
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet">
+
   <style>
+    :root {
+      --bg-dark: #0f172a;
+      --bg-card: #1e293b;
+      --gold: #facc15;
+      --success: #22c55e;
+      --error: #ef4444;
+    }
+
     body {
       font-family: 'Prompt', sans-serif;
-      background: #0f172a;
+      background: radial-gradient(circle at top, var(--bg-dark), #1a2234);
       color: #fff;
       margin: 0;
       padding: 2rem;
-      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
     }
+
     .container {
-      background: #1e293b;
-      border-radius: 16px;
-      padding: 1.5rem;
-      max-width: 480px;
-      margin: auto;
-      box-shadow: 0 0 15px rgba(255,255,255,0.05);
-    }
-    input, select, button {
+      background: var(--bg-card);
+      border-radius: 20px;
+      box-shadow: 0 0 25px rgba(0, 0, 0, 0.4);
+      padding: 2rem;
       width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      border-radius: 8px;
-      border: none;
-      font-size: 16px;
+      max-width: 420px;
+      text-align: center;
+      transition: 0.3s;
     }
-    button {
-      background: #22c55e;
-      color: white;
-      cursor: pointer;
+
+    h2 {
+      color: var(--gold);
+      text-shadow: 0 0 10px rgba(250, 204, 21, 0.4);
+      margin-bottom: 1rem;
+    }
+
+    .profile-img {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-bottom: 10px;
+      border: 2px solid var(--gold);
+    }
+
+    select, input {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #fff;
+      font-size: 16px;
+      outline: none;
       transition: 0.2s;
     }
-    button:hover {
-      background: #16a34a;
+
+    select:focus, input:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 6px rgba(250,204,21,0.3);
     }
-    .status-box {
-      background: #334155;
-      border-radius: 10px;
-      padding: 10px;
+
+    button {
+      width: 100%;
+      padding: 12px;
       margin-top: 15px;
+      border-radius: 10px;
+      background: linear-gradient(90deg, #facc15, #eab308);
+      border: none;
+      color: #000;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: 0.3s;
     }
-    .approved { color: #22c55e; font-weight: bold; }
-    .pending { color: #facc15; font-weight: bold; }
-    .rejected { color: #ef4444; font-weight: bold; }
+
+    button:hover {
+      filter: brightness(1.1);
+    }
+
+    .status-box {
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 20px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .pending {
+      background: rgba(250, 204, 21, 0.15);
+      border: 1px solid var(--gold);
+      color: var(--gold);
+    }
+
+    .approved {
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid var(--success);
+      color: var(--success);
+    }
+
+    .rejected {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid var(--error);
+      color: var(--error);
+    }
+
+    .info-text {
+      color: #94a3b8;
+      font-size: 0.9rem;
+      margin-top: 8px;
+    }
+
+    .fade-in {
+      animation: fadeIn 0.8s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
+
 <body>
-  <div class="container">
+  <div class="container fade-in">
     <h2>📸 ลงทะเบียนช่างภาพ</h2>
     <div id="profileBox"></div>
 
@@ -65,61 +149,65 @@
       </select>
       <input id="first_name" placeholder="ชื่อ" required>
       <input id="last_name" placeholder="นามสกุล" required>
-      <button type="submit">ลงทะเบียน</button>
+      <button type="submit">✅ ลงทะเบียน</button>
+      <div class="info-text">ระบบจะส่งแจ้งเตือนไปยังผู้ดูแลเพื่ออนุมัติ</div>
     </form>
 
     <div id="statusBox"></div>
   </div>
 
   <script>
-    const liffId = "2001781240-2Px6N01b"; // ← ใส่ LIFF ID ของคุณ
+    const liffId = "2001781240-2Px6N01b"; // ใส่ LIFF ID ของคุณ
     const supabaseUrl = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-    const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+    const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
     const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
-
-    let userProfile;
 
     async function initLiff() {
       await liff.init({ liffId });
       if (!liff.isLoggedIn()) liff.login();
-      userProfile = await liff.getProfile();
-      const email = (await liff.getDecodedIDToken()).email;
 
-      // ดึงข้อมูลจาก Supabase
+      const profile = await liff.getProfile();
+      const email = (await liff.getDecodedIDToken()).email || "ไม่พบอีเมล";
+
+      // ตรวจสอบว่ามีใน DB หรือยัง
       const { data } = await supabase
         .from("photographer_registration")
         .select("*")
-        .eq("user_id", userProfile.userId)
+        .eq("user_id", profile.userId)
         .maybeSingle();
 
       const profileBox = document.getElementById("profileBox");
       const form = document.getElementById("registerForm");
       const statusBox = document.getElementById("statusBox");
 
-      // ถ้าเจอข้อมูลในฐานข้อมูล แปลว่าลงทะเบียนแล้ว
       if (data) {
         const statusClass =
           data.status === "approved" ? "approved" :
           data.status === "pending" ? "pending" : "rejected";
 
         profileBox.innerHTML = `
-          <img src="${data.picture_url}" width="80" style="border-radius:50%;margin-bottom:10px;"><br>
-          <div><b>${data.prefix}${data.first_name} ${data.last_name}</b></div>
-          <div>${data.email || '-'}</div>
+          <img src="${data.picture_url}" class="profile-img">
+          <h3>${data.prefix}${data.first_name} ${data.last_name}</h3>
+          <p class="info-text">${data.email}</p>
           <div class="status-box ${statusClass}">
-            สถานะ: ${data.status === "approved" ? "✅ อนุมัติแล้ว" :
-                      data.status === "pending" ? "🕓 รออนุมัติ" :
-                      "❌ ไม่ผ่านการอนุมัติ"}
+            ${
+              data.status === "approved"
+                ? "✅ ผ่านการอนุมัติแล้ว"
+                : data.status === "pending"
+                ? "🕓 อยู่ระหว่างรอการอนุมัติ"
+                : "❌ ไม่ผ่านการอนุมัติ"
+            }
           </div>
         `;
       } else {
-        // ยังไม่ลงทะเบียน → เปิดฟอร์มให้กรอก
+        // ยังไม่ลงทะเบียน
         form.style.display = "block";
         profileBox.innerHTML = `
-          <img src="${userProfile.pictureUrl}" width="80" style="border-radius:50%;margin-bottom:10px;"><br>
-          <div><b>${userProfile.displayName}</b></div>
-          <div>${email || '-'}</div>
+          <img src="${profile.pictureUrl}" class="profile-img">
+          <h3>${profile.displayName}</h3>
+          <p class="info-text">${email}</p>
         `;
+
         form.onsubmit = async (e) => {
           e.preventDefault();
           const prefix = document.getElementById("prefix").value;
@@ -127,33 +215,32 @@
           const last = document.getElementById("last_name").value;
 
           const { error } = await supabase.from("photographer_registration").insert({
-            user_id: userProfile.userId,
-            display_name: userProfile.displayName,
-            picture_url: userProfile.pictureUrl,
+            user_id: profile.userId,
+            display_name: profile.displayName,
+            picture_url: profile.pictureUrl,
             email,
             prefix,
             first_name: first,
             last_name: last,
           });
 
-          if (error) {
-            alert("❌ ลงทะเบียนไม่สำเร็จ: " + error.message);
-          } else {
-            await fetch(`${supabaseUrl}/functions/v1/notify_telegram`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                user_id: userProfile.userId,
-                display_name: userProfile.displayName,
-                email,
-                prefix,
-                first_name: first,
-                last_name: last,
-              }),
-            });
-            alert("✅ ลงทะเบียนสำเร็จ! รอการอนุมัติจากผู้ดูแล");
-            location.reload();
-          }
+          if (error) return alert("❌ ลงทะเบียนไม่สำเร็จ: " + error.message);
+
+          await fetch(`${supabaseUrl}/functions/v1/notify_telegram`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_id: profile.userId,
+              display_name: profile.displayName,
+              email,
+              prefix,
+              first_name: first,
+              last_name: last,
+            }),
+          });
+
+          alert("✅ ลงทะเบียนสำเร็จ! รอการอนุมัติจากผู้ดูแลระบบ");
+          location.reload();
         };
       }
     }
