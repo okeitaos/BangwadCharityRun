@@ -20,31 +20,34 @@
 
     h1 {
       color: #facc15;
-      text-shadow: 0 0 10px rgba(250,204,21,0.4);
+      text-shadow: 0 0 10px rgba(250, 204, 21, 0.4);
     }
 
     form {
-      background: rgba(255,255,255,0.05);
+      background: rgba(255, 255, 255, 0.05);
       border-radius: 15px;
       padding: 25px;
-      max-width: 400px;
+      max-width: 420px;
       margin: 20px auto;
-      box-shadow: 0 0 15px rgba(0,0,0,0.3);
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
     }
 
     input, select, button {
-      width: 90%;
-      padding: 10px;
-      margin: 8px 0;
+      width: 92%;
+      padding: 12px;
+      margin: 10px 0;
       border-radius: 10px;
-      border: none;
-      outline: none;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08);
+      color: #fff;
       font-size: 1rem;
+      outline: none;
+      transition: 0.3s;
     }
 
-    input, select {
-      background: rgba(255,255,255,0.1);
-      color: #fff;
+    input:focus, select:focus {
+      border-color: #facc15;
+      background: rgba(255,255,255,0.15);
     }
 
     button {
@@ -55,7 +58,10 @@
       transition: 0.3s;
     }
 
-    button:hover { opacity: 0.9; }
+    button:hover {
+      opacity: 0.9;
+      transform: translateY(-2px);
+    }
 
     #status {
       margin-top: 15px;
@@ -69,6 +75,24 @@
       border-radius: 50%;
       border: 3px solid #facc15;
       margin-bottom: 10px;
+    }
+
+    .readonly-info {
+      background: rgba(255,255,255,0.1);
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 15px;
+      text-align: left;
+    }
+
+    .readonly-info p {
+      margin: 5px 0;
+      font-size: 1rem;
+    }
+
+    .status {
+      color: #facc15;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -87,11 +111,12 @@
 
     <input type="text" id="firstName" placeholder="ชื่อจริง" required />
     <input type="text" id="lastName" placeholder="นามสกุล" required />
-    <input type="email" id="email" placeholder="อีเมล" required />
+    <input type="email" id="email" placeholder="อีเมล" required readonly />
 
     <button type="submit">📤 ลงทะเบียน</button>
   </form>
 
+  <div id="registeredInfo" class="readonly-info" style="display:none;"></div>
   <div id="status">กำลังโหลด...</div>
 
   <script>
@@ -101,28 +126,55 @@
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const LIFF_ID = "2001781240-2Px6N01b";
 
-  let userId = "", displayName = "", pictureUrl = "";
+  let userId = "", displayName = "", pictureUrl = "", email = "";
 
   async function main() {
     await liff.init({ liffId: LIFF_ID });
     if (!liff.isLoggedIn()) return liff.login();
 
     const profile = await liff.getProfile();
+    const decoded = liff.getDecodedIDToken();
+
     userId = profile.userId;
     displayName = profile.displayName;
     pictureUrl = profile.pictureUrl;
+    email = decoded?.email || "";
 
     document.getElementById("profileSection").innerHTML = `
       <img src="${pictureUrl}" alt="Profile">
       <p><b>${displayName}</b></p>
     `;
 
-    document.getElementById("status").innerText = "กรอกข้อมูลเพื่อลงทะเบียน";
+    document.getElementById("email").value = email;
+
+    // ตรวจสอบว่าลงทะเบียนแล้วหรือไม่
+    const { data } = await sb
+      .from("photographer_registration")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (data) {
+      showRegisteredInfo(data);
+    } else {
+      document.getElementById("status").innerText = "กรอกข้อมูลเพื่อลงทะเบียน";
+    }
   }
 
-  main();
+  function showRegisteredInfo(data) {
+    document.getElementById("registerForm").style.display = "none";
+    document.getElementById("registeredInfo").style.display = "block";
 
-  // ✅ แจ้งเตือน Telegram
+    document.getElementById("registeredInfo").innerHTML = `
+      <p><b>คำนำหน้า:</b> ${data.prefix}</p>
+      <p><b>ชื่อ:</b> ${data.first_name}</p>
+      <p><b>นามสกุล:</b> ${data.last_name}</p>
+      <p class="status"><b>สถานะ:</b> ${data.status}</p>
+    `;
+
+    document.getElementById("status").innerText = "✅ คุณได้ลงทะเบียนแล้ว";
+  }
+
   async function notifyTelegram(data) {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/notify_telegram`, {
@@ -134,7 +186,6 @@
         },
         body: JSON.stringify(data),
       });
-
       const result = await res.json();
       console.log("📨 Telegram notify:", result);
     } catch (err) {
@@ -142,16 +193,13 @@
     }
   }
 
-  // ✅ เมื่อกดปุ่มลงทะเบียน
   document.getElementById("registerForm").onsubmit = async (e) => {
     e.preventDefault();
-
     const prefix = document.getElementById("prefix").value;
     const first_name = document.getElementById("firstName").value.trim();
     const last_name = document.getElementById("lastName").value.trim();
-    const email = document.getElementById("email").value.trim();
-
     const statusBox = document.getElementById("status");
+
     statusBox.innerText = "⏳ กำลังลงทะเบียน...";
 
     const insertData = {
@@ -162,7 +210,7 @@
       prefix,
       first_name,
       last_name,
-      status: "pending"
+      status: "pending",
     };
 
     const { error } = await sb
@@ -175,12 +223,11 @@
       return;
     }
 
-    // ✅ ส่งแจ้งเตือน Telegram
     await notifyTelegram(insertData);
-
-    statusBox.innerText = "✅ ลงทะเบียนสำเร็จ! ระบบจะแจ้งเตือนผู้ดูแลทาง Telegram แล้ว";
-    document.getElementById("registerForm").reset();
+    showRegisteredInfo(insertData);
   };
+
+  main();
   </script>
 </body>
 </html>
