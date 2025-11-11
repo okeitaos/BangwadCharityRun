@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🛠️ Admin Upload Manager</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  body {
+    font-family: "Prompt", sans-serif;
+    background: #0f172a;
+    color: #fff;
+    margin: 0;
+    padding: 20px;
+    text-align: center;
+  }
+  h1 {
+    color: #facc15;
+    text-shadow: 0 0 10px rgba(250,204,21,0.4);
+  }
+  table {
+    width: 95%;
+    max-width: 900px;
+    margin: 20px auto;
+    border-collapse: collapse;
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  th, td {
+    padding: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  th {
+    background: rgba(255,255,255,0.1);
+    color: #facc15;
+  }
+  tr:hover { background: rgba(255,255,255,0.1); }
+
+  button {
+    border: none;
+    padding: 6px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+    color: #fff;
+    transition: 0.2s;
+  }
+  .btn-view { background: #2563eb; }
+  .btn-delete { background: #dc2626; }
+  .btn-back { background: #475569; margin-top: 20px; }
+  .btn-delete:hover { background: #b91c1c; }
+  .btn-view:hover { background: #1e3a8a; }
+
+  #gallery {
+    display: none;
+    margin-top: 30px;
+  }
+  .thumb {
+    width: 150px;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 10px;
+    margin: 5px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .thumb:hover { transform: scale(1.05); }
+  #userHeader { margin: 20px 0; font-size: 1.2rem; color: #facc15; }
+</style>
+</head>
+
+<body>
+<h1>🛠️ Admin Upload Manager</h1>
+
+<div id="userTableSection">
+  <h2>รายชื่อผู้ใช้ทั้งหมด</h2>
+  <table id="userTable">
+    <thead>
+      <tr>
+        <th>โปรไฟล์</th>
+        <th>ชื่อผู้ใช้</th>
+        <th>จำนวนรูป</th>
+        <th>จัดการ</th>
+      </tr>
+    </thead>
+    <tbody id="userList">
+      <tr><td colspan="4">⏳ กำลังโหลด...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div id="gallery">
+  <h2 id="userHeader">📸 รูปของผู้ใช้</h2>
+  <div id="imageGrid"></div>
+  <button class="btn-delete" onclick="deleteAllFromUser()">🗑️ ลบรูปทั้งหมดของคนนี้</button>
+  <button class="btn-back" onclick="backToUserList()">⬅️ กลับไปหน้าเดิม</button>
+</div>
+
+<script>
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // ใช้ Service Role เท่านั้น!
+const BUCKET = "gallery";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+let currentUserId = "";
+let currentUserName = "";
+let allUsers = [];
+
+/* ✅ โหลดรายชื่อผู้ใช้ทั้งหมด */
+async function loadUsers() {
+  const { data, error } = await sb.from("file_hashes")
+    .select("user_id, profile_name, profile_pic, file_path")
+    .order("user_id");
+
+  if (error) {
+    alert("❌ โหลดข้อมูลไม่สำเร็จ");
+    console.error(error);
+    return;
+  }
+
+  // รวมตาม user
+  const users = {};
+  data.forEach(row => {
+    if (!users[row.user_id]) {
+      users[row.user_id] = {
+        profile_name: row.profile_name || "ไม่ทราบชื่อ",
+        profile_pic: row.profile_pic || "",
+        files: []
+      };
+    }
+    users[row.user_id].files.push(row.file_path);
+  });
+
+  allUsers = Object.entries(users);
+  renderUserTable();
+}
+
+/* ✅ แสดงตารางผู้ใช้ */
+function renderUserTable() {
+  const tbody = document.getElementById("userList");
+  tbody.innerHTML = "";
+  allUsers.forEach(([uid, info]) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><img src="${info.profile_pic}" width="50" height="50" style="border-radius:50%;"></td>
+      <td>${info.profile_name}</td>
+      <td>${info.files.length}</td>
+      <td>
+        <button class="btn-view" onclick="viewUser('${uid}','${info.profile_name}')">ดูรูป</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ✅ ดูรูปของ user */
+async function viewUser(uid, name) {
+  currentUserId = uid;
+  currentUserName = name;
+  document.getElementById("userTableSection").style.display = "none";
+  document.getElementById("gallery").style.display = "block";
+  document.getElementById("userHeader").innerText = `📸 รูปของ: ${name}`;
+
+  const { data, error } = await sb.storage.from(BUCKET).list(`${uid}/`, { limit: 10000 });
+  if (error) return alert("โหลดรูปไม่สำเร็จ");
+  
+  const grid = document.getElementById("imageGrid");
+  grid.innerHTML = "";
+  if (!data.length) {
+    grid.innerHTML = "<p>❌ ไม่มีรูป</p>";
+    return;
+  }
+
+  data.forEach(f => {
+    const url = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${uid}/${f.name}`;
+    const img = document.createElement("img");
+    img.src = url;
+    img.className = "thumb";
+    img.title = f.name;
+    img.onclick = () => deleteSingle(uid, f.name);
+    grid.appendChild(img);
+  });
+}
+
+/* 🗑️ ลบรูปเดี่ยว */
+async function deleteSingle(uid, name) {
+  if (!confirm(`⚠️ ต้องการลบไฟล์นี้หรือไม่?\n${name}`)) return;
+  const path = `${uid}/${name}`;
+  await sb.storage.from(BUCKET).remove([path]);
+  await sb.from("file_hashes").delete().eq("file_path", path);
+  alert(`✅ ลบรูป ${name} เรียบร้อย`);
+  await viewUser(uid, currentUserName);
+}
+
+/* 🗑️ ลบทั้งหมดของ user */
+async function deleteAllFromUser() {
+  const confirmText = prompt(`⚠️ ต้องการลบรูปทั้งหมดของ "${currentUserName}"?\nพิมพ์ CONFIRM เพื่อยืนยัน:`);
+  if (confirmText !== "CONFIRM") return alert("❌ ยกเลิกการลบทั้งหมด");
+
+  const { data } = await sb.storage.from(BUCKET).list(`${currentUserId}/`, { limit: 10000 });
+  const files = data.map(f => `${currentUserId}/${f.name}`);
+
+  if (files.length) {
+    await sb.storage.from(BUCKET).remove(files);
+    await sb.from("file_hashes").delete().eq("user_id", currentUserId);
+  }
+
+  alert(`✅ ลบรูปทั้งหมดของ ${currentUserName} เรียบร้อย`);
+  backToUserList();
+}
+
+/* 🔙 กลับหน้าหลัก */
+function backToUserList() {
+  document.getElementById("gallery").style.display = "none";
+  document.getElementById("userTableSection").style.display = "block";
+  loadUsers();
+}
+
+loadUsers();
+</script>
+</body>
+</html>
