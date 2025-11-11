@@ -127,20 +127,53 @@ let allFiles = [];
 let currentPage = 1;
 const PAGE_SIZE = 15;
 
-/* 🟢 เริ่มต้น LIFF */
+/* 🟢 เริ่มต้น LIFF + ตรวจสอบสิทธิ์ */
 async function main() {
   await liff.init({ liffId: LIFF_ID });
-  if (!liff.isLoggedIn()) document.getElementById("loginSection").style.display = "block";
-  else {
-    const profile = await liff.getProfile();
-    userId = profile.userId;
-    profileName = profile.displayName;
-    profilePic = profile.pictureUrl;
-    showUploadSection();
-    await loadExistingHashes();
-    await listUserFiles();
+
+  if (!liff.isLoggedIn()) {
+    document.getElementById("loginSection").style.display = "block";
+    return;
   }
+
+  const profile = await liff.getProfile();
+  userId = profile.userId;
+  profileName = profile.displayName;
+  profilePic = profile.pictureUrl;
+
+  // ✅ ตรวจสอบสิทธิ์จากตาราง photographer_registration
+  const { data, error } = await sb
+    .from("photographer_registration")
+    .select("status, prefix, first_name, last_name")
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !data) {
+    document.body.innerHTML = `
+      <h1 style="color:#ef4444;">🚫 ไม่มีสิทธิ์ใช้งาน</h1>
+      <p>บัญชีนี้ยังไม่ผ่านการลงทะเบียนช่างภาพ</p>
+      <p><a href="https://okeitaos.github.io/BangwadCharityRun/photographer/register.html"
+        style="color:#3b82f6;">คลิกที่นี่เพื่อลงทะเบียน</a></p>
+    `;
+    return;
+  }
+
+  if (data.status !== "approved") {
+    document.body.innerHTML = `
+      <h1 style="color:#facc15;">⏳ รอการอนุมัติ</h1>
+      <p>บัญชีของคุณ (${data.prefix}${data.first_name} ${data.last_name})</p>
+      <p>ยังไม่ได้รับการอนุมัติจากผู้ดูแลระบบ</p>
+    `;
+    return;
+  }
+
+  // ✅ ผ่านการตรวจสอบแล้ว แสดงหน้า upload
+  showUploadSection();
+  await loadExistingHashes();
+  await listUserFiles();
 }
+
+/* 👇 ฟังก์ชันทั้งหมดด้านล่างเหมือนเดิม ห้ามแก้ไข */
 function login() { liff.login(); }
 function logout() { liff.logout(); location.reload(); }
 
@@ -258,7 +291,7 @@ async function deleteFile(name) {
   await listUserFiles();
 }
 
-/* ⚠️ ลบทั้งหมด (ต้องพิมพ์ CONFIRM ก่อน) */
+/* ⚠️ ลบทั้งหมด */
 async function deleteAllFiles() {
   const confirmText = prompt("⚠️ ต้องการลบรูปทั้งหมดของคุณหรือไม่?\nพิมพ์ CONFIRM เพื่อยืนยัน:");
   if (confirmText !== "CONFIRM") return alert("❌ ยกเลิกการลบทั้งหมด");
@@ -274,7 +307,7 @@ async function deleteAllFiles() {
   await listUserFiles();
 }
 
-/* 🔄 รีเซ็ต Progress */
+/* 🔄 รีเฟรช Progress */
 function refreshProgress() {
   document.getElementById("progressBar").style.width = "0%";
   document.getElementById("progressText").innerText = "0%";
@@ -284,5 +317,6 @@ function refreshProgress() {
 
 main();
 </script>
+
 </body>
 </html>
