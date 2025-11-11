@@ -190,6 +190,51 @@ async function loadExistingHashes() {
 }
 
 /* 📤 อัปโหลดไฟล์ */
+// async function uploadFiles() {
+//   const files = document.getElementById("fileInput").files;
+//   const status = document.getElementById("status");
+//   const progressBar = document.getElementById("progressBar");
+//   const progressText = document.getElementById("progressText");
+//   if (!files.length) return alert("กรุณาเลือกไฟล์");
+//   if (files.length > 1000) return alert("อัปโหลดได้ไม่เกิน 1,000 รูปต่อครั้ง");
+
+//   status.innerText = "⏳ กำลังตรวจสอบ...";
+//   let success = 0, skipDup = 0, skipBig = 0;
+//   const total = files.length;
+
+//   for (let i = 0; i < total; i++) {
+//     const f = files[i];
+//     if (f.size > 5 * 1024 * 1024) { skipBig++; continue; }
+
+//     const buffer = await f.arrayBuffer();
+//     const hash = sha256(buffer);
+//     if (existingHashes.has(hash)) { skipDup++; continue; }
+
+//     const safeName = f.name.replace(/[^\w.-]+/g, "_").slice(0, 100);
+//     const path = `${userId}/${Date.now()}_${safeName}`;
+//     const { error } = await sb.storage.from(BUCKET).upload(path, f);
+//     if (!error) {
+//       await sb.from("file_hashes").insert({
+//         user_id: userId,
+//         profile_name: profileName,
+//         profile_pic: profilePic,
+//         file_path: path,
+//         hash
+//       });
+//       existingHashes.add(hash);
+//       success++;
+//     }
+//     const percent = Math.round(((i + 1) / total) * 100);
+//     progressBar.style.width = `${percent}%`;
+//     progressText.innerText = `${i + 1}/${total} (${percent}%)`;
+//   }
+
+//   status.innerText = `✅ สำเร็จ ${success}, ซ้ำ ${skipDup}, เกินขนาด ${skipBig}`;
+//   progressBar.style.width = "100%";
+//   progressText.innerText = "เสร็จสิ้น ✅";
+//   await listUserFiles();
+// }
+  /* 📤 อัปโหลดไฟล์ผ่าน Edge Function */
 async function uploadFiles() {
   const files = document.getElementById("fileInput").files;
   const status = document.getElementById("status");
@@ -198,42 +243,56 @@ async function uploadFiles() {
   if (!files.length) return alert("กรุณาเลือกไฟล์");
   if (files.length > 1000) return alert("อัปโหลดได้ไม่เกิน 1,000 รูปต่อครั้ง");
 
-  status.innerText = "⏳ กำลังตรวจสอบ...";
-  let success = 0, skipDup = 0, skipBig = 0;
+  status.innerText = "⏳ กำลังอัปโหลดผ่าน Edge Function...";
+  let success = 0, skipBig = 0, fail = 0;
   const total = files.length;
 
   for (let i = 0; i < total; i++) {
     const f = files[i];
-    if (f.size > 5 * 1024 * 1024) { skipBig++; continue; }
-
-    const buffer = await f.arrayBuffer();
-    const hash = sha256(buffer);
-    if (existingHashes.has(hash)) { skipDup++; continue; }
-
-    const safeName = f.name.replace(/[^\w.-]+/g, "_").slice(0, 100);
-    const path = `${userId}/${Date.now()}_${safeName}`;
-    const { error } = await sb.storage.from(BUCKET).upload(path, f);
-    if (!error) {
-      await sb.from("file_hashes").insert({
-        user_id: userId,
-        profile_name: profileName,
-        profile_pic: profilePic,
-        file_path: path,
-        hash
-      });
-      existingHashes.add(hash);
-      success++;
+    if (f.size > 5 * 1024 * 1024) { 
+      skipBig++; 
+      continue; 
     }
+
+    const formData = new FormData();
+    formData.append("user_id", userId);
+    formData.append("profile_name", profileName);
+    formData.append("profile_pic", profilePic);
+    formData.append("file", f);
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/upload_image`, {
+        method: "POST",
+        body: formData
+      });
+
+      const result = await res.json();
+
+      if (result.success) {
+        success++;
+      } else {
+        console.warn("Upload fail:", result);
+        fail++;
+      }
+    } catch (err) {
+      console.error("❌ Upload Error:", err);
+      fail++;
+    }
+
+    // ✅ อัปเดต Progress Bar
     const percent = Math.round(((i + 1) / total) * 100);
     progressBar.style.width = `${percent}%`;
     progressText.innerText = `${i + 1}/${total} (${percent}%)`;
   }
 
-  status.innerText = `✅ สำเร็จ ${success}, ซ้ำ ${skipDup}, เกินขนาด ${skipBig}`;
+  status.innerText = `✅ สำเร็จ ${success}, ❌ ล้มเหลว ${fail}, 📦 เกินขนาด ${skipBig}`;
   progressBar.style.width = "100%";
   progressText.innerText = "เสร็จสิ้น ✅";
+
+  // ✅ โหลดรายการไฟล์ใหม่
   await listUserFiles();
 }
+
 
 /* 📜 โหลดรายการ */
 async function listUserFiles() {
