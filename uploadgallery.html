@@ -102,12 +102,12 @@
     <div id="progressText">0%</div>
   </div>
   
-<div id="uploadControls" style="margin-top:15px;">
-  <p id="eta" style="color:#facc15;font-size:0.9rem;">🕒 ประมาณเวลา: -</p>
-  <button id="pauseBtn" class="btn-gray" style="display:none;" onclick="pauseUpload()">⏸️ พัก</button>
-  <button id="resumeBtn" class="btn-green" style="display:none;" onclick="resumeUpload()">▶️ ดำเนินต่อ</button>
-  <button id="cancelBtn" class="btn-red" style="display:none;" onclick="cancelUpload()">⏹️ ยกเลิก</button>
-</div>
+  <div id="uploadControls" style="margin-top:15px;">
+    <p id="eta" style="color:#facc15;font-size:0.9rem;">🕒 ประมาณเวลา: -</p>
+    <button id="pauseBtn" class="btn-gray" style="display:none;" onclick="pauseUpload()">⏸️ พัก</button>
+    <button id="resumeBtn" class="btn-green" style="display:none;" onclick="resumeUpload()">▶️ ดำเนินต่อ</button>
+    <button id="cancelBtn" class="btn-red" style="display:none;" onclick="cancelUpload()">⏹️ ยกเลิก</button>
+  </div>
 
   <div id="status">⏳ รออัปโหลด...</div>
   <p id="totalCount">📸 อัปโหลดทั้งหมด: 0 รูป</p>
@@ -164,16 +164,14 @@ async function main() {
     document.body.innerHTML = `
       <h1 style="color:#ef4444;">🚫 ไม่มีสิทธิ์ใช้งาน</h1>
       <p>บัญชีนี้ยังไม่ผ่านการลงทะเบียนช่างภาพ</p>
-      <p><a href="https://okeitaos.github.io/BangwadCharityRun/photographer/register.html"
-        style="color:#3b82f6;">คลิกที่นี่เพื่อลงทะเบียน</a></p>`;
+      <p><a href="https://okeitaos.github.io/BangwadCharityRun/photographer/register.html" style="color:#3b82f6;">คลิกที่นี่เพื่อลงทะเบียน</a></p>`;
     return;
   }
 
   if (data.status !== "approved") {
     document.body.innerHTML = `
       <h1 style="color:#facc15;">⏳ รอการอนุมัติ</h1>
-      <p>บัญชีของคุณ (${data.prefix}${data.first_name} ${data.last_name})</p>
-      <p>ยังไม่ได้รับการอนุมัติจากผู้ดูแลระบบ</p>`;
+      <p>บัญชีของคุณ (${data.prefix}${data.first_name} ${data.last_name}) ยังไม่ได้รับการอนุมัติจากผู้ดูแลระบบ</p>`;
     return;
   }
 
@@ -182,6 +180,7 @@ async function main() {
   await listUserFiles();
 }
 
+/* 👇 ฟังก์ชันทั้งหมดเหมือนเดิม */
 function login() { liff.login(); }
 function logout() { liff.logout(); location.reload(); }
 
@@ -191,26 +190,13 @@ function showUploadSection() {
   document.getElementById("userProfile").innerHTML = `<img src="${profilePic}" alt=""><p>${profileName}</p>`;
 }
 
-/* 🧩 โหลด hash ที่มีอยู่แล้ว */
+/* 🧩 โหลด hash */
 async function loadExistingHashes() {
   const { data } = await sb.from("file_hashes").select("hash").eq("user_id", userId);
   existingHashes = new Set(data?.map(x => x.hash));
 }
 
-/* ✅ ตรวจสอบไฟล์ซ้ำก่อนอัปโหลด */
-async function checkDuplicateFiles(files) {
-  const duplicateList = [];
-  for (const f of files) {
-    const buffer = await f.arrayBuffer();
-    const hash = sha256(buffer);
-    if (existingHashes.has(hash)) {
-      duplicateList.push(f.name);
-    }
-  }
-  return duplicateList;
-}
-
-/* 📤 อัปโหลดไฟล์ผ่าน Edge Function */
+/* 📤 อัปโหลดไฟล์ (เร็วขึ้น ไม่ตรวจ hash ก่อน) */
 async function uploadFiles() {
   cancelRequested = false;
   paused = false;
@@ -227,31 +213,18 @@ async function uploadFiles() {
 
   if (!files.length) return alert("กรุณาเลือกไฟล์");
 
-  // ✅ ตรวจไฟล์ซ้ำก่อนอัปโหลด
-  status.innerText = "🔍 กำลังตรวจสอบไฟล์ซ้ำ...";
-  await loadExistingHashes();
-  const duplicateFiles = await checkDuplicateFiles(files);
-  if (duplicateFiles.length > 0) {
-    alert(`⛔️ พบไฟล์ซ้ำ ${duplicateFiles.length} ไฟล์\n\n${duplicateFiles.join("\n")}\n\nไฟล์เหล่านี้จะไม่ถูกอัปโหลด`);
-  }
-  const filteredFiles = files.filter(f => !duplicateFiles.includes(f.name));
-  if (filteredFiles.length === 0) {
-    status.innerText = "❌ ไม่มีไฟล์ใหม่ให้อัปโหลด";
-    return;
-  }
-
   cancelBtn.style.display = "inline-block";
   pauseBtn.style.display = "inline-block";
   resumeBtn.style.display = "none";
 
   const MAX_CONCURRENT = 10;
-  const total = filteredFiles.length;
+  const total = files.length;
   let success = 0, fail = 0, skipBig = 0, completed = 0;
   let startTime = Date.now();
 
-  queueContainer.innerHTML = filteredFiles.map(f => `
+  queueContainer.innerHTML = files.map((f, i) => `
     <div id="queue-${sha256(f.name)}" style="background:rgba(255,255,255,0.08);margin:5px 0;padding:8px;border-radius:10px;display:flex;align-items:center;justify-content:space-between;">
-      <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.name}</span>
+      <span style="flex:1;">#${i + 1} ${f.name}</span>
       <div style="width:35%;height:8px;background:rgba(255,255,255,0.1);border-radius:5px;overflow:hidden;margin:0 5px;">
         <div id="bar-${sha256(f.name)}" style="height:8px;width:0%;background:linear-gradient(90deg,#22c55e,#84cc16);"></div>
       </div>
@@ -268,7 +241,7 @@ async function uploadFiles() {
 
     if (f.size > 5 * 1024 * 1024) {
       skipBig++;
-      textEl.innerText = "❌ ขนาดเกิน 5MB";
+      textEl.innerText = "❌ เกิน 5MB";
       barEl.style.background = "#ef4444";
       return;
     }
@@ -279,11 +252,15 @@ async function uploadFiles() {
     formData.append("profile_pic", profilePic);
     formData.append("file", f);
 
-    textEl.innerText = "📤 กำลังอัปโหลด...";
+    textEl.innerText = "📤 อัปโหลด...";
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/upload_image`, { method: "POST", body: formData });
       const result = await res.json();
-      if (result.success) {
+
+      if (result.duplicate) {
+        textEl.innerText = "⚠️ ซ้ำ (ถูกข้าม)";
+        barEl.style.background = "#f59e0b";
+      } else if (result.success) {
         textEl.innerText = "✅ สำเร็จ";
         barEl.style.width = "100%";
       } else {
@@ -291,7 +268,7 @@ async function uploadFiles() {
         barEl.style.background = "#ef4444";
       }
     } catch {
-      textEl.innerText = "⚠️ ข้อผิดพลาด";
+      textEl.innerText = "⚠️ Error";
       barEl.style.background = "#ef4444";
       fail++;
     }
@@ -304,13 +281,12 @@ async function uploadFiles() {
     const elapsed = (Date.now() - startTime) / 1000;
     const avg = elapsed / completed;
     const remaining = (total - completed) * avg;
-    etaEl.innerText = `🕒 ประมาณเวลา: ${Math.floor(remaining / 60)} นาที ${Math.floor(remaining % 60)} วินาที`;
+    etaEl.innerText = `🕒 ประมาณ: ${Math.floor(remaining / 60)} นาที ${Math.floor(remaining % 60)} วิ`;
   }
 
   for (let i = 0; i < total; i += MAX_CONCURRENT) {
     if (cancelRequested) break;
-    while (paused) await new Promise(r => resumePromise = r);
-    const batch = filteredFiles.slice(i, i + MAX_CONCURRENT);
+    const batch = files.slice(i, i + MAX_CONCURRENT);
     await Promise.all(batch.map(uploadSingleFile));
   }
 
@@ -320,17 +296,18 @@ async function uploadFiles() {
   progressText.innerText = cancelRequested ? "⏹️ ยกเลิกแล้ว" : "✅ เสร็จสิ้น";
 }
 
-function cancelUpload() { if (confirm("แน่ใจหรือไม่ที่จะยกเลิกการอัปโหลดทั้งหมด?")) cancelRequested = true; }
-function pauseUpload() { paused = true; document.getElementById("pauseBtn").style.display = "none"; document.getElementById("resumeBtn").style.display = "inline-block"; document.getElementById("eta").innerText = "⏸️ การอัปโหลดถูกพักชั่วคราว"; }
+/* 🛑 ยกเลิก / พัก / ดำเนินต่อ */
+function cancelUpload() { if (confirm("แน่ใจหรือไม่ที่จะยกเลิก?")) cancelRequested = true; }
+function pauseUpload() { paused = true; document.getElementById("pauseBtn").style.display = "none"; document.getElementById("resumeBtn").style.display = "inline-block"; document.getElementById("eta").innerText = "⏸️ พักชั่วคราว"; }
 function resumeUpload() { paused = false; if (resumePromise) resumePromise(); document.getElementById("pauseBtn").style.display = "inline-block"; document.getElementById("resumeBtn").style.display = "none"; }
 
+/* 📜 โหลดรายการ / ลบ / ค้นหา */
 async function listUserFiles() {
   const { data } = await sb.storage.from(BUCKET).list(`${userId}/`, { limit: 10000 });
   allFiles = data?.filter(f => f.name !== ".emptyFolderPlaceholder") || [];
-  document.getElementById("totalCount").innerText = `📸 อัปโหลดทั้งหมด: ${allFiles.length} รูป`;
+  document.getElementById("totalCount").innerText = `📸 ${allFiles.length} รูป`;
   renderPage(1);
 }
-
 function renderPage(page) {
   const list = document.getElementById("fileList");
   const start = (page - 1) * PAGE_SIZE;
@@ -370,14 +347,14 @@ async function deleteFile(name) {
 }
 
 async function deleteAllFiles() {
-  const confirmText = prompt("⚠️ ต้องการลบรูปทั้งหมดของคุณหรือไม่?\nพิมพ์ CONFIRM เพื่อยืนยัน:");
-  if (confirmText !== "CONFIRM") return alert("❌ ยกเลิกการลบทั้งหมด");
+  const confirmText = prompt("⚠️ ต้องการลบทั้งหมด?\nพิมพ์ CONFIRM เพื่อยืนยัน:");
+  if (confirmText !== "CONFIRM") return alert("❌ ยกเลิก");
   const { data } = await sb.storage.from(BUCKET).list(`${userId}/`, { limit: 10000 });
   const files = data?.map(f => `${userId}/${f.name}`) || [];
   if (!files.length) return alert("ไม่มีรูปให้ลบ");
   await sb.storage.from(BUCKET).remove(files);
   await sb.from("file_hashes").delete().eq("user_id", userId);
-  alert("✅ ลบรูปทั้งหมดเรียบร้อยแล้ว");
+  alert("✅ ลบเรียบร้อยแล้ว");
   await listUserFiles();
 }
 
