@@ -3,90 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📸 ลงทะเบียนช่างภาพ | Bangwad Charity Run</title>
+<title>📸 ลงทะเบียนช่างภาพ</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <style>
-  body {
-    font-family: "Prompt", sans-serif;
-    background: linear-gradient(135deg, #0f172a, #1e293b);
-    color: #fff;
-    text-align: center;
-    padding: 30px;
-    min-height: 100vh;
-  }
-
-  h1 {
-    color: #facc15;
-    text-shadow: 0 0 10px rgba(250,204,21,0.5);
-  }
-
-  input, select {
-    width: 90%;
-    max-width: 400px;
-    margin: 10px 0;
-    padding: 10px;
-    border-radius: 10px;
-    border: none;
-    outline: none;
-    font-size: 1rem;
-    text-align: center;
-    background: rgba(255,255,255,0.1);
-    color: #fff;
-  }
-
-  button {
-    background: linear-gradient(90deg, #06C755, #00B900);
-    color: white;
-    border: none;
-    border-radius: 25px;
-    padding: 10px 25px;
-    cursor: pointer;
-    font-weight: bold;
-    margin-top: 15px;
-  }
-
-  button:hover {
-    background: #009d48;
-  }
-
-  #profilePic {
-    width: 90px;
-    height: 90px;
-    border-radius: 50%;
-    border: 3px solid #facc15;
-    margin-bottom: 10px;
-  }
-
-  #status {
-    margin-top: 15px;
-    font-weight: 600;
-    color: #facc15;
-  }
-
-  .hidden { display: none; }
-
+  body { font-family: "Prompt", sans-serif; background: #0f172a; color: #fff; text-align: center; padding: 20px; }
+  input, select { padding: 10px; border-radius: 8px; border: none; margin: 8px; width: 80%; max-width: 400px; }
+  button { padding: 10px 20px; border-radius: 25px; border: none; color: #fff; background: #06C755; cursor: pointer; margin-top: 10px; }
+  button:hover { background: #00B900; }
 </style>
 </head>
 <body>
-  <h1>📸 ลงทะเบียนช่างภาพ</h1>
-
-  <div id="profileSection"></div>
-
-  <form id="registerForm">
-    <select id="prefix">
-      <option value="นาย">นาย</option>
-      <option value="นาง">นาง</option>
-      <option value="นางสาว">นางสาว</option>
-    </select><br>
-    <input type="text" id="firstName" placeholder="ชื่อ" required><br>
-    <input type="text" id="lastName" placeholder="นามสกุล" required><br>
-    <input type="email" id="email" placeholder="อีเมล" required><br>
-    <button type="submit">📤 ลงทะเบียน</button>
-  </form>
-
-  <div id="status">⏳ กำลังโหลดข้อมูล...</div>
+<h1>📸 ลงทะเบียนช่างภาพ</h1>
+<form id="registerForm">
+  <div id="profileInfo"></div>
+  <select id="prefix" required>
+    <option value="">-- คำนำหน้า --</option>
+    <option>นาย</option>
+    <option>นางสาว</option>
+    <option>นาง</option>
+  </select><br>
+  <input type="text" id="first_name" placeholder="ชื่อ" required><br>
+  <input type="text" id="last_name" placeholder="นามสกุล" required><br>
+  <button type="submit">📤 ลงทะเบียน</button>
+</form>
+<p id="status"></p>
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
@@ -94,122 +35,58 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const LIFF_ID = "2001781240-2Px6N01b";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-window.onload = async () => {
+let userId = "", displayName = "", pictureUrl = "", email = "";
+
+async function init() {
   await liff.init({ liffId: LIFF_ID });
   if (!liff.isLoggedIn()) return liff.login();
-
   const profile = await liff.getProfile();
-  const email = (await liff.getDecodedIDToken()).email || "";
-  const userId = profile.userId;
-  const displayName = profile.displayName;
-  const pictureUrl = profile.pictureUrl;
+  userId = profile.userId;
+  displayName = profile.displayName;
+  pictureUrl = profile.pictureUrl || "";
+  email = (await liff.getDecodedIDToken()).email || "";
 
-  document.getElementById("profileSection").innerHTML = `
-    <img id="profilePic" src="${pictureUrl}">
-    <p>${displayName}</p>
+  document.getElementById("profileInfo").innerHTML = `
+    <img src="${pictureUrl}" width="80" style="border-radius:50%;border:2px solid #facc15;"><br>
+    <b>${displayName}</b><br>
+    <small>${email}</small><br><br>
   `;
-
-  await checkRegistrationStatus(userId, displayName, pictureUrl, email);
-};
-
-// ✅ ตรวจสอบสถานะ
-async function checkRegistrationStatus(userId, displayName, pictureUrl, email) {
-  const { data, error } = await sb
-    .from("photographer_registration")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  const form = document.getElementById("registerForm");
-  const statusDiv = document.getElementById("status");
-
-  if (data) {
-    form.style.display = "none";
-
-    if (data.status === "approved")
-      statusDiv.innerText = `✅ ได้รับการอนุมัติแล้ว (${data.prefix}${data.first_name} ${data.last_name})`;
-    else if (data.status === "pending")
-      statusDiv.innerText = `⌛ รอการตรวจสอบ (${data.prefix}${data.first_name} ${data.last_name})`;
-    else if (data.status === "rejected")
-      statusDiv.innerText = `❌ คำขอถูกปฏิเสธ (${data.prefix}${data.first_name} ${data.last_name})`;
-    return;
-  }
-
-  // ถ้ายังไม่ลงทะเบียน แสดงฟอร์ม
-  form.style.display = "block";
-  statusDiv.innerText = "📝 โปรดกรอกข้อมูลเพื่อลงทะเบียน";
-
-  const emailInput = document.getElementById("email");
-  emailInput.value = email || "";
-  form.onsubmit = (e) => handleRegister(e, userId, displayName, pictureUrl, email);
 }
+init();
 
-// ✅ ลงทะเบียน
-async function handleRegister(e, userId, displayName, pictureUrl, emailInput) {
+document.getElementById("registerForm").onsubmit = async (e) => {
   e.preventDefault();
-  const prefix = document.getElementById("prefix").value;
-  const firstName = document.getElementById("firstName").value.trim();
-  const lastName = document.getElementById("lastName").value.trim();
-  const email = document.getElementById("email").value.trim();
-  const status = document.getElementById("status");
+  const prefix = prefix.value;
+  const first_name = first_name.value.trim();
+  const last_name = last_name.value.trim();
+  const statusText = document.getElementById("status");
+  statusText.innerText = "⏳ กำลังส่งข้อมูล...";
 
-  status.innerText = "⏳ กำลังบันทึกข้อมูล...";
-
-  // ตรวจซ้ำ
-  const { data: existing } = await sb
-    .from("photographer_registration")
-    .select("status")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (existing) {
-    status.innerText = "⚠️ คุณได้ลงทะเบียนแล้ว";
-    return;
-  }
-
-  // บันทึกใหม่
   const { error } = await sb.from("photographer_registration").insert([{
     user_id: userId,
     display_name: displayName,
     picture_url: pictureUrl,
     email,
     prefix,
-    first_name: firstName,
-    last_name: lastName,
+    first_name,
+    last_name,
     status: "pending"
   }]);
 
-  if (error) {
-    console.error(error);
-    status.innerText = "❌ บันทึกข้อมูลไม่สำเร็จ";
+  if (error && error.code === "23505") {
+    statusText.innerText = "⚠️ คุณลงทะเบียนแล้ว";
     return;
   }
 
-  // ✅ แจ้ง Telegram
+  // 🔔 แจ้ง Telegram
   await fetch(`${SUPABASE_URL}/functions/v1/notify_telegram`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${SUPABASE_KEY}`,
-      "apikey": SUPABASE_KEY
-    },
-    body: JSON.stringify({
-      user_id: userId,
-      text: `
-🆕 *ช่างภาพลงทะเบียนใหม่*
-👤 ${prefix}${firstName} ${lastName}
-📧 ${email}
-📱 ${displayName}
-🪪 ${userId}
-⏰ ${new Date().toLocaleString("th-TH")}
-`,
-      image_url: pictureUrl
-    })
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId, display_name, picture_url: pictureUrl, email, prefix, first_name, last_name })
   });
 
-  status.innerText = "✅ ลงทะเบียนสำเร็จ รอการอนุมัติจากผู้ดูแล";
-  document.getElementById("registerForm").style.display = "none";
-}
+  statusText.innerText = "✅ ลงทะเบียนสำเร็จ! กรุณารอการอนุมัติ";
+};
 </script>
 </body>
 </html>
