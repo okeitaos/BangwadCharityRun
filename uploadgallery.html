@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📤 LINE Upload Gallery</title>
+<title>📤 LINE Upload Gallery</title>ำ
 
 <!-- LINE LIFF & Supabase -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -104,6 +104,9 @@
 
   <div id="status">⏳ รออัปโหลด...</div>
   <p id="totalCount">📸 อัปโหลดทั้งหมด: 0 รูป</p>
+  
+  <!-- 📋 Upload Queue -->
+  <div id="uploadQueue" style="max-width:600px;margin:20px auto;text-align:left;"></div>
 
   <input type="text" id="searchInput" placeholder="🔍 ค้นหาชื่อไฟล์...">
   <ul id="fileList"></ul>
@@ -234,24 +237,49 @@ async function loadExistingHashes() {
 //   progressText.innerText = "เสร็จสิ้น ✅";
 //   await listUserFiles();
 // }
-  /* 📤 อัปโหลดไฟล์ผ่าน Edge Function */
+/* 📤 อัปโหลดไฟล์ผ่าน Edge Function (Parallel + Queue UI) */
 async function uploadFiles() {
-  const files = document.getElementById("fileInput").files;
+  const files = Array.from(document.getElementById("fileInput").files);
   const status = document.getElementById("status");
   const progressBar = document.getElementById("progressBar");
   const progressText = document.getElementById("progressText");
+  const queueContainer = document.getElementById("uploadQueue");
+
   if (!files.length) return alert("กรุณาเลือกไฟล์");
   if (files.length > 1000) return alert("อัปโหลดได้ไม่เกิน 1,000 รูปต่อครั้ง");
 
-  status.innerText = "⏳ กำลังอัปโหลดผ่าน Edge Function...";
-  let success = 0, skipBig = 0, fail = 0;
+  const MAX_CONCURRENT = 10; // ปรับค่าได้ตามต้องการ
   const total = files.length;
+  let success = 0, skipBig = 0, fail = 0, completed = 0;
 
-  for (let i = 0; i < total; i++) {
-    const f = files[i];
-    if (f.size > 5 * 1024 * 1024) { 
-      skipBig++; 
-      continue; 
+  queueContainer.innerHTML = files.map(f => `
+    <div id="queue-${sha256(f.name)}" style="
+      background: rgba(255,255,255,0.08);
+      margin:5px 0;padding:8px;border-radius:10px;
+      display:flex;align-items:center;justify-content:space-between;
+    ">
+      <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.name}</span>
+      <div style="width:35%;height:8px;background:rgba(255,255,255,0.1);border-radius:5px;overflow:hidden;margin:0 5px;">
+        <div id="bar-${sha256(f.name)}" style="height:8px;width:0%;background:linear-gradient(90deg,#22c55e,#84cc16);"></div>
+      </div>
+      <small id="text-${sha256(f.name)}" style="color:#facc15;font-size:0.8rem;">รอคิว...</small>
+    </div>
+  `).join("");
+
+  status.innerText = "🚀 เริ่มอัปโหลด...";
+  progressBar.style.width = "0%";
+  progressText.innerText = "0%";
+
+  async function uploadSingleFile(f) {
+    const hash = sha256(f.name);
+    const textEl = document.getElementById(`text-${hash}`);
+    const barEl = document.getElementById(`bar-${hash}`);
+
+    if (f.size > 5 * 1024 * 1024) {
+      skipBig++;
+      textEl.innerText = "❌ ขนาดเกิน 5MB";
+      barEl.style.background = "#ef4444";
+      return;
     }
 
     const formData = new FormData();
@@ -260,38 +288,50 @@ async function uploadFiles() {
     formData.append("profile_pic", profilePic);
     formData.append("file", f);
 
+    textEl.innerText = "📤 กำลังอัปโหลด...";
+
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/upload_image`, {
         method: "POST",
         body: formData
       });
-
       const result = await res.json();
 
       if (result.success) {
+        textEl.innerText = "✅ สำเร็จ";
+        barEl.style.width = "100%";
+        barEl.style.background = "linear-gradient(90deg,#22c55e,#84cc16)";
         success++;
       } else {
-        console.warn("Upload fail:", result);
+        textEl.innerText = "❌ ล้มเหลว";
+        barEl.style.background = "#ef4444";
         fail++;
       }
-    } catch (err) {
-      console.error("❌ Upload Error:", err);
+    } catch {
+      textEl.innerText = "⚠️ ข้อผิดพลาด";
+      barEl.style.background = "#ef4444";
       fail++;
     }
 
-    // ✅ อัปเดต Progress Bar
-    const percent = Math.round(((i + 1) / total) * 100);
+    completed++;
+    const percent = Math.round((completed / total) * 100);
     progressBar.style.width = `${percent}%`;
-    progressText.innerText = `${i + 1}/${total} (${percent}%)`;
+    progressText.innerText = `${completed}/${total} (${percent}%)`;
   }
 
-  status.innerText = `✅ สำเร็จ ${success}, ❌ ล้มเหลว ${fail}, 📦 เกินขนาด ${skipBig}`;
+  // 🧠 อัปโหลดพร้อมกันเป็น batch ละ MAX_CONCURRENT
+  for (let i = 0; i < total; i += MAX_CONCURRENT) {
+    const batch = files.slice(i, i + MAX_CONCURRENT);
+    await Promise.all(batch.map(uploadSingleFile));
+  }
+
   progressBar.style.width = "100%";
   progressText.innerText = "เสร็จสิ้น ✅";
+  status.innerText = `✅ สำเร็จ ${success}, ❌ ล้มเหลว ${fail}, 📦 เกินขนาด ${skipBig}`;
 
-  // ✅ โหลดรายการไฟล์ใหม่
   await listUserFiles();
 }
+
 
 
 /* 📜 โหลดรายการ */
