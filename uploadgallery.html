@@ -268,7 +268,7 @@ async function uploadFiles() {
   pauseBtn.style.display = "inline-block";
   resumeBtn.style.display = "none";
 
-  const MAX_CONCURRENT = 10;
+  const MAX_CONCURRENT = 5;
   const total = files.length;
   let success = 0, fail = 0, skipBig = 0, completed = 0;
   let startTime = Date.now();
