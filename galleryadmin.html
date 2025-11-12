@@ -134,19 +134,80 @@
     }
 
     async function detectFaceSmart(img, retry = 0) {
-      try {
-        let det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-        if (!det)
-          det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.4 }))
-            .withFaceLandmarks().withFaceDescriptor();
-        return det;
-      } catch (e) {
-        if (retry < 2) {
-          await delay(300);
-          return await detectFaceSmart(img, retry + 1);
-        } else throw e;
-      }
+  try {
+    let detections = [];
+
+    // 1️⃣ ตรวจแบบละเอียดด้วย SSD
+    detections = await faceapi
+      .detectAllFaces(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.25 }))
+      .withFaceLandmarks()
+      .withFaceDescriptors();
+
+    // 2️⃣ ถ้าไม่เจอเลย → ใช้ TinyFaceDetector
+    if (!detections.length) {
+      detections = await faceapi
+        .detectAllFaces(img, new faceapi.TinyFaceDetectorOptions({
+          inputSize: 608,          // ใหญ่ขึ้นเพื่อความละเอียด
+          scoreThreshold: 0.25     // ลด threshold ให้เจอมากขึ้น
+        }))
+        .withFaceLandmarks()
+        .withFaceDescriptors();
     }
+
+    // 3️⃣ ถ้ายังไม่เจอ → crop center แล้วตรวจอีกครั้ง
+    if (!detections.length) {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const w = img.width, h = img.height;
+      const cropSize = Math.min(w, h) * 0.9;
+      const sx = (w - cropSize) / 2;
+      const sy = (h - cropSize) / 2;
+      canvas.width = cropSize;
+      canvas.height = cropSize;
+      ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, cropSize, cropSize);
+      const cropped = await faceapi.bufferToImage(canvas.toDataURL("image/jpeg"));
+
+      detections = await faceapi
+        .detectAllFaces(cropped, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.2 }))
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+    }
+
+    // 4️⃣ ถ้ายังไม่เจออีก → retry ได้สูงสุด 3 ครั้ง
+    if (!detections.length && retry < 2) {
+      await delay(500);
+      return await detectFaceSmart(img, retry + 1);
+    }
+
+    if (!detections.length) {
+      log("warn", "😕 ไม่พบใบหน้าในภาพ (หลังสแกนทั่วทั้งรูป)");
+      return null;
+    }
+
+    // 🔍 รายงานผลแต่ละใบหน้า
+    detections.forEach((d, i) => {
+      const score = d.detection.score.toFixed(2);
+      const box = d.detection.box;
+      log("info", `👁️ พบใบหน้าที่ ${i + 1}: confidence=${score}, box=(${Math.round(box.x)},${Math.round(box.y)},${Math.round(box.width)}x${Math.round(box.height)})`);
+    });
+
+    // ✅ เลือกใบหน้าหลัก (ที่ใหญ่ที่สุดในภาพ)
+    const mainFace = detections.reduce((max, cur) =>
+      cur.detection.box.area > max.detection.box.area ? cur : max
+    );
+
+    return mainFace; // คืนค่ารายละเอียดใบหน้าหลัก
+  } catch (e) {
+    if (retry < 2) {
+      await delay(500);
+      return await detectFaceSmart(img, retry + 1);
+    } else {
+      log("error", "❌ ตรวจจับใบหน้าล้มเหลว: " + e.message);
+      return null;
+    }
+  }
+}
+
 
     function addFailedPreview(path, imgUrl, reason) {
       if (failedImages.has(path)) return;
