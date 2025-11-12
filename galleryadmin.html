@@ -133,81 +133,121 @@
       log("info", "📦 โหลดโมเดลครบแล้ว");
     }
 
-    async function detectFaceSmart(img, retry = 0) {
+async function detectFaceSmart(img, retry = 0) {
+  const rotations = [0, 90, 180, 270]; // หมุน 4 มุม
+  let bestDetection = null;
+  let bestScore = 0;
+
   try {
-    let detections = [];
+    for (const angle of rotations) {
+      const rotatedImg = angle ? await rotateImage(img, angle) : img;
 
-    // 1️⃣ ตรวจแบบละเอียดด้วย SSD
-    detections = await faceapi
-      .detectAllFaces(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.25 }))
-      .withFaceLandmarks()
-      .withFaceDescriptors();
-
-    // 2️⃣ ถ้าไม่เจอเลย → ใช้ TinyFaceDetector
-    if (!detections.length) {
-      detections = await faceapi
-        .detectAllFaces(img, new faceapi.TinyFaceDetectorOptions({
-          inputSize: 608,          // ใหญ่ขึ้นเพื่อความละเอียด
-          scoreThreshold: 0.25     // ลด threshold ให้เจอมากขึ้น
-        }))
+      // 1️⃣ ตรวจด้วย SSD (ละเอียดสุด)
+      let detections = await faceapi
+        .detectAllFaces(rotatedImg, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.25 }))
         .withFaceLandmarks()
         .withFaceDescriptors();
+
+      // 2️⃣ ถ้าไม่เจอ → TinyFaceDetector (เร็วกว่า)
+      if (!detections.length) {
+        detections = await faceapi
+          .detectAllFaces(rotatedImg, new faceapi.TinyFaceDetectorOptions({
+            inputSize: 640,
+            scoreThreshold: 0.25
+          }))
+          .withFaceLandmarks()
+          .withFaceDescriptors();
+      }
+
+      // 3️⃣ ถ้าเจอ → เก็บคะแนนสูงสุด
+      for (const det of detections) {
+        if (det.detection.score > bestScore) {
+          bestDetection = det;
+          bestScore = det.detection.score;
+        }
+      }
+
+      // 4️⃣ log ผล
+      if (detections.length) {
+        log("info", `👁️ ตรวจพบ ${detections.length} ใบหน้าในมุม ${angle}° (สูงสุด ${bestScore.toFixed(2)})`);
+      }
     }
 
-    // 3️⃣ ถ้ายังไม่เจอ → crop center แล้วตรวจอีกครั้ง
-    if (!detections.length) {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      const w = img.width, h = img.height;
-      const cropSize = Math.min(w, h) * 0.9;
-      const sx = (w - cropSize) / 2;
-      const sy = (h - cropSize) / 2;
-      canvas.width = cropSize;
-      canvas.height = cropSize;
-      ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, cropSize, cropSize);
-      const cropped = await faceapi.bufferToImage(canvas.toDataURL("image/jpeg"));
+    // 5️⃣ ถ้ายังไม่เจอ → crop ซีกซ้าย/ขวา สำหรับภาพแนวนอน
+    if (!bestDetection && img.width > img.height) {
+      const halfW = img.width / 2;
+      const leftCrop = await cropImage(img, 0, 0, halfW, img.height);
+      const rightCrop = await cropImage(img, halfW, 0, halfW, img.height);
 
-      detections = await faceapi
-        .detectAllFaces(cropped, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.2 }))
-        .withFaceLandmarks()
-        .withFaceDescriptors();
+      for (const side of [leftCrop, rightCrop]) {
+        const det = await faceapi
+          .detectSingleFace(side, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.2 }))
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+        if (det && det.detection.score > bestScore) {
+          bestDetection = det;
+          bestScore = det.detection.score;
+        }
+      }
+      if (bestDetection) log("info", `📸 ตรวจเจอจาก crop ซีก (${bestScore.toFixed(2)})`);
     }
 
-    // 4️⃣ ถ้ายังไม่เจออีก → retry ได้สูงสุด 3 ครั้ง
-    if (!detections.length && retry < 2) {
+    if (!bestDetection && retry < 2) {
       await delay(500);
       return await detectFaceSmart(img, retry + 1);
     }
 
-    if (!detections.length) {
-      log("warn", "😕 ไม่พบใบหน้าในภาพ (หลังสแกนทั่วทั้งรูป)");
+    if (bestDetection) {
+      const { box, score } = bestDetection.detection;
+      log("info", `✅ ใบหน้าหลัก (confidence=${score.toFixed(2)}, ${Math.round(box.width)}x${Math.round(box.height)})`);
+      return bestDetection;
+    } else {
+      log("warn", "❌ ไม่พบใบหน้าแม้สแกนทั่วทั้งภาพทุกมุม");
       return null;
     }
 
-    // 🔍 รายงานผลแต่ละใบหน้า
-    detections.forEach((d, i) => {
-      const score = d.detection.score.toFixed(2);
-      const box = d.detection.box;
-      log("info", `👁️ พบใบหน้าที่ ${i + 1}: confidence=${score}, box=(${Math.round(box.x)},${Math.round(box.y)},${Math.round(box.width)}x${Math.round(box.height)})`);
-    });
-
-    // ✅ เลือกใบหน้าหลัก (ที่ใหญ่ที่สุดในภาพ)
-    const mainFace = detections.reduce((max, cur) =>
-      cur.detection.box.area > max.detection.box.area ? cur : max
-    );
-
-    return mainFace; // คืนค่ารายละเอียดใบหน้าหลัก
   } catch (e) {
     if (retry < 2) {
       await delay(500);
       return await detectFaceSmart(img, retry + 1);
     } else {
-      log("error", "❌ ตรวจจับใบหน้าล้มเหลว: " + e.message);
+      log("error", "⚠️ ตรวจจับใบหน้าล้มเหลว: " + e.message);
       return null;
     }
   }
 }
 
+/* 🌀 หมุนภาพตามองศา */
+async function rotateImage(img, degrees) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  const radians = (degrees * Math.PI) / 180;
+
+  if (degrees % 180 === 0) {
+    canvas.width = img.width;
+    canvas.height = img.height;
+  } else {
+    canvas.width = img.height;
+    canvas.height = img.width;
+  }
+
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate(radians);
+  ctx.drawImage(img, -img.width / 2, -img.height / 2);
+  return await faceapi.bufferToImage(canvas.toDataURL("image/jpeg"));
+}
+
+/* ✂️ crop เฉพาะส่วนของภาพ */
+async function cropImage(img, x, y, w, h) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = w;
+  canvas.height = h;
+  ctx.drawImage(img, x, y, w, h, 0, 0, w, h);
+  return await faceapi.bufferToImage(canvas.toDataURL("image/jpeg"));
+}
+
+    
 
     function addFailedPreview(path, imgUrl, reason) {
       if (failedImages.has(path)) return;
