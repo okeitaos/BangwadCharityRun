@@ -8,12 +8,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 </head>
-
 <body class="bg-slate-900 text-white min-h-screen p-6">
   <div class="max-w-6xl mx-auto">
-    <h1 class="text-3xl font-bold mb-4 text-center">
-      🧠 Admin v2.7.3 — Smart Face Sync Dashboard (Enhanced Detection)
-    </h1>
+    <h1 class="text-3xl font-bold mb-4 text-center">🧠 Admin v2.7.3 — Smart Face Sync Dashboard</h1>
 
     <!-- Control Panel -->
     <div class="bg-slate-800 rounded-xl p-5 mb-4 shadow">
@@ -82,6 +79,7 @@
 
     const $ = id => document.getElementById(id);
     const delay = ms => new Promise(r => setTimeout(r, ms));
+
     const log = (type, text) => {
       const time = new Date().toLocaleTimeString();
       const color = type === "error" ? "text-red-300" : type === "warn" ? "text-yellow-300" : "text-green-300";
@@ -96,6 +94,32 @@
     const processedSet = new Set();
     const failedImages = new Map();
 
+    /* 📊 อัปเดตสถิติและ Progress Bar */
+    function updateStats() {
+      $("countSuccess").textContent = stats.success;
+      $("countSkipped").textContent = stats.skipped;
+      $("countFailed").textContent = stats.failed;
+      $("processed").textContent = stats.processed;
+      $("total").textContent = stats.total;
+      const percent = stats.total ? Math.round((stats.processed / stats.total) * 100) : 0;
+      $("progressBar").style.width = percent + "%";
+    }
+
+    const loadCache = () => JSON.parse(localStorage.getItem("gallery-cache") || "{}");
+    const saveCache = c => localStorage.setItem("gallery-cache", JSON.stringify(c));
+
+    async function checkAPIKey() {
+      try {
+        const { error } = await supabase.from("faces").select("id").limit(1);
+        if (error) throw error;
+        log("info", "✅ ตรวจสอบคีย์ Supabase สำเร็จ พร้อมใช้งาน");
+      } catch (e) {
+        log("error", "❌ Invalid API key: " + e.message);
+        $("status").textContent = "❌ Invalid API key";
+        throw e;
+      }
+    }
+
     async function loadModels() {
       $("status").textContent = "⏳ โหลดโมเดล...";
       const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
@@ -109,48 +133,21 @@
       log("info", "📦 โหลดโมเดลครบแล้ว");
     }
 
-    /* ✅ Smart Detect+ — Improved Accuracy */
     async function detectFaceSmart(img, retry = 0) {
       try {
-        let det = await faceapi.detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 }))
-          .withFaceLandmarks()
-          .withFaceDescriptor();
-
+        let det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
         if (!det)
-          det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.25 }))
-            .withFaceLandmarks()
-            .withFaceDescriptor();
-
-        if (!det) {
-          const canvas = document.createElement("canvas");
-          canvas.width = img.width * 1.5;
-          canvas.height = img.height * 1.5;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          det = await faceapi.detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.2 }))
-            .withFaceLandmarks()
-            .withFaceDescriptor();
-        }
-
-        if (!det)
-          det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.1 }))
-            .withFaceLandmarks()
-            .withFaceDescriptor();
-
-        if (det)
-          log("info", `✅ ตรวจพบใบหน้า (${Math.round(det.detection.box.width)}x${Math.round(det.detection.box.height)})`);
-        return det || null;
+          det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.4 }))
+            .withFaceLandmarks().withFaceDescriptor();
+        return det;
       } catch (e) {
         if (retry < 2) {
-          await delay(400);
+          await delay(300);
           return await detectFaceSmart(img, retry + 1);
-        } else {
-          log("error", "Detect error: " + e.message);
-          return null;
-        }
+        } else throw e;
       }
     }
-    /* 🧠 เพิ่มภาพที่ตรวจไม่ผ่าน */
+
     function addFailedPreview(path, imgUrl, reason) {
       if (failedImages.has(path)) return;
       failedImages.set(path, true);
@@ -162,7 +159,6 @@
         <button class="absolute bottom-2 right-2 bg-blue-600 hover:bg-blue-700 text-xs px-2 py-1 rounded retry-btn">Retry</button>
       `;
       $("failedGrid").appendChild(div);
-
       div.querySelector(".retry-btn").onclick = async () => {
         div.style.opacity = "0.5";
         await handleSync(path, { [path]: { updated_at: new Date().toISOString() } }, loadCache(), 0, true);
@@ -171,146 +167,66 @@
       };
     }
 
-    /* 🧩 ฟังก์ชันหลักในการ Sync */
     async function handleSync(path, map, cache, attempt = 0, singleRetry = false) {
-      const cacheT = cache[path];
-      const updated = map[path].updated_at;
-
-      // ✅ Skip ถ้ามีใน cache และเวลาไม่เปลี่ยน
-      if (!singleRetry && cacheT && updated <= cacheT) {
-        stats.skipped++;
-        if (!processedSet.has(path)) { processedSet.add(path); stats.processed++; }
-        updateStats();
-        return;
-      }
-
+      const cacheT = cache[path], updated = map[path].updated_at;
+      if (!singleRetry && cacheT && updated <= cacheT) { stats.skipped++; if(!processedSet.has(path)){processedSet.add(path);stats.processed++;} updateStats(); return; }
       try {
-        // ✅ ตรวจสอบว่ามีใน faces table แล้วหรือยัง
         const { data: exists } = await supabase.from("faces").select("id").eq("image_url", path).maybeSingle();
-        if (exists) {
-          stats.skipped++;
-          if (!processedSet.has(path)) { processedSet.add(path); stats.processed++; }
-          cache[path] = updated;
-          saveCache(cache);
-          updateStats();
-          return;
-        }
+        if (exists) { stats.skipped++; if(!processedSet.has(path)){processedSet.add(path);stats.processed++;} cache[path] = updated; saveCache(cache); updateStats(); return; }
 
-        // 🔗 โหลดรูปภาพ
         const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`;
         const img = await faceapi.fetchImage(imgUrl);
-
-        // 🎯 ตรวจจับใบหน้าด้วย Smart Detect+
         const det = await detectFaceSmart(img);
         if (!det) throw new Error("ไม่พบใบหน้า");
-
         const minFace = Number($("minFaceSize").value) || 50;
-        if (det.detection.box.width < minFace || det.detection.box.height < minFace)
-          throw new Error("ใบหน้าเล็กเกินไป");
+        if (det.detection.box.width < minFace || det.detection.box.height < minFace) throw new Error("ใบหน้าเล็กเกินไป");
 
-        // 🔢 แปลง Descriptor → Array
         const emb = Array.from(det.descriptor);
         const name = path.split("/").pop().split(".").shift();
-
-        // 🧾 บันทึกลง Supabase
-        const { error } = await supabase.rpc("insert_face_vector", {
-          p_name: name,
-          p_image_url: path,
-          p_embedding: emb
-        });
+        const { error } = await supabase.rpc("insert_face_vector", { p_name: name, p_image_url: path, p_embedding: emb });
         if (error) throw new Error(error.message);
 
-        stats.success++;
-        cache[path] = updated;
-        saveCache(cache);
-        log("info", `✅ ${path}`);
+        stats.success++; cache[path] = updated; saveCache(cache); log("info", `✅ ${path}`);
       } catch (err) {
-        // 🔁 Retry สูงสุด 3 ครั้ง
-        if (attempt < 2 && !singleRetry) {
-          log("warn", `Retry ${attempt + 1}/3: ${path} (${err.message})`);
-          await delay(500);
-          return await handleSync(path, map, cache, attempt + 1);
-        } else {
-          log("error", `❌ ${path}: ${err.message}`);
-          stats.failed++;
-          const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`;
-          addFailedPreview(path, imgUrl, err.message);
-        }
-      } finally {
-        if (!processedSet.has(path)) {
-          processedSet.add(path);
-          stats.processed++;
-          updateStats();
-        }
-      }
+        if (attempt < 2 && !singleRetry) { log("warn", `Retry ${attempt + 1}/3: ${path} (${err.message})`); await delay(500); return await handleSync(path, map, cache, attempt + 1); }
+        else { log("error", `❌ ${path}: ${err.message}`); stats.failed++; const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`; addFailedPreview(path, imgUrl, err.message); }
+      } finally { if (!processedSet.has(path)) { processedSet.add(path); stats.processed++; updateStats(); } }
     }
 
-    /* 📂 ดึงรายการไฟล์ทั้งหมดจาก Storage */
     async function listRecursive(path = "", map = {}) {
-      const limit = 1000;
-      let offset = 0;
-
+      const limit = 1000; let offset = 0;
       while (true) {
         const { data, error } = await supabase.storage.from(BUCKET).list(path, { limit, offset });
         if (error) { log("error", `Storage list error: ${error.message}`); break; }
         if (!data || data.length === 0) break;
-
         for (const item of data) {
-          if (!item.metadata) {
-            // 📁 Recursive เข้า subfolder
-            if (item.name.startsWith(".")) continue;
-            await listRecursive(path ? `${path}/${item.name}` : item.name, map);
-          } else {
-            const full = path ? `${path}/${item.name}` : item.name;
-            map[full] = { updated_at: item.updated_at };
-          }
+          if (!item.metadata) { if (item.name.startsWith(".")) continue; await listRecursive(path ? `${path}/${item.name}` : item.name, map); }
+          else { const full = path ? `${path}/${item.name}` : item.name; map[full] = { updated_at: item.updated_at }; }
         }
-
         if (data.length < limit) break;
-        offset += limit;
-        await delay(100);
-      }
-
-      return map;
+        offset += limit; await delay(100);
+      } return map;
     }
 
-    /* 🔄 ฟังก์ชัน Sync ทั้งระบบ */
     async function syncGallery() {
       if (isSyncing) return log("warn", "⚙️ กำลังซิงค์อยู่แล้ว");
-      stopRequested = false;
-      isSyncing = true;
+      stopRequested = false; isSyncing = true;
       stats = { success: 0, skipped: 0, failed: 0, processed: 0, total: 0 };
-      processedSet.clear();
-      updateStats();
-      startTime = Date.now();
-      $("status").textContent = "🔄 เริ่มซิงค์...";
-      $("failedGrid").innerHTML = "";
-
+      processedSet.clear(); updateStats(); startTime = Date.now();
+      $("status").textContent = "🔄 เริ่มซิงค์..."; $("failedGrid").innerHTML = "";
       try {
         await checkAPIKey();
-
-        // 📋 ดึงรายการทั้งหมด
         const map = await listRecursive("");
         const files = Object.keys(map).filter(p => p.match(/\.(jpg|jpeg|png|webp|gif)$/i));
         const cache = loadCache();
-
-        stats.total = files.length;
-        updateStats();
-        log("info", `พบ ${stats.total} ไฟล์`);
-
-        // ⚡ Parallel Workers
-        const limit = Number($("rateLimit").value) || 5;
-        const delayMs = Number($("delayMs").value) || 200;
-
-        await Promise.all(
-          Array.from({ length: limit }, async (_, w) => {
-            for (let i = w; i < files.length && !stopRequested; i += limit) {
-              await handleSync(files[i], map, cache);
-              if (delayMs) await delay(delayMs);
-            }
-          })
-        );
-
+        stats.total = files.length; updateStats(); log("info", `พบ ${stats.total} ไฟล์`);
+        const limit = Number($("rateLimit").value) || 5, delayMs = Number($("delayMs").value) || 200;
+        await Promise.all(Array.from({ length: limit }, async (_, w) => {
+          for (let i = w; i < files.length && !stopRequested; i += limit) {
+            await handleSync(files[i], map, cache);
+            if (delayMs) await delay(delayMs);
+          }
+        }));
         $("lastSync").textContent = "ซิงค์ล่าสุด: " + new Date().toLocaleString();
         $("status").textContent = `✅ เสร็จสิ้น (สำเร็จ ${stats.success}, ข้าม ${stats.skipped}, ล้มเหลว ${stats.failed})`;
       } catch (e) {
@@ -320,58 +236,16 @@
         isSyncing = false;
       }
     }
-    /* ⚙️ ปุ่มและระบบควบคุม */
+
     $("syncNow").onclick = syncGallery;
+    $("stopAuto").onclick = () => { stopRequested = true; log("warn", "⏸️ หยุดการซิงค์แล้ว"); };
+    $("clearLog").onclick = () => { $("log").innerHTML = ""; stats = { success: 0, skipped: 0, failed: 0, processed: 0, total: 0 }; updateStats(); };
+    $("clearCache").onclick = () => { localStorage.removeItem("gallery-cache"); log("info", "🧹 ล้าง cache แล้ว"); };
+    $("autoSyncToggle").onchange = e => e.target.checked ? autoSyncId = setInterval(syncGallery, Number($("autoInterval").value)*1000) : clearInterval(autoSyncId);
 
-    $("stopAuto").onclick = () => {
-      stopRequested = true;
-      log("warn", "⏸️ หยุดการซิงค์แล้วโดยผู้ใช้");
-      $("status").textContent = "⏸️ การซิงค์ถูกหยุดชั่วคราว";
-    };
-
-    $("clearLog").onclick = () => {
-      $("log").innerHTML = "";
-      stats = { success: 0, skipped: 0, failed: 0, processed: 0, total: 0 };
-      processedSet.clear();
-      updateStats();
-      log("info", "🧹 เคลียร์ Log ทั้งหมดแล้ว");
-    };
-
-    $("clearCache").onclick = () => {
-      localStorage.removeItem("gallery-cache");
-      log("info", "🗑️ เคลียร์ cache สำเร็จ");
-    };
-
-    /* 🔁 ระบบ Auto Sync */
-    $("autoSyncToggle").onchange = e => {
-      if (e.target.checked) {
-        const interval = Number($("autoInterval").value) * 1000;
-        if (isNaN(interval) || interval <= 0) {
-          alert("❌ Interval ต้องมากกว่า 0");
-          e.target.checked = false;
-          return;
-        }
-        log("info", `🔁 เริ่ม Auto Sync ทุก ${interval / 1000} วินาที`);
-        $("status").textContent = `🕒 Auto Sync ทำงานทุก ${interval / 1000}s`;
-        autoSyncId = setInterval(syncGallery, interval);
-      } else {
-        clearInterval(autoSyncId);
-        autoSyncId = null;
-        log("warn", "🛑 ปิด Auto Sync แล้ว");
-        $("status").textContent = "🛑 Auto Sync หยุดทำงาน";
-      }
-    };
-
-    /* ⏱️ ตัวจับเวลา Elapsed */
-    setInterval(() => {
-      if (startTime) $("elapsed").textContent = Math.floor((Date.now() - startTime) / 1000) + "s";
-    }, 1000);
-
-    /* 🚀 เมื่อโหลดเสร็จ */
     window.addEventListener("DOMContentLoaded", async () => {
       await loadModels();
-      log("info", "✨ ระบบพร้อมใช้งานแล้ว");
-      $("status").textContent = "✅ พร้อมสำหรับการซิงค์";
+      setInterval(() => $("elapsed").textContent = Math.floor((Date.now() - startTime) / 1000) + "s", 1000);
     });
   </script>
 </body>
