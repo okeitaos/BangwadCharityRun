@@ -148,30 +148,75 @@ async function transformImage(img, { angle = 0, scale = 1 } = {}) {
   return await blobToImage(blob);
 }
 
-/* ตรวจจับใบหน้าพร้อมรองรับการหมุน */
+/* ตรวจจับใบหน้าพร้อมรองรับการหมุน + multi-scale hybrid */
 async function detectFaceWithRotationSupport(imgUrl, minFaceSize = 50) {
   const img = await fetchImageRobust(imgUrl);
+
+  // 🔸 ลองตรวจทั้ง ssd และ tiny ในรอบแรก
   let det = await detectFaceMulti(img, { minFaceSize });
   if (det) return det;
+
+  // 🔸 ลองหมุนภาพ 90 / 270 องศา
   for (const angle of [90, 270]) {
     const rImg = await transformImage(img, { angle });
     det = await detectFaceMulti(rImg, { minFaceSize });
     if (det) return det;
   }
+
+  // 🔸 ลอง upscale 1.5x (ช่วยจับหน้าเล็ก)
+  const upImg = await transformImage(img, { angle: 0, scale: 1.5 });
+  det = await detectFaceMulti(upImg, { minFaceSize: minFaceSize * 0.8 });
+  if (det) return det;
+
+  // 🔸 ลองสุดท้าย: detectAllFaces แล้วเลือกหน้าที่ใหญ่ที่สุด
+  const all = await faceapi.detectAllFaces(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.2 }))
+    .withFaceLandmarks().withFaceDescriptors();
+  if (all && all.length) {
+    const largest = all.reduce((a, b) =>
+      (b.detection.box.width * b.detection.box.height > a.detection.box.width * a.detection.box.height ? b : a)
+    );
+    return largest;
+  }
+
   return null;
 }
 
-/* ตรวจหลาย scale */
+/* ตรวจหลาย scale และ hybrid ssd + tiny */
 async function detectFaceMulti(img, opts = {}) {
   const minFaceSize = opts.minFaceSize || 50;
-  const dets = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 640, scoreThreshold: 0.25 }))
-    .withFaceLandmarks().withFaceDescriptors();
-  if (!dets.length) return null;
-  dets.sort((a,b)=>b.detection.box.width*b.detection.box.height - a.detection.box.width*a.detection.box.height);
-  const best = dets[0];
-  if (best.detection.box.width < minFaceSize || best.detection.box.height < minFaceSize) return null;
-  return best;
+
+  // 🧠 ลอง ssd ก่อน (ละเอียดสุด)
+  try {
+    const detSSD = await faceapi.detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.2 }))
+      .withFaceLandmarks().withFaceDescriptor();
+    if (detSSD && (detSSD.detection.box.width >= minFaceSize || detSSD.detection.box.height >= minFaceSize)) {
+      return detSSD;
+    }
+  } catch (e) {
+    console.warn("SSD failed:", e.message);
+  }
+
+  // 🔹 ถ้า ssd ไม่เจอ ใช้ tiny หลาย inputSize
+  const tinyConfigs = [
+    { inputSize: 512, scoreThreshold: 0.35 },
+    { inputSize: 416, scoreThreshold: 0.3 },
+    { inputSize: 320, scoreThreshold: 0.25 }
+  ];
+  for (const cfg of tinyConfigs) {
+    try {
+      const detTiny = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions(cfg))
+        .withFaceLandmarks().withFaceDescriptor();
+      if (detTiny && (detTiny.detection.box.width >= minFaceSize || detTiny.detection.box.height >= minFaceSize)) {
+        return detTiny;
+      }
+    } catch (e) {
+      console.warn("Tiny failed:", e.message);
+    }
+  }
+
+  return null;
 }
+
 
 /* อัปเดตสถิติ */
 function updateStats() {
