@@ -3,30 +3,41 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin v2.1 | Face Sync (Smart + Fast)</title>
+  <title>Admin v2.4 | Face Sync (Smart + Fast + Safe)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 </head>
 <body class="bg-slate-900 text-white min-h-screen p-6">
-  <div class="max-w-4xl mx-auto">
-    <h1 class="text-3xl font-bold mb-4 text-center">🧠 Admin v2.1 — Face Sync Dashboard (Smart + Fast)</h1>
+  <div class="max-w-5xl mx-auto">
+    <h1 class="text-3xl font-bold mb-4 text-center">🧠 Admin v2.4 — Face Sync (Smart + Fast + Safe)</h1>
 
     <!-- Control panel -->
     <div class="bg-slate-800 rounded-xl p-5 mb-4 shadow">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 flex-wrap">
         <div>
           <p id="status" class="text-gray-300">⏳ Loading models...</p>
           <p id="lastSync" class="text-gray-400 text-sm mt-1">ยังไม่ได้ซิงค์</p>
         </div>
 
-        <div class="flex gap-2 items-center">
-          <label class="text-sm text-gray-300 mr-2">MIN FACE (px)</label>
-          <input id="minFaceSize" type="number" value="50" min="20" max="1000" class="w-24 px-2 py-1 rounded bg-slate-700 text-white"/>
-          <label class="ml-4 text-sm text-gray-300">Auto Sync</label>
+        <div class="flex flex-wrap gap-3 items-center">
+          <label class="text-sm text-gray-300">MIN FACE (px)</label>
+          <input id="minFaceSize" type="number" value="50" min="20" max="1000" class="w-20 px-2 py-1 rounded bg-slate-700 text-white"/>
+
+          <label class="text-sm text-gray-300">Batch Size</label>
+          <input id="batchSize" type="number" value="10" min="1" max="50" class="w-20 px-2 py-1 rounded bg-slate-700 text-white"/>
+
+          <label class="text-sm text-gray-300">Rate Limit</label>
+          <input id="rateLimit" type="number" value="5" min="1" max="20" class="w-20 px-2 py-1 rounded bg-slate-700 text-white"/>
+
+          <label class="text-sm text-gray-300">Delay (ms)</label>
+          <input id="delayMs" type="number" value="200" min="0" max="2000" class="w-24 px-2 py-1 rounded bg-slate-700 text-white"/>
+
+          <label class="text-sm text-gray-300">Auto Sync</label>
           <input id="autoSyncToggle" type="checkbox" class="h-5 w-5 ml-2" />
-          <label class="ml-2 text-sm text-gray-300">Interval (s)</label>
-          <input id="autoInterval" type="number" value="60" min="10" step="5" class="w-20 px-2 py-1 rounded bg-slate-700 text-white ml-2"/>
+
+          <label class="text-sm text-gray-300">Interval (s)</label>
+          <input id="autoInterval" type="number" value="60" min="10" step="5" class="w-20 px-2 py-1 rounded bg-slate-700 text-white"/>
         </div>
       </div>
 
@@ -38,31 +49,21 @@
       </div>
     </div>
 
-    <!-- Progress / Stats -->
+    <!-- Progress -->
     <div class="bg-slate-800 rounded-xl p-5 mb-4 shadow">
       <div class="mb-3">
-        <div class="flex justify-between">
-          <div class="text-sm text-gray-300">Processed: <span id="processed">0</span>/<span id="total">0</span></div>
-          <div class="text-sm text-gray-300">Elapsed: <span id="elapsed">0s</span></div>
+        <div class="flex justify-between text-sm text-gray-300">
+          <div>Processed: <span id="processed">0</span>/<span id="total">0</span></div>
+          <div>Elapsed: <span id="elapsed">0s</span></div>
         </div>
         <div class="w-full bg-slate-700 rounded h-4 mt-2 overflow-hidden">
           <div id="progressBar" class="h-4 bg-green-500 w-0 transition-all"></div>
         </div>
       </div>
-
       <div class="grid grid-cols-3 gap-3 text-center">
-        <div class="bg-slate-700 p-3 rounded">
-          <div class="text-sm text-gray-300">✅ Success</div>
-          <div id="countSuccess" class="text-2xl font-bold text-green-400">0</div>
-        </div>
-        <div class="bg-slate-700 p-3 rounded">
-          <div class="text-sm text-gray-300">⚙️ Skipped</div>
-          <div id="countSkipped" class="text-2xl font-bold text-blue-300">0</div>
-        </div>
-        <div class="bg-slate-700 p-3 rounded">
-          <div class="text-sm text-gray-300">❌ Failed</div>
-          <div id="countFailed" class="text-2xl font-bold text-red-400">0</div>
-        </div>
+        <div class="bg-slate-700 p-3 rounded"><div>✅ Success</div><div id="countSuccess" class="text-2xl font-bold text-green-400">0</div></div>
+        <div class="bg-slate-700 p-3 rounded"><div>⚙️ Skipped</div><div id="countSkipped" class="text-2xl font-bold text-blue-300">0</div></div>
+        <div class="bg-slate-700 p-3 rounded"><div>❌ Failed</div><div id="countFailed" class="text-2xl font-bold text-red-400">0</div></div>
       </div>
     </div>
 
@@ -71,29 +72,25 @@
       <h2 class="text-lg font-semibold mb-2">📜 Log</h2>
       <div id="log" class="h-72 overflow-y-auto bg-slate-900/30 p-3 rounded text-xs font-mono"></div>
     </div>
-
-    <!-- Footer / Help -->
-    <div class="text-sm text-gray-400">
-      <p>หมายเหตุ: ระบบจะข้ามไฟล์ที่ไม่ใช่ภาพอัตโนมัติ (jpg, jpeg, png, webp, gif) และข้าม `.emptyFolderPlaceholder`</p>
-      <p class="mt-1">หากต้องการยอมรับใบหน้าเล็ก ให้ปรับค่า MIN FACE เป็นค่าต่ำลง (เช่น 40 หรือ 30)</p>
-      <p class="mt-1">✨ ระบบนี้ใช้ Local Cache เพื่อเร่งการซิงค์ครั้งต่อไป (Incremental Sync)</p>
-    </div>
   </div>
 
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 
-    // -------------------------
-    // CONFIG
-    // -------------------------
     const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
     const BUCKET = "gallery";
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // -------------------------
-    // DOM
-    // -------------------------
+    const log = (type, text) => {
+      const time = new Date().toLocaleTimeString();
+      const color = type === 'error' ? 'text-red-300' : type === 'warn' ? 'text-yellow-300' : 'text-green-300';
+      const p = document.createElement('div');
+      p.className = `${color} mb-1`;
+      p.innerHTML = `<span class="text-gray-400">[${time}]</span> ${text}`;
+      logEl.prepend(p);
+    };
+
     const statusEl = document.getElementById('status');
     const lastSyncEl = document.getElementById('lastSync');
     const syncNowBtn = document.getElementById('syncNow');
@@ -108,284 +105,133 @@
     const minFaceSizeInput = document.getElementById('minFaceSize');
     const autoSyncToggle = document.getElementById('autoSyncToggle');
     const autoIntervalInput = document.getElementById('autoInterval');
+    const batchSizeInput = document.getElementById('batchSize');
+    const rateLimitInput = document.getElementById('rateLimit');
+    const delayMsInput = document.getElementById('delayMs');
     const countSuccessEl = document.getElementById('countSuccess');
     const countSkippedEl = document.getElementById('countSkipped');
     const countFailedEl = document.getElementById('countFailed');
 
-    let isSyncing = false;
-    let stopRequested = false;
-    let autoSyncId = null;
-    let stats = { success: 0, skipped: 0, failed: 0, processed: 0, total: 0 };
-    let startTime = null;
+    let isSyncing=false,stopRequested=false,autoSyncId=null,startTime=null;
+    let stats={success:0,skipped:0,failed:0,processed:0,total:0};
 
-    // -------------------------
-    // CACHE HELPERS
-    // -------------------------
-    function loadCache() {
-      return JSON.parse(localStorage.getItem('gallery-cache') || '{}');
-    }
-    function saveCache(cache) {
-      localStorage.setItem('gallery-cache', JSON.stringify(cache));
-    }
-    function clearCache() {
-      localStorage.removeItem('gallery-cache');
-      log('info', '🗑️ ล้าง cache เรียบร้อย');
-    }
+    const loadCache=()=>JSON.parse(localStorage.getItem('gallery-cache')||'{}');
+    const saveCache=c=>localStorage.setItem('gallery-cache',JSON.stringify(c));
+    const clearCache=()=>{localStorage.removeItem('gallery-cache');log('info','🗑️ ล้าง cache เรียบร้อย');};
 
-    // -------------------------
-    // LOG / UI HELPERS
-    // -------------------------
-    function log(type, text) {
-      const time = new Date().toLocaleTimeString();
-      const color = type === 'error' ? 'text-red-300' : type === 'warn' ? 'text-yellow-300' : 'text-green-300';
-      const p = document.createElement('div');
-      p.className = `${color} mb-1`;
-      p.innerHTML = `<span class="text-gray-400">[${time}]</span> ${text}`;
-      logEl.prepend(p);
-    }
+    const updateStatsUI=()=>{countSuccessEl.textContent=stats.success;countSkippedEl.textContent=stats.skipped;countFailedEl.textContent=stats.failed;processedEl.textContent=stats.processed;totalEl.textContent=stats.total;progressBar.style.width=(stats.total?Math.round(stats.processed/stats.total*100):0)+'%';};
+    const updateElapsed=()=>{elapsedEl.textContent=Math.floor((Date.now()-startTime)/1000)+'s';};
 
-    function resetStats() {
-      stats = { success: 0, skipped: 0, failed: 0, processed: 0, total: 0 };
-      updateStatsUI();
+    const delay=ms=>new Promise(r=>setTimeout(r,ms));
+
+    async function processWithRateLimit(items, limit, fn, delayMs) {
+      let index = 0;
+      const results = [];
+      async function worker() {
+        while (index < items.length && !stopRequested) {
+          const currentIndex = index++;
+          const item = items[currentIndex];
+          try {
+            results.push(await fn(item));
+          } catch (err) {
+            console.error(err);
+          }
+          if (delayMs) await delay(delayMs);
+        }
+      }
+      const workers = [];
+      for (let i = 0; i < limit; i++) workers.push(worker());
+      await Promise.all(workers);
+      return results;
     }
 
-    function updateStatsUI() {
-      countSuccessEl.textContent = stats.success;
-      countSkippedEl.textContent = stats.skipped;
-      countFailedEl.textContent = stats.failed;
-      processedEl.textContent = stats.processed;
-      totalEl.textContent = stats.total;
-      const pct = stats.total ? Math.round((stats.processed / stats.total) * 100) : 0;
-      progressBar.style.width = pct + '%';
-    }
-
-    function updateElapsed() {
-      if (!startTime) { elapsedEl.textContent = '0s'; return; }
-      const s = Math.floor((Date.now() - startTime) / 1000);
-      elapsedEl.textContent = s + 's';
-    }
-
-    // -------------------------
-    // FACE-API
-    // -------------------------
     async function loadModels() {
-      statusEl.textContent = '⏳ โหลดโมเดล face-api...';
-      const modelURL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/';
+      statusEl.textContent='⏳ โหลดโมเดล face-api...';
+      const modelURL='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/';
       await Promise.all([
         faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
         faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
         faceapi.nets.faceRecognitionNet.loadFromUri(modelURL)
       ]);
-      statusEl.textContent = '✅ พร้อมซิงค์';
-      log('info', 'โมเดลพร้อมใช้งาน');
+      statusEl.textContent='✅ พร้อมซิงค์';
+      log('info','โมเดลพร้อมใช้งาน');
     }
 
-    // -------------------------
-    // STORAGE LIST (recursive)
-    // -------------------------
-   // -------------------------
-// LIST RECURSIVE (FULL GALLERY, NO LIMIT)
-// -------------------------
-async function listRecursive(path = '', map = {}) {
-  const limit = 1000;
-  let offset = 0;
-
-  while (true) {
-    const { data, error } = await supabase.storage
-      .from(BUCKET)
-      .list(path, { limit, offset });
-
-    if (error) {
-      log('error', `Storage list error: ${error.message}`);
-      break;
-    }
-
-    if (!data || data.length === 0) break;
-
-    for (const item of data) {
-      if (!item.metadata) {
-        // item นี้คือโฟลเดอร์
-        if (item.name && item.name.startsWith('.')) continue;
-        const subPath = path ? `${path}/${item.name}` : item.name;
-        await listRecursive(subPath, map);
-      } else {
-        // item นี้คือไฟล์
-        const fullPath = path ? `${path}/${item.name}` : item.name;
-        map[fullPath] = { updated_at: item.updated_at };
+    async function listRecursive(path='',map={}) {
+      const limit=1000;let offset=0;
+      while(true){
+        const {data,error}=await supabase.storage.from(BUCKET).list(path,{limit,offset});
+        if(error||!data?.length)break;
+        for(const item of data){
+          if(!item.metadata){
+            if(item.name.startsWith('.'))continue;
+            await listRecursive(path?`${path}/${item.name}`:item.name,map);
+          }else{
+            const full=path?`${path}/${item.name}`:item.name;
+            map[full]={updated_at:item.updated_at};
+          }
+        }
+        if(data.length<limit)break;
+        offset+=limit;
       }
+      return map;
     }
 
-    // ถ้าขนาดชุดนี้น้อยกว่า limit แสดงว่าหมดแล้ว
-    if (data.length < limit) break;
-    offset += limit;
-  }
+    const normalize=d=>{const n=Math.sqrt(d.reduce((a,b)=>a+b*b,0));return d.map(x=>x/n);};
+    const isImage=p=>p&&!p.includes('.emptyFolderPlaceholder')&&p.match(/\.(jpg|jpeg|png|webp|gif)$/i);
+    const insertFace=async(n,u,e)=>{const{error}=await supabase.rpc('insert_face_vector',{p_name:n,p_image_url:u,p_embedding:e});return error?{ok:false,error}:{ok:true};};
 
-  return map;
-}
-
-
-    function normalize(desc) {
-      const norm = Math.sqrt(desc.reduce((a,b)=>a+b*b,0));
-      return desc.map(x => x / norm);
+    async function handleSync(path,map,cache){
+      const cacheT=cache[path];
+      const updated=map[path].updated_at;
+      if(cacheT&&updated<=cacheT){stats.skipped++;stats.processed++;updateStatsUI();return log('info',`⏭️ ข้าม (cache): ${path}`);}
+      const {data:exists}=await supabase.from('faces').select('id').eq('image_url',path).maybeSingle();
+      if(exists){stats.skipped++;stats.processed++;cache[path]=updated;saveCache(cache);updateStatsUI();return log('info',`ข้าม (มีอยู่แล้ว): ${path}`);}
+      const imgUrl=`${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`;
+      const img=await faceapi.fetchImage(imgUrl);
+      const det=await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+      if(!det){stats.failed++;stats.processed++;updateStatsUI();return log('warn',`ไม่พบใบหน้า: ${path}`);}
+      const minFace=Number(minFaceSizeInput.value)||50;
+      if(det.detection.box.width<minFace||det.detection.box.height<minFace){stats.failed++;stats.processed++;updateStatsUI();return log('warn',`ใบหน้าเล็กเกินไป: ${path}`);}
+      const emb=normalize(Array.from(det.descriptor));
+      const name=path.split('/').pop().split('.').shift();
+      const res=await insertFace(name,path,emb);
+      if(res.ok){stats.success++;cache[path]=updated;saveCache(cache);log('info',`✅ ${path}`);}else{stats.failed++;log('error',`❌ ${path}: ${res.error.message}`);}
+      stats.processed++;updateStatsUI();
     }
 
-    function isImagePath(path) {
-      if (!path) return false;
-      if (path.includes('.emptyFolderPlaceholder')) return false;
-      return !!path.match(/\.(jpg|jpeg|png|webp|gif)$/i);
-    }
-
-    async function insertFace(name, image_url, embedding) {
-      const { error } = await supabase.rpc('insert_face_vector', {
-        p_name: name, p_image_url: image_url, p_embedding: embedding
-      });
-      return error ? { ok: false, error } : { ok: true };
-    }
-
-    // -------------------------
-    // MAIN SYNC (with cache)
-    // -------------------------
     async function syncGallery() {
-      if (isSyncing) return log('warn', 'กำลังซิงค์อยู่แล้ว');
-      stopRequested = false;
-      isSyncing = true;
-      resetStats();
-      startTime = Date.now();
-      updateElapsed();
-      statusEl.textContent = '🔄 เริ่มซิงค์...';
+      if(isSyncing)return log('warn','กำลังซิงค์อยู่แล้ว');
+      stopRequested=false;isSyncing=true;stats={success:0,skipped:0,failed:0,processed:0,total:0};updateStatsUI();
+      startTime=Date.now();updateElapsed();statusEl.textContent='🔄 เริ่มซิงค์...';
+      try{
+        const map=await listRecursive('');
+        const files=Object.keys(map).filter(isImage);
+        const cache=loadCache();
+        stats.total=files.length;updateStatsUI();
+        log('info',`พบ ${stats.total} ไฟล์ใน bucket`);
 
-      try {
-        const allFilesMap = await listRecursive('');
-        const allFiles = Object.keys(allFilesMap).filter(isImagePath);
-        const cache = loadCache();
+        const limit=Number(rateLimitInput.value)||5;
+        const delayMs=Number(delayMsInput.value)||200;
 
-        stats.total = allFiles.length;
-        updateStatsUI();
-        if (stats.total === 0) {
-          log('warn', 'ไม่พบไฟล์ภาพใน bucket');
-          statusEl.textContent = '⚠️ ไม่พบไฟล์ภาพ';
-          isSyncing = false;
-          return;
-        }
+        await processWithRateLimit(files,limit,async path=>await handleSync(path,map,cache),delayMs);
 
-        log('info', `เริ่มประมวลผล ${stats.total} ไฟล์`);
-
-        for (const path of allFiles) {
-          if (stopRequested) { log('warn', 'ยกเลิกซิงค์โดยผู้ใช้'); break; }
-          updateElapsed();
-
-          const cacheTimestamp = cache[path];
-          const updatedAt = allFilesMap[path].updated_at;
-
-          if (cacheTimestamp && updatedAt <= cacheTimestamp) {
-            stats.skipped++; stats.processed++;
-            log('info', `⏭️ ข้าม (cache): ${path}`);
-            updateStatsUI();
-            continue;
-          }
-
-          try {
-            const { data: exists } = await supabase.from('faces').select('id').eq('image_url', path).maybeSingle();
-            if (exists) {
-              stats.skipped++; stats.processed++; updateStatsUI();
-              cache[path] = updatedAt; saveCache(cache);
-              log('info', `ข้าม (มีอยู่แล้ว): ${path}`);
-              continue;
-            }
-
-            const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`;
-            let img;
-            try {
-              img = await faceapi.fetchImage(imgUrl);
-            } catch (e) {
-              log('error', `fetchImage failed: ${path} - ${e.message}`);
-              stats.failed++; stats.processed++; updateStatsUI();
-              continue;
-            }
-
-            const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-            if (!det) {
-              stats.failed++; stats.processed++; updateStatsUI();
-              log('warn', `ไม่พบใบหน้า: ${path}`);
-              continue;
-            }
-
-            const minFace = Number(minFaceSizeInput.value) || 50;
-            if (det.detection.box.width < minFace || det.detection.box.height < minFace) {
-              stats.failed++; stats.processed++; updateStatsUI();
-              log('warn', `ใบหน้าเล็กเกินไป: ${path}`);
-              continue;
-            }
-
-            const embedding = normalize(Array.from(det.descriptor));
-            const name = path.split('/').pop().split('.').shift();
-
-            const res = await insertFace(name, path, embedding);
-            if (!res.ok) {
-              stats.failed++; stats.processed++; updateStatsUI();
-              log('error', `❌ Error บันทึก ${path}: ${res.error.message}`);
-            } else {
-              stats.success++; stats.processed++; updateStatsUI();
-              cache[path] = updatedAt; saveCache(cache);
-              log('info', `✅ ซิงค์สำเร็จ: ${path}`);
-            }
-
-          } catch (err) {
-            stats.failed++; stats.processed++; updateStatsUI();
-            log('error', `Exception ${path}: ${err.message}`);
-          }
-        }
-
-        const now = new Date().toLocaleString();
-        lastSyncEl.textContent = `ซิงค์ล่าสุด: ${now}`;
-        statusEl.textContent = `✅ ซิงค์เสร็จ (สำเร็จ ${stats.success}, ข้าม ${stats.skipped}, ล้มเหลว ${stats.failed})`;
-        log('info', `สรุป: สำเร็จ ${stats.success}, ข้าม ${stats.skipped}, ล้มเหลว ${stats.failed}`);
-
-      } catch (err) {
-        log('error', `Critical sync error: ${err.message}`);
-        statusEl.textContent = '❌ เกิดข้อผิดพลาดในการซิงค์';
-      } finally {
-        isSyncing = false;
-      }
+        lastSyncEl.textContent='ซิงค์ล่าสุด: '+new Date().toLocaleString();
+        statusEl.textContent=`✅ เสร็จสิ้น (สำเร็จ ${stats.success}, ข้าม ${stats.skipped}, ล้มเหลว ${stats.failed})`;
+      }catch(err){log('error',`Critical: ${err.message}`);statusEl.textContent='❌ Error';}
+      finally{isSyncing=false;}
     }
 
-    // -------------------------
-    // AUTO SYNC CONTROL
-    // -------------------------
-    function startAutoSync() {
-      stopAuto();
-      const intervalSec = Math.max(10, Number(autoIntervalInput.value) || 60);
-      autoSyncId = setInterval(() => {
-        if (!isSyncing) syncGallery();
-      }, intervalSec * 1000);
-      autoSyncToggle.checked = true;
-      log('info', `Auto Sync เริ่ม (ทุก ${intervalSec}s)`);
-    }
-    function stopAuto() {
-      if (autoSyncId) clearInterval(autoSyncId);
-      autoSyncId = null;
-      autoSyncToggle.checked = false;
-      log('info', 'Auto Sync หยุดแล้ว');
-    }
+    const startAutoSync=()=>{stopAuto();const s=Math.max(10,Number(autoIntervalInput.value)||60);autoSyncId=setInterval(()=>{if(!isSyncing)syncGallery();},s*1000);autoSyncToggle.checked=true;log('info',`Auto Sync เริ่ม (ทุก ${s}s)`);};
+    const stopAuto=()=>{if(autoSyncId)clearInterval(autoSyncId);autoSyncId=null;autoSyncToggle.checked=false;log('info','Auto Sync หยุดแล้ว');};
 
-    // -------------------------
-    // EVENTS
-    // -------------------------
-    syncNowBtn.addEventListener('click', syncGallery);
-    stopAutoBtn.addEventListener('click', () => { stopRequested = true; stopAuto(); });
-    clearLogBtn.addEventListener('click', () => { logEl.innerHTML = ''; resetStats(); });
-    clearCacheBtn.addEventListener('click', clearCache);
-    autoSyncToggle.addEventListener('change', e => e.target.checked ? startAutoSync() : stopAuto());
+    syncNowBtn.onclick=syncGallery;
+    stopAutoBtn.onclick=()=>{stopRequested=true;stopAuto();};
+    clearLogBtn.onclick=()=>{logEl.innerHTML='';stats={success:0,skipped:0,failed:0,processed:0,total:0};updateStatsUI();};
+    clearCacheBtn.onclick=clearCache;
+    autoSyncToggle.onchange=e=>e.target.checked?startAutoSync():stopAuto();
 
-    // -------------------------
-    // INIT
-    // -------------------------
-    window.addEventListener('DOMContentLoaded', async () => {
-      await loadModels();
-      if (autoSyncToggle.checked) startAutoSync();
-      setInterval(updateElapsed, 1000);
-    });
+    window.addEventListener('DOMContentLoaded',async()=>{await loadModels();setInterval(updateElapsed,1000);});
   </script>
 </body>
-</
-
+</html>
