@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin v2.6 | Face Sync (Smart Dual-Detector + Auto-Retry)</title>
+  <title>Admin v2.7 | Face Sync (Dual Detector + Retry + Preview)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 </head>
 <body class="bg-slate-900 text-white min-h-screen p-6">
-  <div class="max-w-5xl mx-auto">
-    <h1 class="text-3xl font-bold mb-4 text-center">🧠 Admin v2.6 — Dual-Detector + Auto-Retry (Smart & Safe)</h1>
+  <div class="max-w-6xl mx-auto">
+    <h1 class="text-3xl font-bold mb-4 text-center">🧠 Admin v2.7 — Face Sync Dashboard (Smart + Preview)</h1>
 
     <!-- Control panel -->
     <div class="bg-slate-800 rounded-xl p-5 mb-4 shadow">
@@ -62,21 +62,28 @@
       <h2 class="text-lg font-semibold mb-2">📜 Log</h2>
       <div id="log" class="h-72 overflow-y-auto bg-slate-900/30 p-3 rounded text-xs font-mono"></div>
     </div>
+
+    <!-- Failed Preview -->
+    <div class="bg-slate-800 rounded-xl p-4 shadow">
+      <h2 class="text-lg font-semibold mb-3">❌ ภาพที่ตรวจไม่ผ่าน</h2>
+      <div id="failedGrid" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+    </div>
   </div>
 
   <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
-
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
     const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
     const BUCKET = "gallery";
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const $ = id => document.getElementById(id);
+    const delay = ms => new Promise(r => setTimeout(r, ms));
+
     const log = (type, text) => {
       const time = new Date().toLocaleTimeString();
-      const color = type === 'error' ? 'text-red-300' : type === 'warn' ? 'text-yellow-300' : 'text-green-300';
-      const div = document.createElement('div');
+      const color = type === "error" ? "text-red-300" : type === "warn" ? "text-yellow-300" : "text-green-300";
+      const div = document.createElement("div");
       div.className = `${color} mb-1`;
       div.innerHTML = `<span class="text-gray-400">[${time}]</span> ${text}`;
       $("log").prepend(div);
@@ -84,8 +91,8 @@
 
     let isSyncing = false, stopRequested = false, autoSyncId = null, startTime = null;
     let stats = { success: 0, skipped: 0, failed: 0, processed: 0, total: 0 };
+    const failedImages = new Map(); // เก็บภาพที่ตรวจไม่ผ่าน
 
-    const delay = ms => new Promise(r => setTimeout(r, ms));
     const updateStats = () => {
       $("countSuccess").textContent = stats.success;
       $("countSkipped").textContent = stats.skipped;
@@ -114,31 +121,43 @@
     async function detectFaceSmart(img, retry = 0) {
       try {
         let det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-        if (!det) {
-          det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.4 })).withFaceLandmarks().withFaceDescriptor();
-        }
+        if (!det)
+          det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.4 }))
+            .withFaceLandmarks().withFaceDescriptor();
         return det;
       } catch (e) {
         if (retry < 2) {
-          log("warn", `🔄 Retry detect (${retry + 1})`);
           await delay(300);
           return await detectFaceSmart(img, retry + 1);
-        } else {
-          throw e;
-        }
+        } else throw e;
       }
     }
 
-    async function handleSync(path, map, cache, attempt = 0) {
+    function addFailedPreview(path, imgUrl, reason) {
+      if (failedImages.has(path)) return;
+      failedImages.set(path, true);
+      const div = document.createElement("div");
+      div.className = "bg-slate-700 p-2 rounded relative";
+      div.innerHTML = `
+        <img src="${imgUrl}" alt="${path}" class="rounded w-full object-cover h-40"/>
+        <p class="text-xs text-center mt-1 text-red-300">${reason}</p>
+        <button class="absolute bottom-2 right-2 bg-blue-600 hover:bg-blue-700 text-xs px-2 py-1 rounded retry-btn">Retry</button>
+      `;
+      $("failedGrid").appendChild(div);
+      div.querySelector(".retry-btn").onclick = async () => {
+        div.style.opacity = "0.5";
+        await handleSync(path, { [path]: { updated_at: new Date().toISOString() } }, loadCache(), 0, true);
+        div.remove();
+        failedImages.delete(path);
+      };
+    }
+
+    async function handleSync(path, map, cache, attempt = 0, singleRetry = false) {
       const cacheT = cache[path], updated = map[path].updated_at;
-      if (cacheT && updated <= cacheT) {
-        stats.skipped++; stats.processed++; updateStats(); return;
-      }
+      if (!singleRetry && cacheT && updated <= cacheT) { stats.skipped++; stats.processed++; updateStats(); return; }
       try {
         const { data: exists } = await supabase.from("faces").select("id").eq("image_url", path).maybeSingle();
-        if (exists) {
-          stats.skipped++; stats.processed++; cache[path] = updated; saveCache(cache); updateStats(); return;
-        }
+        if (exists) { stats.skipped++; stats.processed++; cache[path] = updated; saveCache(cache); updateStats(); return; }
 
         const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`;
         const img = await faceapi.fetchImage(imgUrl);
@@ -152,15 +171,18 @@
         const { error } = await supabase.rpc("insert_face_vector", { p_name: name, p_image_url: path, p_embedding: emb });
         if (error) throw new Error(error.message);
 
-        stats.success++; cache[path] = updated; saveCache(cache); log("info", `✅ ${path}`);
+        stats.success++; cache[path] = updated; saveCache(cache);
+        log("info", `✅ ${path}`);
       } catch (err) {
-        if (attempt < 2) {
+        if (attempt < 2 && !singleRetry) {
           log("warn", `Retry ${attempt + 1}/3: ${path} (${err.message})`);
           await delay(500);
           return await handleSync(path, map, cache, attempt + 1);
         } else {
           log("error", `❌ ${path}: ${err.message}`);
           stats.failed++;
+          const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`;
+          addFailedPreview(path, imgUrl, err.message);
         }
       } finally {
         stats.processed++; updateStats();
@@ -168,15 +190,24 @@
     }
 
     async function listRecursive(path = "", map = {}) {
-      const { data, error } = await supabase.storage.from(BUCKET).list(path, { limit: 1000 });
-      if (error) return map;
-      for (const item of data) {
-        if (!item.metadata) {
-          if (item.name.startsWith(".")) continue;
-          await listRecursive(path ? `${path}/${item.name}` : item.name, map);
-        } else {
-          map[path ? `${path}/${item.name}` : item.name] = { updated_at: item.updated_at };
+      const limit = 1000;
+      let offset = 0;
+      while (true) {
+        const { data, error } = await supabase.storage.from(BUCKET).list(path, { limit, offset });
+        if (error) { log("error", `Storage list error: ${error.message}`); break; }
+        if (!data || data.length === 0) break;
+        for (const item of data) {
+          if (!item.metadata) {
+            if (item.name.startsWith(".")) continue;
+            await listRecursive(path ? `${path}/${item.name}` : item.name, map);
+          } else {
+            const full = path ? `${path}/${item.name}` : item.name;
+            map[full] = { updated_at: item.updated_at };
+          }
         }
+        if (data.length < limit) break;
+        offset += limit;
+        await delay(100);
       }
       return map;
     }
@@ -198,11 +229,13 @@
       stopRequested = false; isSyncing = true;
       stats = { success: 0, skipped: 0, failed: 0, processed: 0, total: 0 };
       updateStats(); startTime = Date.now(); $("status").textContent = "🔄 เริ่มซิงค์...";
+      $("failedGrid").innerHTML = "";
       try {
         const map = await listRecursive("");
         const files = Object.keys(map).filter(p => p.match(/\.(jpg|jpeg|png|webp|gif)$/i));
         const cache = loadCache();
-        stats.total = files.length; updateStats(); log("info", `พบ ${stats.total} ไฟล์`);
+        stats.total = files.length; updateStats();
+        log("info", `พบ ${stats.total} ไฟล์`);
         const limit = Number($("rateLimit").value) || 5, delayMs = Number($("delayMs").value) || 200;
         await processWithRateLimit(files, limit, async p => await handleSync(p, map, cache), delayMs);
         $("lastSync").textContent = "ซิงค์ล่าสุด: " + new Date().toLocaleString();
