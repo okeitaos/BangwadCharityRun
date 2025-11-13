@@ -470,7 +470,20 @@ async function syncGallery() {
 /* ===========================================================
    🔘 BUTTONS
    =========================================================== */
-$("syncNow").onclick = syncGallery;
+if ($("syncNow")) $("syncNow").onclick = syncGallery;
+if ($("stopAuto")) $("stopAuto").onclick = () => { stopRequested = true; log("warn", "⏸️ หยุด Sync แล้ว"); };
+if ($("clearLog")) $("clearLog").onclick = () => { $("log").innerHTML = ""; stats = { success: 0, skipped: 0, failed: 0, processed: 0, total: 0 }; updateStats(); };
+if ($("clearCache")) $("clearCache").onclick = clearCache;
+if ($("autoSyncToggle"))
+  $("autoSyncToggle").onchange = (e) => {
+    if (e.target.checked) {
+      const secs = Number($("autoInterval")?.value) || 60;
+      autoSyncId = setInterval(syncGallery, secs * 1000);
+    } else {
+      clearInterval(autoSyncId);
+    }
+  };
+
 $("stopAuto").onclick = () => {
   stopRequested = true;
   log("warn", "⏸️ หยุด Sync แล้ว");
