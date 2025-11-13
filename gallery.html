@@ -366,8 +366,8 @@
     window.downloadImage = async (url, name) => await previewWatermarkedImage(url, name);
 
     setLang("th");
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
-    document.addEventListener("dragstart", (e) => e.preventDefault());
+    // document.addEventListener("contextmenu", (e) => e.preventDefault());
+    // document.addEventListener("dragstart", (e) => e.preventDefault());
     previewPopup.addEventListener("click", (e) => {
       if (e.target === previewPopup) previewPopup.classList.remove("show");
     });
