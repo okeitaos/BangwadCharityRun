@@ -99,6 +99,13 @@
 
     <div class="bg-slate-800 p-6 rounded-xl shadow-lg text-center">
       <input id="fileInput" type="file" accept="image/*" class="mb-4 w-full text-gray-300" />
+
+      <!-- 🆕 Multi-face toggle -->
+      <label class="flex items-center gap-2 mb-4 justify-center text-sm text-gray-300">
+        <input type="checkbox" id="multiFace" class="h-4 w-4">
+        ตรวจหลายใบหน้าในภาพ
+      </label>
+
       <div class="flex gap-2 mb-4">
         <button id="searchBtn" class="flex-1 bg-green-500 hover:bg-green-600 py-2 rounded-lg">
           🔎 <span id="btnSearchText">ค้นหาภาพ</span>
@@ -121,7 +128,7 @@
     </div>
   </div>
 
-  <!-- 🆕 Popup Preview -->
+  <!-- 🖼️ Popup Preview -->
   <div id="previewPopup">
     <div class="bg-slate-800 p-4 rounded-xl shadow-xl text-center max-w-lg w-[90%]">
       <h2 class="text-lg font-semibold mb-3">🖼️ Preview ก่อนดาวน์โหลด</h2>
@@ -141,11 +148,9 @@
     import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
     const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-    const SUPABASE_ANON_KEY =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
     const BUCKET = "gallery";
-    const WATERMARK_URL =
-      "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
+    const WATERMARK_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
     let SIM_THRESHOLD = 0.95;
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -158,9 +163,6 @@
     const thresholdInput = document.getElementById("threshold");
     const thresholdLabel = document.getElementById("thresholdLabel");
     const thresholdValue = document.getElementById("thresholdValue");
-    const title = document.getElementById("title");
-    const btnSearchText = document.getElementById("btnSearchText");
-    const btnClearText = document.getElementById("btnClearText");
     const previewPopup = document.getElementById("previewPopup");
     const previewCanvas = document.getElementById("previewCanvas");
     const confirmDownload = document.getElementById("confirmDownload");
@@ -200,28 +202,52 @@
     };
 
     let currentLang = "th";
-    function setLang(lang) {
+    const setLang = (lang) => {
       currentLang = lang;
       const t = LANG[lang];
-      title.textContent = t.title;
-      btnSearchText.textContent = t.btnSearch;
-      btnClearText.textContent = t.btnClear;
+      document.getElementById("title").textContent = t.title;
+      document.getElementById("btnSearchText").textContent = t.btnSearch;
+      document.getElementById("btnClearText").textContent = t.btnClear;
       thresholdLabel.textContent = t.level(Math.round(SIM_THRESHOLD * 100));
       thresholdValue.textContent = `≥ ${Math.round(SIM_THRESHOLD * 100)}%`;
       langToggle.textContent = lang === "th" ? "EN" : "TH";
       statusDiv.textContent = t.ready;
-    }
-
+    };
     langToggle.onclick = () => setLang(currentLang === "th" ? "en" : "th");
 
+    // ✅ โหลดโมเดลทั้งหมด
     statusDiv.textContent = LANG[currentLang].loading;
     const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
     await Promise.all([
       faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
+      faceapi.nets.tinyFaceDetector.loadFromUri(modelURL),
       faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
       faceapi.nets.faceRecognitionNet.loadFromUri(modelURL),
     ]);
     statusDiv.textContent = LANG[currentLang].ready;
+
+    // ✅ ฟังก์ชัน Hybrid Detection
+    async function detectFacesHybrid(file, allowMulti = false) {
+      const img = await createImageBitmap(file); // รองรับแนวนอน
+      let detections = [];
+
+      if (allowMulti) {
+        detections = await faceapi.detectAllFaces(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.25 }))
+          .withFaceLandmarks()
+          .withFaceDescriptors();
+      } else {
+        let det = await faceapi.detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 }))
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+        if (!det) {
+          det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.4 }))
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+        }
+        if (det) detections = [det];
+      }
+      return detections;
+    }
 
     const normalize = (desc) => {
       const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
@@ -241,73 +267,18 @@
       statusDiv.textContent = LANG[currentLang].ready;
     };
 
-    // ✅ ฟังก์ชัน Preview พร้อมลายน้ำ + ข้อความใหม่
-    async function previewWatermarkedImage(imageUrl, fileName) {
-      const [imgRes, watermarkRes] = await Promise.all([fetch(imageUrl), fetch(WATERMARK_URL)]);
-      const [imgBlob, watermarkBlob] = await Promise.all([imgRes.blob(), watermarkRes.blob()]);
-      const img = await createImageBitmap(imgBlob);
-      const watermark = await createImageBitmap(watermarkBlob);
-      const ctx = previewCanvas.getContext("2d");
-      previewCanvas.width = img.width;
-      previewCanvas.height = img.height;
-      ctx.drawImage(img, 0, 0, img.width, img.height);
-
-      // โลโก้ขวาล่าง
-      const aspectRatio = img.width / img.height;
-      let scaleFactor;
-      if (aspectRatio > 1.3) scaleFactor = 0.18;
-      else if (aspectRatio < 0.8) scaleFactor = 0.28;
-      else scaleFactor = 0.22;
-
-      const w = img.width * scaleFactor;
-      const s = w / watermark.width;
-      const h = watermark.height * s;
-      const x = img.width - w - 20;
-      const y = img.height - h - 20;
-      ctx.drawImage(watermark, x, y, w, h);
-
-      // ข้อความกลางล่าง (ขนาดเล็ก สีจาง เงาเบา)
-      const text = "BANGWAD CHARITY RUN 2025 | OFFICAIL";
-      const fontSize = Math.floor(img.width * 0.022);
-      ctx.font = `${fontSize}px 'Poppins', sans-serif`;
-      ctx.fillStyle = "rgba(255,255,255,0.65)";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "bottom";
-      ctx.shadowColor = "rgba(0,0,0,0.4)";
-      ctx.shadowBlur = 4;
-      ctx.fillText(text, img.width / 2, img.height - 12);
-
-      previewPopup.classList.add("show");
-
-      confirmDownload.onclick = () => {
-        previewCanvas.toBlob((b) => {
-          const l = document.createElement("a");
-          l.href = URL.createObjectURL(b);
-          l.download = fileName;
-          l.click();
-        }, "image/jpeg", 0.95);
-        previewPopup.classList.remove("show");
-      };
-
-      cancelPreview.onclick = () => previewPopup.classList.remove("show");
-    }
-
-    window.downloadImage = async (url, name) => {
-      await previewWatermarkedImage(url, name);
-    };
-
-    // ✅ ฟังก์ชันค้นหาใบหน้า
+    // ✅ ค้นหาใบหน้า
     searchBtn.onclick = async () => {
       const langPack = LANG[currentLang];
       const file = fileInput.files[0];
       if (!file) return alert(langPack.choose);
+      const multi = document.getElementById("multiFace").checked;
 
       resultDiv.innerHTML = langPack.analyzing;
-      const img = await faceapi.bufferToImage(file);
-      const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-      if (!det) return (resultDiv.innerHTML = langPack.notFound);
+      const detections = await detectFacesHybrid(file, multi);
+      if (!detections.length) return (resultDiv.innerHTML = langPack.notFound);
 
-      const embedding = normalize(Array.from(det.descriptor));
+      const embedding = normalize(Array.from(detections[0].descriptor));
       statusDiv.textContent = langPack.searching(Math.round(SIM_THRESHOLD * 100));
 
       try {
@@ -331,17 +302,16 @@
               .map(
                 (m) => `
              <div class="bg-slate-700 p-2 rounded-lg overflow-hidden relative">
-  <div class="relative">
-    <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}" 
-         class="rounded-lg mb-2 shadow w-full object-cover aspect-[3/4]" >
-    <img src="https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png"
-         class="absolute bottom-2 right-2 w-1/4 opacity-100 pointer-events-none select-none">
-  </div>
-  <p class="filename text-sm text-gray-200 mt-1" title="${m.name}">${m.name}</p>
-  <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
-  <button onclick="downloadImage('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}.jpg')" 
-          class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">${langPack.download}</button>
-</div>
+              <div class="relative">
+                <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}" 
+                    class="rounded-lg mb-2 shadow w-full object-cover aspect-[3/4]" >
+                <img src="${WATERMARK_URL}" class="absolute bottom-2 right-2 w-1/4 opacity-100 pointer-events-none select-none">
+              </div>
+              <p class="filename text-sm text-gray-200 mt-1" title="${m.name}">${m.name}</p>
+              <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
+              <button onclick="downloadImage('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}.jpg')" 
+                      class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">${langPack.download}</button>
+            </div>
             `
               )
               .join("")}
@@ -352,11 +322,52 @@
       }
     };
 
-    setLang("th");
+    // ✅ Preview + Download เดิม
+    async function previewWatermarkedImage(imageUrl, fileName) {
+      const [imgRes, watermarkRes] = await Promise.all([fetch(imageUrl), fetch(WATERMARK_URL)]);
+      const [imgBlob, watermarkBlob] = await Promise.all([imgRes.blob(), watermarkRes.blob()]);
+      const img = await createImageBitmap(imgBlob);
+      const watermark = await createImageBitmap(watermarkBlob);
+      const ctx = previewCanvas.getContext("2d");
+      previewCanvas.width = img.width;
+      previewCanvas.height = img.height;
+      ctx.drawImage(img, 0, 0, img.width, img.height);
+      const aspectRatio = img.width / img.height;
+      let scaleFactor = aspectRatio > 1.3 ? 0.18 : aspectRatio < 0.8 ? 0.28 : 0.22;
+      const w = img.width * scaleFactor;
+      const s = w / watermark.width;
+      const h = watermark.height * s;
+      const x = img.width - w - 20;
+      const y = img.height - h - 20;
+      ctx.drawImage(watermark, x, y, w, h);
+      const text = "BANGWAD CHARITY RUN 2025 | OFFICIAL";
+      const fontSize = Math.floor(img.width * 0.022);
+      ctx.font = `${fontSize}px 'Poppins', sans-serif`;
+      ctx.fillStyle = "rgba(255,255,255,0.65)";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.shadowColor = "rgba(0,0,0,0.4)";
+      ctx.shadowBlur = 4;
+      ctx.fillText(text, img.width / 2, img.height - 12);
+      previewPopup.classList.add("show");
 
+      confirmDownload.onclick = () => {
+        previewCanvas.toBlob((b) => {
+          const l = document.createElement("a");
+          l.href = URL.createObjectURL(b);
+          l.download = fileName;
+          l.click();
+        }, "image/jpeg", 0.95);
+        previewPopup.classList.remove("show");
+      };
+      cancelPreview.onclick = () => previewPopup.classList.remove("show");
+    }
+
+    window.downloadImage = async (url, name) => await previewWatermarkedImage(url, name);
+
+    setLang("th");
     document.addEventListener("contextmenu", (e) => e.preventDefault());
     document.addEventListener("dragstart", (e) => e.preventDefault());
-
     previewPopup.addEventListener("click", (e) => {
       if (e.target === previewPopup) previewPopup.classList.remove("show");
     });
