@@ -39,7 +39,7 @@
       max-width: 400px;
       width: 100%;
       box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
-      display: none; /* ❗ ซ่อนฟอร์มก่อน */
+      display: none;
       flex-direction: column;
       align-items: center;
       gap: 15px;
@@ -160,149 +160,183 @@
   <div id="registeredInfo" class="readonly-info" style="display:none;"></div>
   <div id="status">กำลังโหลด...</div>
 
-  <script>
-  const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-  const SUPABASE_KEY =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  const LIFF_ID = "2001781240-2Px6N01b";
+<script>
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const LIFF_ID = "2001781240-2Px6N01b";
 
-  let userId = "", displayName = "", pictureUrl = "", email = "";
+let userId = "", displayName = "", pictureUrl = "", email = "";
 
-  async function main() {
-    await liff.init({ liffId: LIFF_ID });
+async function main() {
+  await liff.init({ liffId: LIFF_ID });
 
-    if (!liff.isLoggedIn()) return liff.login();
+  if (!liff.isLoggedIn()) return liff.login();
 
-    const statusBox = document.getElementById("status");
-    statusBox.innerText = "⏳ กำลังโหลดข้อมูล LINE...";
-    statusBox.classList.add("show");
+  const statusBox = document.getElementById("status");
+  statusBox.innerText = "⏳ กำลังโหลดข้อมูล LINE...";
+  statusBox.classList.add("show");
 
-    let profile, decoded;
+  let profile, decoded;
 
-    // ป้องกันเน็ตช้า → โหลดไม่สำเร็จ
-    try {
-      profile = await liff.getProfile();
-      decoded = liff.getDecodedIDToken();
-    } catch (err) {
-      statusBox.innerText = "❌ โหลดข้อมูล LINE ไม่สำเร็จ กรุณารีเฟรชหน้า";
-      return;
-    }
-
-    userId = profile?.userId || "";
-    displayName = profile?.displayName || "";
-    pictureUrl = profile?.pictureUrl || "";
-    email = decoded?.email || "";
-
-    // ❗ ถ้าโหลดข้อมูลไม่ครบ → ห้ามแสดงฟอร์ม
-    if (!userId || !displayName || !pictureUrl) {
-      statusBox.innerText = "❌ โหลดข้อมูลไม่สำเร็จ กรุณารีเฟรชหน้า";
-      return;
-    }
-
-    // แสดงโปรไฟล์
-    document.getElementById("profileSection").innerHTML = `
-      <img src="${pictureUrl}" alt="Profile">
-      <p><b>${displayName}</b></p>
-    `;
-
-    document.getElementById("email").value = email;
-
-    // 🔓 แสดงฟอร์มหลังโหลดสำเร็จ
-    document.getElementById("registerForm").style.display = "flex";
-
-    const { data } = await sb
-      .from("photographer_registration")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (data) {
-      showRegisteredInfo(data);
-    } else {
-      statusBox.innerText = "กรอกข้อมูลเพื่อลงทะเบียน";
-    }
+  try {
+    profile = await liff.getProfile();
+    decoded = liff.getDecodedIDToken();
+  } catch (err) {
+    statusBox.innerText = "❌ โหลดข้อมูล LINE ไม่สำเร็จ กรุณารีเฟรชหน้า";
+    return;
   }
 
-  function showRegisteredInfo(data) {
-    document.getElementById("registerForm").style.display = "none";
-    document.getElementById("registeredInfo").style.display = "block";
+  userId = profile?.userId || "";
+  displayName = profile?.displayName || "";
+  pictureUrl = profile?.pictureUrl || "";
+  email = decoded?.email || "";
 
-    document.getElementById("registeredInfo").innerHTML = `
-      <p><b>คำนำหน้า:</b> ${data.prefix}</p>
-      <p><b>ชื่อ:</b> ${data.first_name}</p>
-      <p><b>นามสกุล:</b> ${data.last_name}</p>
-      <p class="status"><b>สถานะ:</b> ${data.status}</p>
-    `;
-
-    const statusBox = document.getElementById("status");
-    statusBox.innerText = "✅ คุณได้ลงทะเบียนแล้ว";
+  if (!userId || !displayName || !pictureUrl) {
+    statusBox.innerText = "❌ โหลดข้อมูลไม่สำเร็จ กรุณารีเฟรชหน้า";
+    return;
   }
 
-  async function notifyTelegram(data) {
-    try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/notify_telegram`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": SUPABASE_KEY,
-          "Authorization": `Bearer ${SUPABASE_KEY}`,
-        },
-        body: JSON.stringify(data),
-      });
-      console.log(await res.json());
-    } catch (err) {
-      console.error("❌ Error notifying Telegram:", err);
-    }
+  statusBox.innerText = "✔ โหลดข้อมูลสำเร็จ";
+
+  document.getElementById("profileSection").innerHTML = `
+    <img src="${pictureUrl}" alt="Profile">
+    <p><b>${displayName}</b></p>
+  `;
+
+  document.getElementById("email").value = email;
+  document.getElementById("registerForm").style.display = "flex";
+
+  const { data } = await sb
+    .from("photographer_registration")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (data) {
+    showRegisteredInfo(data);
+  } else {
+    statusBox.innerText = "กรอกข้อมูลเพื่อลงทะเบียน";
   }
 
-  document.getElementById("registerForm").onsubmit = async (e) => {
-    e.preventDefault();
+  // ⭐ Realtime ฟังสถานะการอนุมัติ
+  sb
+    .channel("photographer-status")
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "photographer_registration",
+        filter: `user_id=eq.${userId}`
+      },
+      (payload) => {
+        const newStatus = payload.new.status;
 
-    const prefix = document.getElementById("prefix").value;
-    const first_name = document.getElementById("firstName").value.trim();
-    const last_name = document.getElementById("lastName").value.trim();
-    const statusBox = document.getElementById("status");
-    const submitBtn = document.getElementById("submitBtn");
+        console.log("Realtime status:", newStatus);
 
-    submitBtn.classList.add("loading");
-    submitBtn.innerHTML = '⏳ กำลังส่งข้อมูล... <span class="loader"></span>';
-    statusBox.innerText = "⏳ กำลังลงทะเบียน...";
-    statusBox.classList.add("show");
+        // อัปเดตหน้าแบบ realtime (ถ้ามี element .status อยู่)
+        const statusEl = document.querySelector('.status');
+        if (statusEl) statusEl.innerHTML = `<b>สถานะ:</b> ${newStatus}`;
 
-    const insertData = {
-      user_id: userId,
-      display_name: displayName,
-      picture_url: pictureUrl,
-      email,
-      prefix,
-      first_name,
-      last_name,
-      status: "pending",
-    };
+        // ถ้าอนุมัติ → เด้งไปหน้าอัปโหลดทันที
+        if (newStatus === "approved") {
+          setTimeout(() => {
+            window.location.href = "uploadgallery.html";
+          }, 600);
+        }
+      }
+    )
+    .subscribe();
 
-    const { error } = await sb
-      .from("photographer_registration")
-      .insert(insertData);
+}
 
-    if (error) {
-      statusBox.innerText = "❌ ลงทะเบียนไม่สำเร็จ (อาจลงทะเบียนแล้ว)";
-      submitBtn.classList.remove("loading");
-      submitBtn.innerText = "📤 ลงทะเบียน";
-      return;
-    }
+function showRegisteredInfo(data) {
+  document.getElementById("registerForm").style.display = "none";
+  document.getElementById("registeredInfo").style.display = "block";
 
-    await notifyTelegram(insertData);
+  document.getElementById("registeredInfo").innerHTML = `
+    <p><b>คำนำหน้า:</b> ${data.prefix}</p>
+    <p><b>ชื่อ:</b> ${data.first_name}</p>
+    <p><b>นามสกุล:</b> ${data.last_name}</p>
+    <p class="status"><b>สถานะ:</b> ${data.status}</p>
+  `;
 
-    statusBox.innerText = "✅ ลงทะเบียนสำเร็จ! กำลังแจ้งผู้ดูแล...";
+  const statusBox = document.getElementById("status");
+  statusBox.innerText = "✅ คุณได้ลงทะเบียนแล้ว";
+
+  // ถ้าอนุมัติแล้ว ให้พาไปหน้า uploadgallery.html
+  if (data.status === "approved") {
     setTimeout(() => {
-      showRegisteredInfo(insertData);
-      submitBtn.classList.remove("loading");
-      submitBtn.innerText = "📤 ลงทะเบียน";
-    }, 1000);
+      window.location.href = "uploadgallery.html";
+    }, 600);
+  }
+}
+
+async function notifyTelegram(data) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/notify_telegram`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_KEY,
+        "Authorization": `Bearer ${SUPABASE_KEY}`,
+      },
+      body: JSON.stringify(data),
+    });
+    console.log(await res.json());
+  } catch (err) {
+    console.error("❌ Error notifying Telegram:", err);
+  }
+}
+
+document.getElementById("registerForm").onsubmit = async (e) => {
+  e.preventDefault();
+
+  const prefix = document.getElementById("prefix").value;
+  const first_name = document.getElementById("firstName").value.trim();
+  const last_name = document.getElementById("lastName").value.trim();
+  const statusBox = document.getElementById("status");
+  const submitBtn = document.getElementById("submitBtn");
+
+  submitBtn.classList.add("loading");
+  submitBtn.innerHTML = '⏳ กำลังส่งข้อมูล... <span class="loader"></span>';
+  statusBox.innerText = "⏳ กำลังลงทะเบียน...";
+  statusBox.classList.add("show");
+
+  const insertData = {
+    user_id: userId,
+    display_name: displayName,
+    picture_url: pictureUrl,
+    email,
+    prefix,
+    first_name,
+    last_name,
+    status: "pending",
   };
 
-  main();
-  </script>
+  const { error } = await sb
+    .from("photographer_registration")
+    .insert(insertData);
+
+  if (error) {
+    statusBox.innerText = "❌ ลงทะเบียนไม่สำเร็จ (อาจลงทะเบียนแล้ว)";
+    submitBtn.classList.remove("loading");
+    submitBtn.innerText = "📤 ลงทะเบียน";
+    return;
+  }
+
+  await notifyTelegram(insertData);
+
+  statusBox.innerText = "✅ ลงทะเบียนสำเร็จ! กำลังแจ้งผู้ดูแล...";
+  setTimeout(() => {
+    showRegisteredInfo(insertData);
+    submitBtn.classList.remove("loading");
+    submitBtn.innerText = "📤 ลงทะเบียน";
+  }, 1000);
+};
+
+main();
+</script>
 </body>
 </html>
