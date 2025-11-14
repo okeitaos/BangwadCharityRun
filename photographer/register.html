@@ -39,7 +39,7 @@
       max-width: 400px;
       width: 100%;
       box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
-      display: flex;
+      display: none; /* ❗ ซ่อนฟอร์มก่อน */
       flex-direction: column;
       align-items: center;
       gap: 15px;
@@ -59,11 +59,6 @@
       box-sizing: border-box;
     }
 
-    select:focus, input:focus {
-      border-color: #facc15;
-      background: rgba(255, 255, 255, 0.15);
-    }
-
     button {
       background: linear-gradient(90deg, #06C755, #00B900);
       color: #fff;
@@ -71,11 +66,6 @@
       cursor: pointer;
       transition: 0.3s;
       position: relative;
-    }
-
-    button:hover {
-      opacity: 0.9;
-      transform: translateY(-2px);
     }
 
     button.loading {
@@ -181,22 +171,45 @@
 
   async function main() {
     await liff.init({ liffId: LIFF_ID });
+
     if (!liff.isLoggedIn()) return liff.login();
 
-    const profile = await liff.getProfile();
-    const decoded = liff.getDecodedIDToken();
+    const statusBox = document.getElementById("status");
+    statusBox.innerText = "⏳ กำลังโหลดข้อมูล LINE...";
+    statusBox.classList.add("show");
 
-    userId = profile.userId;
-    displayName = profile.displayName;
-    pictureUrl = profile.pictureUrl;
+    let profile, decoded;
+
+    // ป้องกันเน็ตช้า → โหลดไม่สำเร็จ
+    try {
+      profile = await liff.getProfile();
+      decoded = liff.getDecodedIDToken();
+    } catch (err) {
+      statusBox.innerText = "❌ โหลดข้อมูล LINE ไม่สำเร็จ กรุณารีเฟรชหน้า";
+      return;
+    }
+
+    userId = profile?.userId || "";
+    displayName = profile?.displayName || "";
+    pictureUrl = profile?.pictureUrl || "";
     email = decoded?.email || "";
 
+    // ❗ ถ้าโหลดข้อมูลไม่ครบ → ห้ามแสดงฟอร์ม
+    if (!userId || !displayName || !pictureUrl) {
+      statusBox.innerText = "❌ โหลดข้อมูลไม่สำเร็จ กรุณารีเฟรชหน้า";
+      return;
+    }
+
+    // แสดงโปรไฟล์
     document.getElementById("profileSection").innerHTML = `
       <img src="${pictureUrl}" alt="Profile">
       <p><b>${displayName}</b></p>
     `;
 
     document.getElementById("email").value = email;
+
+    // 🔓 แสดงฟอร์มหลังโหลดสำเร็จ
+    document.getElementById("registerForm").style.display = "flex";
 
     const { data } = await sb
       .from("photographer_registration")
@@ -207,8 +220,7 @@
     if (data) {
       showRegisteredInfo(data);
     } else {
-      document.getElementById("status").innerText = "กรอกข้อมูลเพื่อลงทะเบียน";
-      document.getElementById("status").classList.add("show");
+      statusBox.innerText = "กรอกข้อมูลเพื่อลงทะเบียน";
     }
   }
 
@@ -223,8 +235,8 @@
       <p class="status"><b>สถานะ:</b> ${data.status}</p>
     `;
 
-    document.getElementById("status").innerText = "✅ คุณได้ลงทะเบียนแล้ว";
-    document.getElementById("status").classList.add("show");
+    const statusBox = document.getElementById("status");
+    statusBox.innerText = "✅ คุณได้ลงทะเบียนแล้ว";
   }
 
   async function notifyTelegram(data) {
@@ -238,8 +250,7 @@
         },
         body: JSON.stringify(data),
       });
-      const result = await res.json();
-      console.log("📨 Telegram notify:", result);
+      console.log(await res.json());
     } catch (err) {
       console.error("❌ Error notifying Telegram:", err);
     }
@@ -247,13 +258,13 @@
 
   document.getElementById("registerForm").onsubmit = async (e) => {
     e.preventDefault();
+
     const prefix = document.getElementById("prefix").value;
     const first_name = document.getElementById("firstName").value.trim();
     const last_name = document.getElementById("lastName").value.trim();
     const statusBox = document.getElementById("status");
     const submitBtn = document.getElementById("submitBtn");
 
-    // แสดงสถานะโหลด
     submitBtn.classList.add("loading");
     submitBtn.innerHTML = '⏳ กำลังส่งข้อมูล... <span class="loader"></span>';
     statusBox.innerText = "⏳ กำลังลงทะเบียน...";
@@ -275,7 +286,6 @@
       .insert(insertData);
 
     if (error) {
-      console.error("❌ Insert Error:", error);
       statusBox.innerText = "❌ ลงทะเบียนไม่สำเร็จ (อาจลงทะเบียนแล้ว)";
       submitBtn.classList.remove("loading");
       submitBtn.innerText = "📤 ลงทะเบียน";
@@ -283,10 +293,8 @@
     }
 
     await notifyTelegram(insertData);
-    statusBox.innerText = "✅ ลงทะเบียนสำเร็จ! กำลังแจ้งผู้ดูแล...";
-    statusBox.classList.add("show");
 
-    // โหลดเสร็จ แสดงผลแบบ fade
+    statusBox.innerText = "✅ ลงทะเบียนสำเร็จ! กำลังแจ้งผู้ดูแล...";
     setTimeout(() => {
       showRegisteredInfo(insertData);
       submitBtn.classList.remove("loading");
