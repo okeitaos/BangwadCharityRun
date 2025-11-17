@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin | Block / Unblock Photographer</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white p-6">
+<h1 class="text-3xl font-bold text-yellow-400 mb-6">📸 Admin — จัดการช่างภาพ (Block / Unblock)</h1>
+<div id="photographerList" class="grid gap-4"></div>
+
+<script>
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function loadPhotographers() {
+  const { data, error } = await sb
+    .from("photographer_registration")
+    .select("user_id, prefix, first_name, last_name, is_blocked, profile_pic")
+    .order("first_name", { ascending: true });
+
+  if (error) {
+    console.error(error);
+    alert("โหลดข้อมูลไม่สำเร็จ");
+    return;
+  }
+
+  const container = document.getElementById("photographerList");
+  container.innerHTML = "";
+
+  data.forEach(p => {
+    const card = document.createElement("div");
+    card.className = "flex items-center bg-slate-800 p-4 rounded-xl shadow-lg";
+
+    card.innerHTML = `
+      <img src="${p.profile_pic || 'https://via.placeholder.com/80'}" class="w-16 h-16 rounded-full border-2 border-yellow-400"> 
+      <div class="ml-4 flex-1">
+        <div class="text-lg font-semibold">${p.prefix}${p.first_name} ${p.last_name}</div>
+        <div class="text-sm text-slate-300">UserID: ${p.user_id}</div>
+        <div class="mt-1 ${p.is_blocked ? 'text-red-400' : 'text-green-400'}">${p.is_blocked ? '🔴 Blocked' : '🟢 Active'}</div>
+      </div>
+      <button onclick="toggleBlock('${p.user_id}', ${p.is_blocked})" class="px-4 py-2 rounded-lg font-bold text-white ${p.is_blocked ? 'bg-green-600' : 'bg-red-600'}">${p.is_blocked ? 'Unblock' : 'Block'}</button>
+    `;
+
+    container.appendChild(card);
+  });
+}
+
+async function toggleBlock(userId, currentStatus) {
+  const newStatus = !currentStatus;
+  const { error } = await sb
+    .from("photographer_registration")
+    .update({ is_blocked: newStatus })
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error(error);
+    alert("ไม่สามารถอัปเดตสถานะได้");
+    return;
+  }
+
+  loadPhotographers();
+}
+
+loadPhotographers();
+</script>
+</body>
+</html>
