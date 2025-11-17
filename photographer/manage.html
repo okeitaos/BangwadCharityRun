@@ -24,7 +24,6 @@
 
 <h1 class="text-4xl font-semibold text-center text-[#f5f5f7] mb-10 tracking-tight">📸 Photographer Admin Dashboard</h1>
 
-<!-- Search + Filter Section -->
 <div class="max-w-4xl mx-auto mb-8 flex gap-4">
   <input id="searchBox" type="text" placeholder="🔍 ค้นหาช่างภาพ..." class="flex-1 px-4 py-3 rounded-xl glass focus:outline-none">
 
@@ -35,12 +34,12 @@
   </select>
 </div>
 
-<!-- Photographer Cards -->
 <div id="photographerList" class="grid gap-6 max-w-5xl mx-auto"></div>
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const SUPABASE_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let photographerData = [];
 
@@ -60,7 +59,6 @@ async function loadPhotographers() {
   renderPhotographers();
 }
 
-// Render function with search + filter
 function renderPhotographers() {
   const list = document.getElementById("photographerList");
   const keyword = document.getElementById("searchBox").value.toLowerCase();
@@ -86,7 +84,8 @@ function renderPhotographers() {
           </div>
         </div>
 
-        <div class="flex flex-col gap-2 text-right min-w-[140px]">
+        <div class="flex flex-col gap-2 text-right min-w-[150px]">
+
           <button onclick="toggleBlock('${p.user_id}', ${p.is_blocked})"
             class="px-4 py-2 rounded-lg font-bold text-white ${p.is_blocked ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'}">
             ${p.is_blocked ? 'Unblock' : 'Block'}
@@ -97,12 +96,16 @@ function renderPhotographers() {
             ลบไฟล์ทั้งหมด
           </button>
 
-          <button onclick=\"toggleUploadBlock('${p.user_id}', ${p.is_upload_blocked})\" class=\"px-4 py-2 rounded-lg font-bold text-white ${p.is_upload_blocked ? 'bg-blue-600 hover:bg-blue-500' : 'bg-blue-800 hover:bg-blue-700'}\">${p.is_upload_blocked ? 'อนุญาตอัปโหลด' : 'ห้ามอัปโหลด'}</button>
+          <button onclick="toggleUploadBlock('${p.user_id}', ${p.is_upload_blocked})"
+            class="px-4 py-2 rounded-lg font-bold text-white ${p.is_upload_blocked ? 'bg-blue-600 hover:bg-blue-500' : 'bg-blue-800 hover:bg-blue-700'}">
+            ${p.is_upload_blocked ? 'อนุญาตอัปโหลด' : 'ห้ามอัปโหลด'}
+          </button>
 
-          <button onclick=\"hardDeletePhotographer('${p.user_id}')\" class=\"px-4 py-2 rounded-lg font-bold text-white bg-red-900 hover:bg-red-800\">ลบช่างภาพ</button>('${p.user_id}')"
+          <button onclick="hardDeletePhotographer('${p.user_id}')"
             class="px-4 py-2 rounded-lg font-bold text-white bg-red-900 hover:bg-red-800">
             ลบช่างภาพ
           </button>
+
         </div>
       `;
 
@@ -113,7 +116,6 @@ function renderPhotographers() {
 async function toggleBlock(userId, currentStatus) {
   const newStatus = !currentStatus;
   const { error } = await sb.from("photographer_registration").update({ is_blocked: newStatus }).eq("user_id", userId);
-
   if (error) return alert("อัปเดตสถานะไม่สำเร็จ");
   loadPhotographers();
 }
@@ -148,8 +150,8 @@ async function deletePhotographer(userId) {
 }
 
 async function hardDeletePhotographer(userId) {
-  if (!confirm(`⚠️ ลบช่างภาพแบบถาวร?
-UserID: ${userId}`)) return;
+  if (!confirm(`⚠️ ลบช่างภาพแบบถาวร?\nUserID: ${userId}`)) return;
+
   const { error } = await sb.from("photographer_registration").delete().eq("user_id", userId);
   if (error) return alert("ไม่สามารถลบได้");
 
@@ -157,7 +159,6 @@ UserID: ${userId}`)) return;
   loadPhotographers();
 }
 
-// Events
 searchBox.addEventListener("input", renderPhotographers);
 filterStatus.addEventListener("change", renderPhotographers);
 
