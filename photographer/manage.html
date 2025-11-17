@@ -47,7 +47,7 @@ let photographerData = [];
 async function loadPhotographers() {
   const { data, error } = await sb
     .from("photographer_registration")
-    .select("user_id, prefix, first_name, last_name, is_blocked, picture_url")
+    .select("user_id, prefix, first_name, last_name, is_blocked, is_upload_blocked, picture_url")
     .order("first_name", { ascending: true });
 
   if (error) {
@@ -97,7 +97,9 @@ function renderPhotographers() {
             ลบไฟล์ทั้งหมด
           </button>
 
-          <button onclick="hardDeletePhotographer('${p.user_id}')"
+          <button onclick=\"toggleUploadBlock('${p.user_id}', ${p.is_upload_blocked})\" class=\"px-4 py-2 rounded-lg font-bold text-white ${p.is_upload_blocked ? 'bg-blue-600 hover:bg-blue-500' : 'bg-blue-800 hover:bg-blue-700'}\">${p.is_upload_blocked ? 'อนุญาตอัปโหลด' : 'ห้ามอัปโหลด'}</button>
+
+          <button onclick=\"hardDeletePhotographer('${p.user_id}')\" class=\"px-4 py-2 rounded-lg font-bold text-white bg-red-900 hover:bg-red-800\">ลบช่างภาพ</button>('${p.user_id}')"
             class="px-4 py-2 rounded-lg font-bold text-white bg-red-900 hover:bg-red-800">
             ลบช่างภาพ
           </button>
@@ -113,6 +115,21 @@ async function toggleBlock(userId, currentStatus) {
   const { error } = await sb.from("photographer_registration").update({ is_blocked: newStatus }).eq("user_id", userId);
 
   if (error) return alert("อัปเดตสถานะไม่สำเร็จ");
+  loadPhotographers();
+}
+
+async function toggleUploadBlock(userId, state) {
+  const newState = !state;
+  const { error } = await sb
+    .from("photographer_registration")
+    .update({ is_upload_blocked: newState })
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error(error);
+    alert("ไม่สามารถอัปเดตสิทธิ์อัปโหลดได้");
+    return;
+  }
   loadPhotographers();
 }
 
