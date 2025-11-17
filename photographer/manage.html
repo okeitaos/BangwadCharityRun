@@ -43,6 +43,7 @@ async function loadPhotographers() {
         <div class="mt-1 ${p.is_blocked ? 'text-red-400' : 'text-green-400'}">${p.is_blocked ? '🔴 Blocked' : '🟢 Active'}</div>
       </div>
       <button onclick="toggleBlock('${p.user_id}', ${p.is_blocked})" class="px-4 py-2 rounded-lg font-bold text-white ${p.is_blocked ? 'bg-green-600' : 'bg-red-600'}">${p.is_blocked ? 'Unblock' : 'Block'}</button>
+      <button onclick=\"deletePhotographer('${p.user_id}')\" class=\"ml-2 px-4 py-2 rounded-lg font-bold text-white bg-red-700\">ลบ</button>
     `;
 
     container.appendChild(card);
@@ -63,6 +64,39 @@ async function toggleBlock(userId, currentStatus) {
   }
 
   loadPhotographers();
+}
+
+async function deletePhotographer(userId) {
+  if (!confirm(`ต้องการลบช่างภาพ UserID: ${userId} พร้อมข้อมูลทั้งหมดหรือไม่?`)) return;
+
+  // 1) Soft Delete: ตั้งค่า deleted_at
+  const { error: softErr } = await sb
+    .from("photographer_registration")
+    .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+    .eq("user_id", userId);
+
+  if (softErr) {
+    console.error(softErr);
+    alert("Soft delete ล้มเหลว");
+    return;
+  }
+
+  // 2) ลบข้อมูลใน file_hashes
+  await sb.from("file_hashes").delete().eq("user_id", userId);
+
+  // 3) ลบข้อมูลใน faces
+  await sb.from("faces").delete().like("image_url", `${userId}/%`);
+
+  // 4) ลบรูปจาก Supabase Storage
+  const { data: files } = await sb.storage.from("gallery").list(`${userId}/`, { limit: 10000 });
+  if (files && files.length > 0) {
+    const removePaths = files.map(f => `${userId}/${f.name}`);
+    await sb.storage.from("gallery").remove(removePaths);
+  }
+
+  alert("ลบข้อมูลทั้งหมดของช่างภาพเรียบร้อยแล้ว (Soft Delete)");
+  loadPhotographers();
+}
 }
 
 loadPhotographers();
