@@ -457,6 +457,35 @@ function refreshProgress() {
   document.getElementById("fileInput").value = "";
 }
 
+/* ==============================
+ADD: BLOCK UPLOAD FUNCTION
+============================== */
+async function checkUploadBlocked(userId){
+const { data } = await sb
+.from("photographer_registration")
+.select("is_upload_blocked")
+.eq("user_id", userId)
+.single();
+
+
+if(data?.is_upload_blocked){
+alert("🚫 ผู้ดูแลระบบได้ปิดการอัปโหลดรูปภาพสำหรับบัญชีนี้");
+document.getElementById("fileInput").disabled = true;
+const uploadBtn = document.querySelector("button.btn-green[onclick='uploadFiles()']");
+if(uploadBtn){ uploadBtn.disabled = true; uploadBtn.style.opacity = 0.4; }
+document.getElementById("status").innerText = "🚫 ถูกปิดการอัปโหลดโดยผู้ดูแลระบบ";
+}
+}
+
+
+/* Inject without modifying original function */
+const _originalShowUploadSection = showUploadSection;
+showUploadSection = function(){
+_originalShowUploadSection();
+checkUploadBlocked(userId);
+};
+
+
 main();
 </script>
 
