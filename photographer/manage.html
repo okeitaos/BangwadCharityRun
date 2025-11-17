@@ -18,7 +18,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function loadPhotographers() {
   const { data, error } = await sb
-    .from("public.photographer_registration")
+    .from("photographer_registration")
     .select("user_id, prefix, first_name, last_name, is_blocked, picture_url")
     .order("first_name", { ascending: true });
 
