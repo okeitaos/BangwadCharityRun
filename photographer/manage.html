@@ -185,7 +185,7 @@ async function verifyAdmin() {
   const { data, error } = await sb
     .from("user_profiles")
     .select("role")
-    .eq("user_id", lineUserId)
+    .eq("userId", lineUserId)
     .single();
 
   if (error || !data) {
