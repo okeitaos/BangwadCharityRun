@@ -3,13 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin | Block / Unblock Photographer</title>
+<title>Admin | Manage Photographers</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-slate-900 text-white p-6">
-<h1 class="text-3xl font-bold text-yellow-400 mb-6">📸 Admin — จัดการช่างภาพ (Block / Unblock)</h1>
-<div id="photographerList" class="grid gap-4"></div>
+<h1 class="text-3xl font-bold text-yellow-400 mb-6">📸 Admin — จัดการช่างภาพ</h1>
+
+<div id="photographerList" class="grid gap-6"></div>
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
@@ -33,18 +35,41 @@ async function loadPhotographers() {
 
   data.forEach(p => {
     const card = document.createElement("div");
-    card.className = "flex items-center bg-slate-800 p-4 rounded-xl shadow-lg";
+    card.className = 
+      "flex items-center bg-slate-800 p-4 rounded-xl shadow-xl border border-slate-700";
 
     card.innerHTML = `
-      <img src=\"${p.picture_url || 'https://via.placeholder.com/80'}\" class=\"w-16 h-16 rounded-full border-2 border-yellow-400\"> 
+      <img src="${p.picture_url || 'https://via.placeholder.com/80'}"
+           class="w-20 h-20 rounded-full border-4 border-yellow-400 shadow-md object-cover">
+
       <div class="ml-4 flex-1">
-        <div class="text-lg font-semibold">${p.prefix}${p.first_name} ${p.last_name}</div>
+        <div class="text-xl font-semibold">${p.prefix}${p.first_name} ${p.last_name}</div>
         <div class="text-sm text-slate-300">UserID: ${p.user_id}</div>
-        <div class="mt-1 ${p.is_blocked ? 'text-red-400' : 'text-green-400'}">${p.is_blocked ? '🔴 Blocked' : '🟢 Active'}</div>
+
+        <div class="mt-1 ${p.is_blocked ? 'text-red-400' : 'text-green-400'} text-lg font-bold">
+          ${p.is_blocked ? '🔴 Blocked' : '🟢 Active'}
+        </div>
       </div>
-      <button onclick="toggleBlock('${p.user_id}', ${p.is_blocked})" class="px-4 py-2 rounded-lg font-bold text-white ${p.is_blocked ? 'bg-green-600' : 'bg-red-600'}">${p.is_blocked ? 'Unblock' : 'Block'}</button>
-      <button onclick=\"deletePhotographer('${p.user_id}')\" class=\"ml-2 px-4 py-2 rounded-lg font-bold text-white bg-red-700\">ลบไฟล์ทั้งหมด</button>
-      <button onclick=\"hardDeletePhotographer('${p.user_id}')\" class=\"ml-2 px-4 py-2 rounded-lg font-bold text-white bg-red-900\">ลบช่างภาพ</button>('${p.user_id}')\" class=\"ml-2 px-4 py-2 rounded-lg font-bold text-white bg-red-700\">ลบ</button>
+
+      <div class="flex flex-col gap-2">
+
+        <button onclick="toggleBlock('${p.user_id}', ${p.is_blocked})"
+          class="px-4 py-2 rounded-lg font-bold text-white 
+          ${p.is_blocked ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'}">
+          ${p.is_blocked ? 'Unblock' : 'Block'}
+        </button>
+
+        <button onclick="deletePhotographer('${p.user_id}')"
+          class="px-4 py-2 rounded-lg font-bold text-white bg-red-700 hover:bg-red-600">
+          ลบไฟล์ทั้งหมด
+        </button>
+
+        <button onclick="hardDeletePhotographer('${p.user_id}')"
+          class="px-4 py-2 rounded-lg font-bold text-white bg-red-900 hover:bg-red-800">
+          ลบช่างภาพ
+        </button>
+
+      </div>
     `;
 
     container.appendChild(card);
@@ -53,6 +78,7 @@ async function loadPhotographers() {
 
 async function toggleBlock(userId, currentStatus) {
   const newStatus = !currentStatus;
+
   const { error } = await sb
     .from("photographer_registration")
     .update({ is_blocked: newStatus })
@@ -60,15 +86,35 @@ async function toggleBlock(userId, currentStatus) {
 
   if (error) {
     console.error(error);
-    alert("ไม่สามารถอัปเดตสถานะได้");
+    alert("อัปเดตสถานะไม่สำเร็จ");
     return;
   }
 
   loadPhotographers();
 }
 
+async function deletePhotographer(userId) {
+  if (!confirm(`ต้องการลบไฟล์ทั้งหมดของ User: ${userId} หรือไม่?`)) return;
+
+  // ลบ file_hashes
+  await sb.from("file_hashes").delete().eq("user_id", userId);
+
+  // ลบ faces
+  await sb.from("faces").delete().like("image_url", `${userId}/%`);
+
+  // ลบจาก Storage
+  const { data: files } = await sb.storage.from("gallery").list(`${userId}/`, { limit: 10000 });
+
+  if (files && files.length > 0) {
+    const removePaths = files.map(f => `${userId}/${f.name}`);
+    await sb.storage.from("gallery").remove(removePaths);
+  }
+
+  alert("ลบไฟล์ทั้งหมดเรียบร้อยแล้ว");
+}
+
 async function hardDeletePhotographer(userId) {
-  if (!confirm(`⚠️ ต้องการลบช่างภาพ UserID: ${userId} แบบถาวรหรือไม่?`)) return;
+  if (!confirm(`⚠️ ต้องการลบช่างภาพ *ถาวร* คนนี้หรือไม่?\nUserID: ${userId}`)) return;
 
   const { error } = await sb
     .from("photographer_registration")
@@ -77,7 +123,7 @@ async function hardDeletePhotographer(userId) {
 
   if (error) {
     console.error(error);
-    alert("ไม่สามารถลบช่างภาพได้");
+    alert("ไม่สามารถลบได้");
     return;
   }
 
@@ -85,40 +131,8 @@ async function hardDeletePhotographer(userId) {
   loadPhotographers();
 }
 
-async function deletePhotographer(userId) {
-  if (!confirm(`ต้องการลบช่างภาพ UserID: ${userId} พร้อมข้อมูลทั้งหมดหรือไม่?`)) return;
-
-  // 1) Soft Delete: ตั้งค่า deleted_at
-  const { error: softErr } = await sb
-    .from("photographer_registration")
-    .update({ is_deleted: true, deleted_at: new Date().toISOString() })
-    .eq("user_id", userId);
-
-  if (softErr) {
-    console.error(softErr);
-    alert("Soft delete ล้มเหลว");
-    return;
-  }
-
-  // 2) ลบข้อมูลใน file_hashes
-  await sb.from("file_hashes").delete().eq("user_id", userId);
-
-  // 3) ลบข้อมูลใน faces
-  await sb.from("faces").delete().like("image_url", `${userId}/%`);
-
-  // 4) ลบรูปจาก Supabase Storage
-  const { data: files } = await sb.storage.from("gallery").list(`${userId}/`, { limit: 10000 });
-  if (files && files.length > 0) {
-    const removePaths = files.map(f => `${userId}/${f.name}`);
-    await sb.storage.from("gallery").remove(removePaths);
-  }
-
-  alert("ลบข้อมูลทั้งหมดของช่างภาพเรียบร้อยแล้ว (Soft Delete)");
-  loadPhotographers();
-}
-
-
 loadPhotographers();
 </script>
+
 </body>
 </html>
