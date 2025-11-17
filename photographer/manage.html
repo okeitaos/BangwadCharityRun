@@ -162,7 +162,56 @@ async function hardDeletePhotographer(userId) {
 searchBox.addEventListener("input", renderPhotographers);
 filterStatus.addEventListener("change", renderPhotographers);
 
-loadPhotographers();
+
+ /* ===========================================
+   🔐 LINE LOGIN + CHECK ADMIN PERMISSION
+   =========================================== */
+async function verifyAdmin() {
+  // โหลด LIFF
+  await liff.init({ liffId: "2001781240-k2PJ3Ap2" });
+
+  if (!liff.isLoggedIn()) {
+    liff.login();
+    return;
+  }
+
+  // ดึงโปรไฟล์ผู้ใช้จาก LINE
+  const profile = await liff.getProfile();
+  const lineUserId = profile.userId;
+
+  // ตรวจสอบสิทธิ์ในตาราง user_profiles
+  const { data, error } = await sb
+    .from("user_profiles")
+    .select("role")
+    .eq("user_id", lineUserId)
+    .single();
+
+  if (error || !data) {
+    document.body.innerHTML = `
+      <div class="text-center mt-20 text-red-400 text-3xl">
+        🚫 ไม่พบข้อมูลสิทธิ์ในระบบ
+      </div>
+    `;
+    return;
+  }
+
+  // ไม่ใช่ admin → บล็อคเข้าใช้งาน
+  if (data.role !== "admin") {
+    document.body.innerHTML = `
+      <div class="text-center mt-20 text-red-500 text-3xl">
+        🚫 คุณไม่มีสิทธิ์เข้าหน้านี้
+      </div>
+      <p class="text-center text-gray-300 mt-4">ต้องเป็นผู้ดูแลระบบ (admin) เท่านั้น</p>
+    `;
+    return;
+  }
+
+  // ถ้าผ่าน → โหลดข้อมูลช่างภาพ
+  loadPhotographers();
+}
+
+  verifyAdmin();
+
 </script>
 </body>
 </html>
