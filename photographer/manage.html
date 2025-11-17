@@ -3,17 +3,46 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin | Manage Photographers</title>
+<title>Admin | Photographer Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #0e0f11, #1a1c1f);
+    color: #fff;
+  }
+  .glass {
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+</style>
 </head>
-<body class="bg-slate-900 text-white p-6">
-<h1 class="text-3xl font-bold text-yellow-400 mb-8 text-center">📸 Admin — จัดการช่างภาพ</h1>
-<div id="photographerList" class="grid gap-6 max-w-4xl mx-auto"></div>
+<body class="p-8">
+
+<h1 class="text-4xl font-semibold text-center text-[#f5f5f7] mb-10 tracking-tight">📸 Photographer Admin Dashboard</h1>
+
+<!-- Search + Filter Section -->
+<div class="max-w-4xl mx-auto mb-8 flex gap-4">
+  <input id="searchBox" type="text" placeholder="🔍 ค้นหาช่างภาพ..." class="flex-1 px-4 py-3 rounded-xl glass focus:outline-none">
+
+  <select id="filterStatus" class="px-4 py-3 rounded-xl glass">
+    <option value="all">ทั้งหมด</option>
+    <option value="active">🟢 Active</option>
+    <option value="blocked">🔴 Blocked</option>
+  </select>
+</div>
+
+<!-- Photographer Cards -->
+<div id="photographerList" class="grid gap-6 max-w-5xl mx-auto"></div>
+
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let photographerData = [];
 
 async function loadPhotographers() {
   const { data, error } = await sb
@@ -27,95 +56,93 @@ async function loadPhotographers() {
     return;
   }
 
-  const container = document.getElementById("photographerList");
-  container.innerHTML = "";
+  photographerData = data;
+  renderPhotographers();
+}
 
-  data.forEach(p => {
-    const card = document.createElement("div");
-    card.className = "flex items-center bg-slate-800 p-5 rounded-2xl shadow-lg border border-slate-700 hover:shadow-2xl transition";
+// Render function with search + filter
+function renderPhotographers() {
+  const list = document.getElementById("photographerList");
+  const keyword = document.getElementById("searchBox").value.toLowerCase();
+  const filter = document.getElementById("filterStatus").value;
 
-    card.innerHTML = `
-      <img src="${p.picture_url || 'https://via.placeholder.com/80'}"
-           class="w-20 h-20 rounded-full border-4 border-yellow-400 shadow-md object-cover">
+  list.innerHTML = "";
 
-      <div class="ml-5 flex-1">
-        <div class="text-xl font-semibold">${p.prefix}${p.first_name} ${p.last_name}</div>
-        <div class="text-sm text-slate-300">UserID: ${p.user_id}</div>
-        <div class="mt-1 ${p.is_blocked ? 'text-red-400' : 'text-green-400'} text-lg font-bold">
-          ${p.is_blocked ? '🔴 Blocked' : '🟢 Active'}
+  photographerData
+    .filter(p => p.first_name.toLowerCase().includes(keyword) || p.last_name.toLowerCase().includes(keyword))
+    .filter(p => filter === "all" ? true : filter === "active" ? !p.is_blocked : p.is_blocked)
+    .forEach(p => {
+      const card = document.createElement("div");
+      card.className = "flex items-center glass p-5 rounded-2xl shadow-xl hover:shadow-2xl transition border border-slate-700";
+
+      card.innerHTML = `
+        <img src="${p.picture_url || 'https://via.placeholder.com/80'}" class="w-20 h-20 rounded-full border-4 border-yellow-400 shadow-md object-cover">
+
+        <div class="ml-5 flex-1">
+          <div class="text-xl font-semibold">${p.prefix}${p.first_name} ${p.last_name}</div>
+          <div class="text-sm text-slate-300">UserID: ${p.user_id}</div>
+          <div class="mt-1 ${p.is_blocked ? 'text-red-400' : 'text-green-400'} text-lg font-bold">
+            ${p.is_blocked ? '🔴 Blocked' : '🟢 Active'}
+          </div>
         </div>
-      </div>
 
-      <div class="flex flex-col gap-2 text-right">
-        <button onclick="toggleBlock('${p.user_id}', ${p.is_blocked})"
-          class="px-4 py-2 rounded-lg font-bold text-white ${p.is_blocked ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'}">
-          ${p.is_blocked ? 'Unblock' : 'Block'}
-        </button>
+        <div class="flex flex-col gap-2 text-right min-w-[140px]">
+          <button onclick="toggleBlock('${p.user_id}', ${p.is_blocked})"
+            class="px-4 py-2 rounded-lg font-bold text-white ${p.is_blocked ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'}">
+            ${p.is_blocked ? 'Unblock' : 'Block'}
+          </button>
 
-        <button onclick="deletePhotographer('${p.user_id}')"
-          class="px-4 py-2 rounded-lg font-bold text-white bg-red-700 hover:bg-red-600">
-          ลบไฟล์ทั้งหมด
-        </button>
+          <button onclick="deletePhotographer('${p.user_id}')"
+            class="px-4 py-2 rounded-lg font-bold text-white bg-red-700 hover:bg-red-600">
+            ลบไฟล์ทั้งหมด
+          </button>
 
-        <button onclick="hardDeletePhotographer('${p.user_id}')"
-          class="px-4 py-2 rounded-lg font-bold text-white bg-red-900 hover:bg-red-800">
-          ลบช่างภาพ
-        </button>
-      </div>
-    `;
+          <button onclick="hardDeletePhotographer('${p.user_id}')"
+            class="px-4 py-2 rounded-lg font-bold text-white bg-red-900 hover:bg-red-800">
+            ลบช่างภาพ
+          </button>
+        </div>
+      `;
 
-    container.appendChild(card);
-  });
+      list.appendChild(card);
+    });
 }
 
 async function toggleBlock(userId, currentStatus) {
   const newStatus = !currentStatus;
-  const { error } = await sb
-    .from("photographer_registration")
-    .update({ is_blocked: newStatus })
-    .eq("user_id", userId);
+  const { error } = await sb.from("photographer_registration").update({ is_blocked: newStatus }).eq("user_id", userId);
 
-  if (error) {
-    console.error(error);
-    alert("อัปเดตสถานะไม่สำเร็จ");
-    return;
-  }
-
+  if (error) return alert("อัปเดตสถานะไม่สำเร็จ");
   loadPhotographers();
 }
 
 async function deletePhotographer(userId) {
-  if (!confirm(`ต้องการลบไฟล์ทั้งหมดของ User: ${userId} หรือไม่?`)) return;
+  if (!confirm(`ต้องการลบไฟล์ทั้งหมดของ User: ${userId}?`)) return;
 
   await sb.from("file_hashes").delete().eq("user_id", userId);
   await sb.from("faces").delete().like("image_url", `${userId}/%`);
 
   const { data: files } = await sb.storage.from("gallery").list(`${userId}/`, { limit: 10000 });
-  if (files && files.length > 0) {
-    const removePaths = files.map(f => `${userId}/${f.name}`);
-    await sb.storage.from("gallery").remove(removePaths);
+  if (files?.length) {
+    await sb.storage.from("gallery").remove(files.map(f => `${userId}/${f.name}`));
   }
 
-  alert("ลบไฟล์ทั้งหมดเรียบร้อยแล้ว");
+  alert("ลบไฟล์ทั้งหมดเสร็จสิ้น");
 }
 
 async function hardDeletePhotographer(userId) {
-  if (!confirm(`⚠️ ต้องการลบช่างภาพ *ถาวร* คนนี้หรือไม่?\nUserID: ${userId}`)) return;
+  if (!confirm(`⚠️ ลบช่างภาพแบบถาวร?
+UserID: ${userId}`)) return;
+  const { error } = await sb.from("photographer_registration").delete().eq("user_id", userId);
+  if (error) return alert("ไม่สามารถลบได้");
 
-  const { error } = await sb
-    .from("photographer_registration")
-    .delete()
-    .eq("user_id", userId);
-
-  if (error) {
-    console.error(error);
-    alert("ไม่สามารถลบได้");
-    return;
-  }
-
-  alert("ลบช่างภาพเรียบร้อยแล้ว (Hard Delete)");
+  alert("ลบช่างภาพเรียบร้อยแล้ว");
   loadPhotographers();
 }
+
+// Events
+searchBox.addEventListener("input", renderPhotographers);
+filterStatus.addEventListener("change", renderPhotographers);
 
 loadPhotographers();
 </script>
