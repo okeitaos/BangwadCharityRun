@@ -47,6 +47,11 @@
 
   button:hover { opacity: 0.85; }
 
+  .lang-btn {
+    background: #475569;
+    margin-bottom: 15px;
+  }
+
   .card {
     background: rgba(255,255,255,0.08);
     padding: 20px;
@@ -76,18 +81,79 @@
 
 <body>
 
-<h1>🔍 ตรวจสอบสถานะการสมัคร</h1>
+<button class="lang-btn" onclick="switchLang()">
+  🌏 <span id="langBtnText">English</span>
+</button>
 
-<p>กรอกเลขบัตรประชาชนเพื่อค้นหา</p>
+<h1 id="title">🔍 ตรวจสอบสถานะการสมัคร</h1>
+
+<p id="desc">กรอกเลขบัตรประชาชนเพื่อค้นหา</p>
 
 <input type="text" id="nationalId" placeholder="กรอกเลขบัตรประชาชน 13 หลัก">
-<button onclick="searchData()">ค้นหา</button>
+<button onclick="searchData()" id="searchBtn">ค้นหา</button>
 
 <div id="result"></div>
 
 <script>
+/* ==============================
+   LANGUAGE SYSTEM
+============================== */
+let lang = "th";
+
+const textData = {
+  th: {
+    title: "🔍 ตรวจสอบสถานะการสมัคร",
+    desc: "กรอกเลขบัตรประชาชนเพื่อค้นหา",
+    placeholder: "กรอกเลขบัตรประชาชน 13 หลัก",
+    searchBtn: "ค้นหา",
+    noCid: "❌ กรุณากรอกเลขบัตรประชาชน",
+    searching: "⏳ กำลังค้นหา...",
+    notFound: "❌ ไม่พบข้อมูลของเลขบัตรนี้",
+    labels: {
+      name: "ชื่อ",
+      age: "อายุ",
+      phone: "เบอร์โทร",
+      email: "อีเมล",
+      category: "ประเภท",
+      status: "สถานะการสมัคร",
+      created: "ลงทะเบียนเมื่อ",
+    }
+  },
+  en: {
+    title: "🔍 Check Registration Status",
+    desc: "Enter your national ID to search",
+    placeholder: "Enter 13-digit national ID",
+    searchBtn: "Search",
+    noCid: "❌ Please enter national ID",
+    searching: "⏳ Searching...",
+    notFound: "❌ No data found",
+    labels: {
+      name: "Name",
+      age: "Age",
+      phone: "Phone",
+      email: "Email",
+      category: "Category",
+      status: "Status",
+      created: "Registered at",
+    }
+  }
+};
+
+function switchLang() {
+  lang = lang === "th" ? "en" : "th";
+  document.getElementById("langBtnText").innerText = lang === "th" ? "English" : "ภาษาไทย";
+
+  document.getElementById("title").innerText = textData[lang].title;
+  document.getElementById("desc").innerText = textData[lang].desc;
+  document.getElementById("nationalId").placeholder = textData[lang].placeholder;
+  document.getElementById("searchBtn").innerText = textData[lang].searchBtn;
+}
+
+/* ==============================
+   SUPABASE QUERY
+============================== */
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";   // ใส่ anon key
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function searchData() {
@@ -95,11 +161,11 @@ async function searchData() {
   const result = document.getElementById("result");
 
   if (!nationalId) {
-    result.innerHTML = `<p style="color:#ef4444;">❌ กรุณากรอกเลขบัตรประชาชน</p>`;
+    result.innerHTML = `<p style="color:#ef4444;">${textData[lang].noCid}</p>`;
     return;
   }
 
-  result.innerHTML = `<p style="color:#facc15;">⏳ กำลังค้นหา...</p>`;
+  result.innerHTML = `<p style="color:#facc15;">${textData[lang].searching}</p>`;
 
   const { data, error } = await sb
     .from("bangwad")
@@ -108,25 +174,25 @@ async function searchData() {
     .maybeSingle();
 
   if (error || !data) {
-    result.innerHTML = `<p style="color:#ef4444;">❌ ไม่พบข้อมูลของเลขบัตรนี้</p>`;
+    result.innerHTML = `<p style="color:#ef4444;">${textData[lang].notFound}</p>`;
     return;
   }
 
-  // กำหนดสีสถานะ
+  const t = textData[lang].labels;
+
   let statusColor = "status-pending";
   if (data.status === "approved") statusColor = "status-approved";
   if (data.status === "rejected") statusColor = "status-rejected";
 
   result.innerHTML = `
     <div class="card">
-      <p><span class="label">ชื่อ:</span> ${data.first_name} ${data.last_name}</p>
-      <p><span class="label">อายุ:</span> ${data.age}</p>
-      <p><span class="label">เบอร์โทร:</span> ${data.phone}</p>
-      <p><span class="label">อีเมล:</span> ${data.email}</p>
-      <p><span class="label">ประเภท:</span> ${data.category}</p>
-      <p><span class="label">สถานะการสมัคร:</span> <span class="${statusColor}">${data.status}</span></p>
-      <p><span class="label">ลงทะเบียนเมื่อ:</span> ${new Date(data.created_at).toLocaleString("th-TH")}</p>
-
+      <p><span class="label">${t.name}:</span> ${data.first_name} ${data.last_name}</p>
+      <p><span class="label">${t.age}:</span> ${data.age}</p>
+      <p><span class="label">${t.phone}:</span> ${data.phone}</p>
+      <p><span class="label">${t.email}:</span> ${data.email}</p>
+      <p><span class="label">${t.category}:</span> ${data.category}</p>
+      <p><span class="label">${t.status}:</span> <span class="${statusColor}">${data.status}</span></p>
+      <p><span class="label">${t.created}:</span> ${new Date(data.created_at).toLocaleString("th-TH")}</p>
       ${data.slip_url ? `<img src="${data.slip_url}" class="slip">` : ""}
     </div>
   `;
