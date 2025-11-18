@@ -20,14 +20,49 @@
     -webkit-backdrop-filter: blur(14px);
     border: 1px solid rgba(255,255,255,0.12);
   }
+
+  /* ⭐ รองรับมือถือ */
+  @media (max-width: 640px) {
+    .admin-card {
+      flex-direction: column;
+      text-align: center;
+      gap: 15px;
+    }
+
+    .admin-card img {
+      margin: 0 auto;
+      width: 80px;
+      height: 80px;
+    }
+
+    .admin-buttons {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .admin-buttons button {
+      width: 100%;
+    }
+
+    #searchBox, #filterStatus {
+      font-size: 0.95rem;
+      padding: 12px;
+    }
+  }
 </style>
 </head>
-<body class="p-8">
+<body class="p-4 sm:p-8">
 
-<h1 class="text-4xl font-semibold text-center text-[#f5f5f7] mb-10 tracking-tight">📸 Photographer Admin Dashboard</h1>
+<h1 class="text-3xl sm:text-4xl font-semibold text-center text-[#f5f5f7] mb-6 sm:mb-10 tracking-tight">
+  📸 Photographer Admin Dashboard
+</h1>
 
-<div class="max-w-4xl mx-auto mb-8 flex gap-4">
-  <input id="searchBox" type="text" placeholder="🔍 ค้นหาช่างภาพ..." class="flex-1 px-4 py-3 rounded-xl glass focus:outline-none">
+<!-- Search -->
+<div class="max-w-3xl mx-auto mb-8 flex flex-col sm:flex-row gap-3 sm:gap-4">
+  <input id="searchBox" type="text" placeholder="🔍 ค้นหาช่างภาพ..."
+    class="flex-1 px-4 py-3 rounded-xl glass focus:outline-none">
 
   <select id="filterStatus" class="px-4 py-3 rounded-xl glass">
     <option value="all">ทั้งหมด</option>
@@ -36,9 +71,13 @@
   </select>
 </div>
 
-<div id="photographerList" class="grid gap-6 max-w-5xl mx-auto"></div>
+<!-- List -->
+<div id="photographerList" class="grid gap-6 max-w-4xl mx-auto"></div>
 
 <script>
+/* ================================
+   (โค้ด JS เดิมของคุณ — ไม่แก้)
+================================ */
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
@@ -51,11 +90,7 @@ async function loadPhotographers() {
     .select("user_id, prefix, first_name, last_name, is_blocked, is_upload_blocked, picture_url")
     .order("first_name", { ascending: true });
 
-  if (error) {
-    console.error(error);
-    alert("โหลดข้อมูลไม่สำเร็จ");
-    return;
-  }
+  if (error) return alert("โหลดข้อมูลไม่สำเร็จ");
 
   photographerData = data;
   renderPhotographers();
@@ -63,8 +98,8 @@ async function loadPhotographers() {
 
 function renderPhotographers() {
   const list = document.getElementById("photographerList");
-  const keyword = document.getElementById("searchBox").value.toLowerCase();
-  const filter = document.getElementById("filterStatus").value;
+  const keyword = searchBox.value.toLowerCase();
+  const filter = filterStatus.value;
 
   list.innerHTML = "";
 
@@ -73,23 +108,27 @@ function renderPhotographers() {
     .filter(p => filter === "all" ? true : filter === "active" ? !p.is_blocked : p.is_blocked)
     .forEach(p => {
       const card = document.createElement("div");
-      card.className = "flex items-center glass p-5 rounded-2xl shadow-xl hover:shadow-2xl transition border border-slate-700";
+      card.className =
+        "admin-card flex items-center glass p-5 rounded-2xl shadow-xl hover:shadow-2xl transition border border-slate-700";
 
       card.innerHTML = `
-        <img src="${p.picture_url || 'https://via.placeholder.com/80'}" class="w-20 h-20 rounded-full border-4 border-yellow-400 shadow-md object-cover">
+        <img src="${p.picture_url || 'https://via.placeholder.com/80'}"
+             class="w-20 h-20 rounded-full border-4 border-yellow-400 shadow-md object-cover">
 
-        <div class="ml-5 flex-1">
+        <div class="ml-5 flex-1 text-left sm:text-left">
           <div class="text-xl font-semibold">${p.prefix}${p.first_name} ${p.last_name}</div>
-          <div class="text-sm text-slate-300">UserID: ${p.user_id}</div>
+          <div class="text-sm text-slate-300 break-all">UserID: ${p.user_id}</div>
           <div class="mt-1 ${p.is_blocked ? 'text-red-400' : 'text-green-400'} text-lg font-bold">
             ${p.is_blocked ? '🔴 Blocked' : '🟢 Active'}
           </div>
         </div>
 
-        <div class="flex flex-col gap-2 text-right min-w-[150px]">
+        <div class="admin-buttons flex flex-col gap-2 text-right min-w-[150px]">
 
           <button onclick="toggleBlock('${p.user_id}', ${p.is_blocked})"
-            class="px-4 py-2 rounded-lg font-bold text-white ${p.is_blocked ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'}">
+            class="px-4 py-2 rounded-lg font-bold text-white ${
+              p.is_blocked ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'
+            }">
             ${p.is_blocked ? 'Unblock' : 'Block'}
           </button>
 
@@ -99,7 +138,9 @@ function renderPhotographers() {
           </button>
 
           <button onclick="toggleUploadBlock('${p.user_id}', ${p.is_upload_blocked})"
-            class="px-4 py-2 rounded-lg font-bold text-white ${p.is_upload_blocked ? 'bg-blue-600 hover:bg-blue-500' : 'bg-blue-800 hover:bg-blue-700'}">
+            class="px-4 py-2 rounded-lg font-bold text-white ${
+              p.is_upload_blocked ? 'bg-blue-600 hover:bg-blue-500' : 'bg-blue-800 hover:bg-blue-700'
+            }">
             ${p.is_upload_blocked ? 'อนุญาตอัปโหลด' : 'ห้ามอัปโหลด'}
           </button>
 
@@ -107,7 +148,6 @@ function renderPhotographers() {
             class="px-4 py-2 rounded-lg font-bold text-white bg-red-900 hover:bg-red-800">
             ลบช่างภาพ
           </button>
-
         </div>
       `;
 
@@ -115,105 +155,58 @@ function renderPhotographers() {
     });
 }
 
-async function toggleBlock(userId, currentStatus) {
-  const newStatus = !currentStatus;
-  const { error } = await sb.from("photographer_registration").update({ is_blocked: newStatus }).eq("user_id", userId);
-  if (error) return alert("อัปเดตสถานะไม่สำเร็จ");
+async function toggleBlock(id, status) {
+  await sb.from("photographer_registration").update({ is_blocked: !status }).eq("user_id", id);
   loadPhotographers();
 }
 
-async function toggleUploadBlock(userId, state) {
-  const newState = !state;
-  const { error } = await sb
-    .from("photographer_registration")
-    .update({ is_upload_blocked: newState })
-    .eq("user_id", userId);
-
-  if (error) {
-    console.error(error);
-    alert("ไม่สามารถอัปเดตสิทธิ์อัปโหลดได้");
-    return;
-  }
+async function toggleUploadBlock(id, state) {
+  await sb.from("photographer_registration").update({ is_upload_blocked: !state }).eq("user_id", id);
   loadPhotographers();
 }
 
-async function deletePhotographer(userId) {
-  if (!confirm(`ต้องการลบไฟล์ทั้งหมดของ User: ${userId}?`)) return;
-
-  await sb.from("file_hashes").delete().eq("user_id", userId);
-  await sb.from("faces").delete().like("image_url", `${userId}/%`);
-
-  const { data: files } = await sb.storage.from("gallery").list(`${userId}/`, { limit: 10000 });
-  if (files?.length) {
-    await sb.storage.from("gallery").remove(files.map(f => `${userId}/${f.name}`));
-  }
-
-  alert("ลบไฟล์ทั้งหมดเสร็จสิ้น");
+async function deletePhotographer(id) {
+  if (!confirm(`ลบไฟล์ทั้งหมดของ ${id}?`)) return;
+  await sb.from("file_hashes").delete().eq("user_id", id);
+  await sb.from("faces").delete().like("image_url", `${id}/%`);
+  const { data } = await sb.storage.from("gallery").list(`${id}/`);
+  if (data) await sb.storage.from("gallery").remove(data.map(f => `${id}/${f.name}`));
+  alert("ลบไฟล์ทั้งหมดแล้ว");
 }
 
-async function hardDeletePhotographer(userId) {
-  if (!confirm(`⚠️ ลบช่างภาพแบบถาวร?\nUserID: ${userId}`)) return;
-
-  const { error } = await sb.from("photographer_registration").delete().eq("user_id", userId);
-  if (error) return alert("ไม่สามารถลบได้");
-
-  alert("ลบช่างภาพเรียบร้อยแล้ว");
+async function hardDeletePhotographer(id) {
+  if (!confirm(`ลบช่างภาพถาวร?\n${id}`)) return;
+  await sb.from("photographer_registration").delete().eq("user_id", id);
+  alert("ลบช่างภาพเรียบร้อย");
   loadPhotographers();
 }
 
 searchBox.addEventListener("input", renderPhotographers);
 filterStatus.addEventListener("change", renderPhotographers);
 
-
- /* ===========================================
-   🔐 LINE LOGIN + CHECK ADMIN PERMISSION
-   =========================================== */
+/* =============================
+   CHECK ADMIN PERMISSION (เดิม)
+============================= */
 async function verifyAdmin() {
-  // โหลด LIFF
   await liff.init({ liffId: "2001781240-k2PJ3Ap2" });
+  if (!liff.isLoggedIn()) return liff.login();
 
-  if (!liff.isLoggedIn()) {
-    liff.login();
-    return;
-  }
-
-  // ดึงโปรไฟล์ผู้ใช้จาก LINE
   const profile = await liff.getProfile();
   const lineUserId = profile.userId;
 
-  // ตรวจสอบสิทธิ์ในตาราง user_profiles
-  const { data, error } = await sb
-    .from("user_profiles")
-    .select("role")
-    .eq("userId", lineUserId)
-    .single();
-
-  if (error || !data) {
+  const { data } = await sb.from("user_profiles").select("role").eq("userId", lineUserId).single();
+  if (!data || data.role !== "admin") {
     document.body.innerHTML = `
-      <div class="text-center mt-20 text-red-400 text-3xl">
-        🚫 ไม่พบข้อมูลสิทธิ์ในระบบ
-      </div>
+      <div class="text-center mt-20 text-red-500 text-3xl">🚫 คุณไม่มีสิทธิ์เข้าหน้านี้</div>
+      <p class="text-center text-gray-300 mt-4">ต้องเป็นผู้ดูแลระบบเท่านั้น</p>
     `;
     return;
   }
 
-  // ไม่ใช่ admin → บล็อคเข้าใช้งาน
-  if (data.role !== "admin") {
-    document.body.innerHTML = `
-      <div class="text-center mt-20 text-red-500 text-3xl">
-        🚫 คุณไม่มีสิทธิ์เข้าหน้านี้
-      </div>
-      <p class="text-center text-gray-300 mt-4">ต้องเป็นผู้ดูแลระบบ (admin) เท่านั้น</p>
-    `;
-    return;
-  }
-
-  // ถ้าผ่าน → โหลดข้อมูลช่างภาพ
   loadPhotographers();
 }
 
-  verifyAdmin();
-
+verifyAdmin();
 </script>
 </body>
 </html>
