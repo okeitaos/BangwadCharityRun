@@ -266,20 +266,19 @@ function exportExcel() {
 sb
   .channel("realtime:public:bangwad")
   .on(
-    'postgres_changes',
+    "postgres_changes",
     {
-      event: '*',
-      schema: 'public',
-      table: 'bangwad'
+      event: "*",
+      schema: "public",
+      table: "bangwad",
     },
     payload => {
       console.log("Realtime update:", payload);
-
-      // โหลดใหม่ทุกครั้งที่มีการเปลี่ยนแปลง
       loadData();
     }
   )
   .subscribe();
+
 
 loadData();
 </script>
