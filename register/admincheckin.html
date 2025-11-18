@@ -140,12 +140,13 @@
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let allData = [];
 
 /* =============================
-   LOAD DATA (พร้อมตรวจ error)
+   LOAD DATA
 ============================= */
 async function loadData() {
   const { data, error } = await sb.from("bangwad").select("*").order("id");
@@ -160,14 +161,11 @@ async function loadData() {
     return;
   }
 
-  allData = data.map((d, i) => {
-  const bibNumber = String(i + 1).padStart(3, "0"); // ทำให้เป็น 001, 002, 003
-  return {
+  // ใส่ BIB TOP001, TOP002...
+  allData = data.map((d, i) => ({
     ...d,
-    bib: "TOP" + bibNumber
-  };
-});
-
+    bib: "TOP" + String(i + 1).padStart(3, "0")
+  }));
 
   updateStats();
   renderTable();
@@ -192,40 +190,39 @@ function updateStats() {
    RENDER TABLE
 ============================= */
 function renderTable() {
-  if (!allData || allData.length === 0) return;
+  if (allData.length === 0) return;
 
   const status = document.getElementById("filterStatus").value;
   const category = document.getElementById("filterCategory").value;
 
   let rows = [...allData];
 
+  // Filter status
   if (status === "checked") rows = rows.filter(r => r.checkin_status === "checked");
   if (status === "not") rows = rows.filter(r => r.checkin_status !== "checked");
 
-  if (category !== "all") rows = rows.filter(r => r.category == category);
+  // Filter category
+  if (category !== "all") rows = rows.filter(r => r.category === category);
 
-  let html = "";
-  rows.forEach(r => {
-    html += `
-      <tr>
-        <td>${r.bib}</td>
-        <td>${r.first_name} ${r.last_name}</td>
-        <td>${r.phone}</td>
-        <td>${r.category}</td>
-        <td style="color:${r.checkin_status === "checked" ? "#22c55e" : "#ef4444"}">
-            ${r.checkin_status === "checked" ? "✓ เช็คอินแล้ว" : "ยังไม่เช็คอิน"}
-        </td>
-        <td>${r.checkin_time ? new Date(r.checkin_time).toLocaleString("th-TH") : "-"}</td>
-      </tr>
-    `;
-  });
+  // Build table HTML
+  const html = rows.map(r => `
+    <tr>
+      <td>${r.bib}</td>
+      <td>${r.first_name} ${r.last_name}</td>
+      <td>${r.phone}</td>
+      <td>${r.category}</td>
+      <td style="color:${r.checkin_status === "checked" ? "#22c55e" : "#ef4444"}">
+          ${r.checkin_status === "checked" ? "✓ เช็คอินแล้ว" : "ยังไม่เช็คอิน"}
+      </td>
+      <td>${r.checkin_time ? new Date(r.checkin_time).toLocaleString("th-TH") : "-"}</td>
+    </tr>
+  `).join("");
 
   document.getElementById("tableBody").innerHTML = html;
 }
 
-
 /* =============================
-   EXPORT EXCEL
+   EXPORT EXCEL (ตาม filter)
 ============================= */
 function exportExcel() {
   const status = document.getElementById("filterStatus").value;
@@ -252,13 +249,10 @@ function exportExcel() {
   `;
 
   rows.forEach(r => {
-    // สีแบ่งชายหญิง
-    let bg =
-      r.category === "TOP100MEN"
-        ? "#DBF3FF"
-        : r.category === "TOP100WOMEN"
-        ? "#FFE4F0"
-        : "white";
+    const bg =
+      r.category === "TOP100MEN" ? "#DBF3FF" :
+      r.category === "TOP100WOMEN" ? "#FFE4F0" :
+      "white";
 
     html += `
       <tr style="background:${bg};">
@@ -275,7 +269,6 @@ function exportExcel() {
 
   html += "</table>";
 
-  // สร้าง Blob เป็นไฟล์ .xls
   const blob = new Blob([html], { type: "application/vnd.ms-excel" });
   const url = URL.createObjectURL(blob);
 
@@ -287,18 +280,17 @@ function exportExcel() {
   URL.revokeObjectURL(url);
 }
 
-
 /* =============================
-   REALTIME AUTO UPDATE
+   REALTIME AUTO UPDATE (แก้แล้ว)
 ============================= */
 sb
-  .channel('realtime:bangwad')
+  .channel("realtime:public:bangwad")
   .on(
-    'postgres_changes',
+    "postgres_changes",
     {
-      event: '*',
-      schema: 'public',
-      table: 'bangwad'
+      event: "*",
+      schema: "public",
+      table: "bangwad"
     },
     payload => {
       console.log("Realtime update:", payload);
@@ -307,10 +299,12 @@ sb
   )
   .subscribe();
 
-
-
+/* =============================
+   START
+============================= */
 loadData();
 </script>
+
 
 </body>
 </html>
