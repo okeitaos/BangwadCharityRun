@@ -152,8 +152,12 @@ async function searchData(){
   if (data.status === "rejected") statusClass = "status-rejected";
 
   // QR Code จาก BIB
-  const qrText = `BIB:${bib} | Bangwad Charity Run`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrText)}`;
+// ลิงก์หน้าเช็คอิน (แก้ URL ให้เป็นของจริง)
+const qrLink = `https://yourdomain.com/checkin.html?bib=${bib}`;
+
+// QR Code ใช้ลิงก์สำหรับสแกนรับบิบ
+const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrLink)}`;
+
 
   result.innerHTML = `
     <div class="card">
