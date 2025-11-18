@@ -264,7 +264,7 @@ function exportExcel() {
    REALTIME AUTO UPDATE
 ============================= */
 sb
-  .channel('realtime:bangwad')
+  .channel("realtime:public:bangwad")
   .on(
     'postgres_changes',
     {
