@@ -223,26 +223,70 @@ function renderTable() {
   document.getElementById("tableBody").innerHTML = html;
 }
 
+
 /* =============================
    EXPORT EXCEL
 ============================= */
 function exportExcel() {
-  const worksheet = XLSX.utils.json_to_sheet(allData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Check-in");
+  const status = document.getElementById("filterStatus").value;
+  const category = document.getElementById("filterCategory").value;
 
-  XLSX.writeFile(workbook, "bangwad-checkin.xlsx");
-}
-/* =============================
-   EXPORT EXCEL
-============================= */
-function exportExcel() {
-  const worksheet = XLSX.utils.json_to_sheet(allData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Check-in");
+  let rows = [...allData];
 
-  XLSX.writeFile(workbook, "bangwad-checkin.xlsx");
+  if (status === "checked") rows = rows.filter(r => r.checkin_status === "checked");
+  if (status === "not") rows = rows.filter(r => r.checkin_status !== "checked");
+  if (category !== "all") rows = rows.filter(r => r.category === category);
+
+  // สร้าง HTML Table พร้อมสี
+  let html = `
+    <table border="1" style="border-collapse:collapse;">
+      <tr style="background:#1e293b; color:white;">
+        <th>BIB</th>
+        <th>First Name</th>
+        <th>Last Name</th>
+        <th>Phone</th>
+        <th>Category</th>
+        <th>Status</th>
+        <th>Check-in Time</th>
+      </tr>
+  `;
+
+  rows.forEach(r => {
+    // สีแบ่งชายหญิง
+    let bg =
+      r.category === "TOP100MEN"
+        ? "#DBF3FF"
+        : r.category === "TOP100WOMEN"
+        ? "#FFE4F0"
+        : "white";
+
+    html += `
+      <tr style="background:${bg};">
+        <td>${r.bib}</td>
+        <td>${r.first_name}</td>
+        <td>${r.last_name}</td>
+        <td>${r.phone}</td>
+        <td>${r.category}</td>
+        <td>${r.checkin_status === "checked" ? "Checked" : "Not Checked"}</td>
+        <td>${r.checkin_time ? new Date(r.checkin_time).toLocaleString("th-TH") : "-"}</td>
+      </tr>
+    `;
+  });
+
+  html += "</table>";
+
+  // สร้าง Blob เป็นไฟล์ .xls
+  const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "bangwad-checkin-colored.xls";
+  a.click();
+
+  URL.revokeObjectURL(url);
 }
+
 
 /* =============================
    REALTIME AUTO UPDATE
