@@ -132,7 +132,9 @@ async function searchData(){
 
   result.innerHTML = `<p style="color:#facc15">${text[lang].loading}</p>`;
 
-  // ดึงข้อมูลของผู้สมัคร
+  /* ============================
+     ดึงข้อมูลผู้สมัคร
+  ============================= */
   const { data, error } = await sb
     .from("bangwad")
     .select("*")
@@ -144,7 +146,9 @@ async function searchData(){
     return;
   }
 
-  /* ============ BIB ============ */
+  /* ============================
+     คำนวณ BIB ตามลำดับ id
+  ============================= */
   const { data: allRows } = await sb
     .from("bangwad")
     .select("id")
@@ -153,49 +157,60 @@ async function searchData(){
   const index = allRows.findIndex(r => r.id === data.id);
   const bib = "TOP" + String(index + 1).padStart(3, "0");
 
-  /* ============ STATUS (ตาม table 100%) ============ */
-  let rawStatus = (data.status || "").toLowerCase();
+  /* ============================
+     สถานะจาก table (ตรงตามจริง)
+  ============================= */
+  let displayStatus = data.status ?? "-";     // ถ้า null ให้เป็น "-"
+  let rawStatus = displayStatus.toLowerCase();
 
-  // ถ้าสตริงไม่ตรง 3 ตัวนี้ ให้ถือว่า pending
-  if (!["approved", "pending", "rejected"].includes(rawStatus)) {
-    rawStatus = "pending";
-  }
+  /* สีของสถานะ */
+  let statusClass = "status-pending";         // default = เหลือง
 
-  let statusKey = rawStatus;
+  if (rawStatus === "approved") statusClass = "status-approved";
+  else if (rawStatus === "rejected") statusClass = "status-rejected";
 
-  let statusClass = "status-pending";
-  if (statusKey === "approved") statusClass = "status-approved";
-  if (statusKey === "rejected") statusClass = "status-rejected";
-
-  /* ============ QR CODE ============ */
+  /* ============================
+     QR CODE
+  ============================= */
   const qrLink = `https://okeitaos.github.io/BangwadCharityRun/checkin.html?bib=${bib}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrLink)}`;
 
-  /* ============ OUTPUT HTML ============ */
+  /* ============================
+     แสดงผล HTML
+  ============================= */
   result.innerHTML = `
     <div class="card">
       <p><span class="label">${text[lang].bib}:</span> ${bib}</p>
-      <p><span class="label">${text[lang].name}:</span> ${data.first_name} ${data.last_name}</p>
+
+      <p><span class="label">${text[lang].name}:</span> 
+        ${data.first_name} ${data.last_name}
+      </p>
+
       <p><span class="label">${text[lang].age}:</span> ${data.age}</p>
       <p><span class="label">${text[lang].phone}:</span> ${data.phone}</p>
       <p><span class="label">${text[lang].email}:</span> ${data.email}</p>
       <p><span class="label">${text[lang].type}:</span> ${data.category}</p>
 
-      <p><span class="label">${text[lang].status}:</span>
-        <span class="${statusClass}">${text[lang][statusKey]}</span>
+      <p>
+        <span class="label">${text[lang].status}:</span>
+        <span class="${statusClass}">${displayStatus}</span>
       </p>
 
-      <p><span class="label">${text[lang].regAt}:</span> ${formatTime(data.created_at)}</p>
+      <p><span class="label">${text[lang].regAt}:</span> 
+        ${formatTime(data.created_at)}
+      </p>
 
       ${data.slip_url ? `<img src="${data.slip_url}" class="slip">` : ""}
 
       <div style="text-align:center;margin-top:25px;">
         <p class="label">${text[lang].qr}</p>
-        <img src="${qrUrl}" style="width:240px;height:240px;border-radius:10px;">
+        <img src="${qrUrl}" 
+             style="width:240px;height:240px;border-radius:10px;">
       </div>
     </div>
   `;
 }
+
 
 
 </script>
