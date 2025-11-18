@@ -132,6 +132,7 @@ async function searchData(){
 
   result.innerHTML = `<p style="color:#facc15">${text[lang].loading}</p>`;
 
+  // ดึงข้อมูลของคนนี้
   const { data, error } = await sb
     .from("bangwad")
     .select("*")
@@ -143,23 +144,44 @@ async function searchData(){
     return;
   }
 
-  // ดึงลำดับทั้งหมด
+  /* ===============================
+     คำนวณ BIB จาก index + padding
+  =============================== */
   const { data: allRows } = await sb
     .from("bangwad")
     .select("id")
     .order("id", { ascending: true });
 
-  // หาอันดับ
   const index = allRows.findIndex(r => r.id === data.id);
-  const bib = formatBib(index + 1);
+  const bib = "TOP" + String(index + 1).padStart(3, "0");
 
+  /* ===============================
+     แปลงสถานะจากฐานข้อมูล
+     (ใช้คอลัมน์: status)
+  =============================== */
+  let rawStatus = (data.status || "").toLowerCase();  // กัน null
+  let statusKey = "pending"; // default
+
+  if (rawStatus === "approved") statusKey = "approved";
+  else if (rawStatus === "rejected") statusKey = "rejected";
+  else statusKey = "pending";
+
+  /* ===============================
+     class สีตามสถานะ
+  =============================== */
   let statusClass = "status-pending";
-  if (data.status === "approved") statusClass = "status-approved";
-  if (data.status === "rejected") statusClass = "status-rejected";
+  if (statusKey === "approved") statusClass = "status-approved";
+  if (statusKey === "rejected") statusClass = "status-rejected";
 
+  /* ===============================
+     QR CODE
+  =============================== */
   const qrLink = `https://okeitaos.github.io/BangwadCharityRun/checkin.html?bib=${bib}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrLink)}`;
 
+  /* ===============================
+     แสดงผล HTML
+  =============================== */
   result.innerHTML = `
     <div class="card">
       <p><span class="label">${text[lang].bib}:</span> ${bib}</p>
@@ -168,9 +190,11 @@ async function searchData(){
       <p><span class="label">${text[lang].phone}:</span> ${data.phone}</p>
       <p><span class="label">${text[lang].email}:</span> ${data.email}</p>
       <p><span class="label">${text[lang].type}:</span> ${data.category}</p>
+
       <p><span class="label">${text[lang].status}:</span>
-        <span class="${statusClass}">${text[lang][data.status]}</span>
+        <span class="${statusClass}">${text[lang][statusKey]}</span>
       </p>
+
       <p><span class="label">${text[lang].regAt}:</span> ${formatTime(data.created_at)}</p>
 
       ${data.slip_url ? `<img src="${data.slip_url}" class="slip">` : ""}
@@ -182,6 +206,7 @@ async function searchData(){
     </div>
   `;
 }
+
 </script>
 
 
