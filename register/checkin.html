@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🏁 Check-in | Bangwad Charity Run</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+<style>
+  body {
+    font-family: "Prompt", sans-serif;
+    background: #0f172a;
+    color: #fff;
+    padding: 20px;
+    text-align: center;
+  }
+  h1 { color: #facc15; margin-bottom: 15px; }
+  input {
+    width: 90%; max-width: 350px;
+    padding: 12px; border-radius: 10px;
+    border: none; text-align: center;
+    font-size: 1.1rem;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+  }
+  button {
+    margin-top: 12px; padding: 12px 25px;
+    background: #3b82f6; color: #fff;
+    border-radius: 25px; border: none;
+    cursor: pointer; font-size: 1rem;
+  }
+  .card {
+    margin-top: 20px; padding: 20px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 15px;
+    max-width: 420px;
+    margin-left: auto; margin-right: auto;
+    text-align: left; line-height: 1.5;
+  }
+  .label { color: #facc15; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>🏁 เช็คอินรับป้ายวิ่ง</h1>
+<p>กรอกหมายเลข BIB ของคุณ</p>
+<input type="text" id="bibInput" placeholder="เช่น 001, 045, 120" />
+<button onclick="searchBib()">ค้นหา</button>
+<div id="result"></div>
+<script>
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+async function searchBib(){
+  const bib = document.getElementById("bibInput").value.trim();
+  const result = document.getElementById("result");
+  if(!bib){ result.innerHTML = `<p style='color:#ef4444;'>❌ กรุณากรอกหมายเลข BIB</p>`; return; }
+  result.innerHTML = `<p style='color:#facc15;'>⏳ กำลังค้นหา...</p>`;
+  const { data, error } = await sb.from("bangwad").select("*").eq("bib", bib).maybeSingle();
+  if(error || !data){ result.innerHTML = `<p style='color:#ef4444;'>❌ ไม่พบหมายเลขนี้</p>`; return; }
+  if(data.checked_in){ result.innerHTML = `<p style='color:#4ade80;'>✔ ผู้สมัครท่านนี้เช็คอินแล้ว</p>`; return; }
+  result.innerHTML = `
+    <div class='card'>
+      <p><span class='label'>ชื่อ:</span> ${data.first_name} ${data.last_name}</p>
+      <p><span class='label'>ประเภท:</span> ${data.category}</p>
+      <p><span class='label'>อายุ:</span> ${data.age}</p>
+      <p><span class='label'>เบอร์:</span> ${data.phone}</p>
+      <button onclick="checkIn('${data.id}')">✔ ยืนยันเช็คอิน</button>
+      <div id='qr'></div>
+    </div>
+  `;
+  new QRCode(document.getElementById("qr"), `BIB:${bib}`);
+}
+async function checkIn(id){
+  const { error } = await sb.from("bangwad").update({ checked_in: true }).eq("id", id);
+  if(error){ alert("❌ ไม่สามารถเช็คอินได้"); return; }
+  alert("✔ เช็คอินสำเร็จ!");
+  document.getElementById("result").innerHTML = `<p style='color:#4ade80;'>✔ เช็คอินเรียบร้อยแล้ว</p>`;
+}
+</script>
+</body>
+</html>
