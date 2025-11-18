@@ -187,7 +187,6 @@ function renderResult(){
   const bib = lastBib;
   const result = document.getElementById("result");
 
-  /* สถานะตาม table ตรง ๆ */
   let displayStatus = data.status ?? "-";
   let rawStatus = displayStatus.toLowerCase();
 
@@ -195,9 +194,18 @@ function renderResult(){
   if (rawStatus === "approved") statusClass = "status-approved";
   else if (rawStatus === "rejected") statusClass = "status-rejected";
 
-  /* QR CODE */
   const qrLink = `https://okeitaos.github.io/BangwadCharityRun/checkin.html?bib=${bib}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrLink)}`;
+
+  // ข้อความอธิบายการแชร์
+  const shareText = (lang === "th")
+      ? "กดปุ่มด้านล่างเพื่อแชร์ QR CODE นี้ให้เพื่อนของคุณ"
+      : "Press the button below to share this QR CODE with your friends";
+
+  // ข้อความในปุ่ม
+  const shareButtonText = (lang === "th")
+      ? "📤 แชร์ QR CODE ให้เพื่อน"
+      : "📤 Share this QR CODE";
 
   result.innerHTML = `
     <div class="card">
@@ -222,9 +230,45 @@ function renderResult(){
       <div style="text-align:center;margin-top:25px;">
         <p class="label">${text[lang].qr}</p>
         <img src="${qrUrl}" style="width:240px;height:240px;border-radius:10px;">
+
+        <p style="margin-top:15px; font-size:1rem; color:#facc15;">
+          ${lang === "th" 
+              ? "นำ QR CODE นี้ ไปรับบิบ" 
+              : "Bring this QR CODE to collect your BIB"}
+        </p>
+
+        <p style="margin-top:5px; font-size:0.9rem; color:#38bdf8;">
+          ${shareText}
+        </p>
+
+        <button onclick="shareQR('${qrLink}')" 
+            style="margin-top:12px;background:#3b82f6;padding:10px 20px;border-radius:10px;font-size:1rem;color:white;">
+          ${shareButtonText}
+        </button>
       </div>
     </div>
   `;
+}
+async function shareQR(link){
+  // ถ้า browser รองรับ Web Share API
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: "Bangwad Charity Run 2025",
+        text: (lang === "th")
+            ? "นี่คือ QR CODE สำหรับรับบิบของฉัน"
+            : "This is my BIB pickup QR CODE",
+        url: link
+      });
+      return;
+    } catch(err) {}
+  }
+
+  // ถ้าแชร์ไม่ได้ → คัดลอกลิงก์ให้เลย
+  navigator.clipboard.writeText(link);
+  alert((lang === "th")
+      ? "คัดลอกลิงก์แล้ว! ส่งให้เพื่อนได้เลย"
+      : "Link copied! Now you can paste and share it");
 }
 
 applyLanguage();
