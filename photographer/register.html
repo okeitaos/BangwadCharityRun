@@ -192,7 +192,7 @@
     userId = profile?.userId || "";
     displayName = profile?.displayName || "";
     pictureUrl = profile?.pictureUrl || "";
-    email = decoded?.email || "";
+    email = decoded?.email || "ไม่มี Email";
 
     // ❗ ถ้าโหลดข้อมูลไม่ครบ → ห้ามแสดงฟอร์ม
     if (!userId || !displayName || !pictureUrl) {
