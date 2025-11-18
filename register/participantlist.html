@@ -124,7 +124,7 @@ async function searchData() {
       <p><span class="label">เบอร์โทร:</span> ${data.phone}</p>
       <p><span class="label">อีเมล:</span> ${data.email}</p>
       <p><span class="label">ประเภท:</span> ${data.category}</p>
-      <p><span class="label">สถานะชำระเงิน:</span> <span class="${statusColor}">${data.status}</span></p>
+      <p><span class="label">สถานะการสมัคร:</span> <span class="${statusColor}">${data.status}</span></p>
       <p><span class="label">ลงทะเบียนเมื่อ:</span> ${new Date(data.created_at).toLocaleString("th-TH")}</p>
 
       ${data.slip_url ? `<img src="${data.slip_url}" class="slip">` : ""}
