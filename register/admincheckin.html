@@ -233,6 +233,37 @@ function exportExcel() {
 
   XLSX.writeFile(workbook, "bangwad-checkin.xlsx");
 }
+/* =============================
+   EXPORT EXCEL
+============================= */
+function exportExcel() {
+  const worksheet = XLSX.utils.json_to_sheet(allData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Check-in");
+
+  XLSX.writeFile(workbook, "bangwad-checkin.xlsx");
+}
+
+/* =============================
+   REALTIME AUTO UPDATE
+============================= */
+sb
+  .channel('realtime:bangwad')
+  .on(
+    'postgres_changes',
+    {
+      event: '*',
+      schema: 'public',
+      table: 'bangwad'
+    },
+    payload => {
+      console.log("Realtime update:", payload);
+      loadData();
+    }
+  )
+  .subscribe();
+
+loadData();
 
 loadData();
 </script>
