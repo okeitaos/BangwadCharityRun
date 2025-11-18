@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADMIN CHECK-IN | Bangwad Charity Run</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+  body {
+    font-family: "Prompt", sans-serif;
+    background: #0f172a;
+    color: #fff;
+    margin: 0;
+    padding: 0;
+  }
+
+  header {
+    background: #1e293b;
+    padding: 20px;
+    text-align: center;
+    border-bottom: 2px solid #334155;
+  }
+  header h1 {
+    margin: 0;
+    color: #facc15;
+    font-size: 1.8rem;
+  }
+
+  .container {
+    padding: 20px;
+    max-width: 1200px;
+    margin: auto;
+  }
+
+  .stats {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .box {
+    background: #1e293b;
+    padding: 20px;
+    border-radius: 15px;
+    flex: 1;
+    min-width: 200px;
+    text-align: center;
+  }
+  .box h2 { margin: 0; font-size: 2rem; color: #38bdf8; }
+  .box p  { margin: 5px 0 0; }
+
+  .filter-box {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  select, button {
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+  }
+  button {
+    background: #3b82f6;
+    color: white;
+  }
+
+  table {
+    width: 100%;
+    margin-top: 20px;
+    border-collapse: collapse;
+  }
+  table th, table td {
+    padding: 12px;
+    border-bottom: 1px solid #334155;
+  }
+  table th {
+    background: #1e293b;
+  }
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>📊 ADMIN CHECK-IN DASHBOARD</h1>
+</header>
+
+<div class="container">
+
+  <div class="stats">
+    <div class="box"><h2 id="total">0</h2><p>ผู้สมัครทั้งหมด</p></div>
+    <div class="box"><h2 id="checked">0</h2><p>เช็คอินแล้ว</p></div>
+    <div class="box"><h2 id="notchecked">0</h2><p>ยังไม่เช็คอิน</p></div>
+    <div class="box"><h2 id="percent">0%</h2><p>เปอร์เซ็นต์เช็คอิน</p></div>
+  </div>
+
+  <div class="filter-box">
+    <select id="filterStatus" onchange="renderTable()">
+      <option value="all">แสดงทั้งหมด</option>
+      <option value="checked">เช็คอินแล้ว</option>
+      <option value="not">ยังไม่เช็คอิน</option>
+    </select>
+
+    <select id="filterCategory" onchange="renderTable()">
+      <option value="all">ทุกประเภท</option>
+      <option value="50.4">50.4</option>
+      <option value="69.3">69.3</option>
+      <option value="100.8">100.8</option>
+    </select>
+
+    <button onclick="exportExcel()">⬇ Export Excel</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>BIB</th>
+        <th>ชื่อ</th>
+        <th>เบอร์</th>
+        <th>ประเภท</th>
+        <th>สถานะ</th>
+        <th>เวลาเช็คอิน</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+
+</div>
+
+<script>
+/* =============================
+   CONFIG
+============================= */
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXNhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let allData = [];
+
+/* =============================
+   LOAD DATA
+============================= */
+async function loadData() {
+  const { data } = await sb.from("bangwad").select("*").order("id");
+  allData = data.map((d, i) => ({
+    ...d,
+    bib: "TOP" + (i + 1)
+  }));
+  updateStats();
+  renderTable();
+}
+
+/* =============================
+   UPDATE STATS
+============================= */
+function updateStats() {
+  const total = allData.length;
+  const checked = allData.filter(r => r.checkin_status === "checked").length;
+  const notchecked = total - checked;
+
+  document.getElementById("total").innerText = total;
+  document.getElementById("checked").innerText = checked;
+  document.getElementById("notchecked").innerText = notchecked;
+  document.getElementById("percent").innerText =
+    ((checked / total) * 100).toFixed(1) + "%";
+}
+
+/* =============================
+   RENDER TABLE
+============================= */
+function renderTable() {
+  const status = document.getElementById("filterStatus").value;
+  const category = document.getElementById("filterCategory").value;
+
+  let rows = allData;
+
+  if (status === "checked") rows = rows.filter(r => r.checkin_status === "checked");
+  if (status === "not") rows = rows.filter(r => r.checkin_status !== "checked");
+
+  if (category !== "all") rows = rows.filter(r => r.category == category);
+
+  let html = "";
+  rows.forEach(r => {
+    html += `
+      <tr>
+        <td>${r.bib}</td>
+        <td>${r.first_name} ${r.last_name}</td>
+        <td>${r.phone}</td>
+        <td>${r.category}</td>
+        <td style="color:${r.checkin_status === "checked" ? "#22c55e" : "#ef4444"}">
+            ${r.checkin_status === "checked" ? "✓ เช็คอินแล้ว" : "ยังไม่เช็คอิน"}
+        </td>
+        <td>${r.checkin_time ? new Date(r.checkin_time).toLocaleString("th-TH") : "-"}</td>
+      </tr>
+    `;
+  });
+
+  document.getElementById("tableBody").innerHTML = html;
+}
+
+/* =============================
+   EXPORT EXCEL
+============================= */
+function exportExcel() {
+  const worksheet = XLSX.utils.json_to_sheet(allData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Check-in");
+
+  XLSX.writeFile(workbook, "bangwad-checkin.xlsx");
+}
+
+/* START */
+loadData();
+</script>
+
+</body>
+</html>
