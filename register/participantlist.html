@@ -237,24 +237,27 @@ function renderResult(){
         </p>
 
         <div style="margin-top:12px;">
-          <button onclick="downloadQR('${qrUrl}', 'jpg')" 
-            style="background:#14b8a6;padding:10px 20px;border-radius:10px;margin:5px;color:white;">
-            JPG
-          </button>
+         <button onclick="downloadQR('${qrUrl}', 'jpg', '${data.first_name} ${data.last_name}', '${bib}')"
+   style="background:#14b8a6;padding:10px 20px;border-radius:10px;margin:5px;color:white;">
+  JPG
+</button>
 
-          <button onclick="downloadQR('${qrUrl}', 'png')" 
-            style="background:#0ea5e9;padding:10px 20px;border-radius:10px;margin:5px;color:white;">
-            PNG
-          </button>
+<button onclick="downloadQR('${qrUrl}', 'png', '${data.first_name} ${data.last_name}', '${bib}')"
+   style="background:#0ea5e9;padding:10px 20px;border-radius:10px;margin:5px;color:white;">
+  PNG
+</button>
+
         </div>
       </div>
     </div>
   `;
 }
 
-async function downloadQR(qrUrl, type) {
-  const LOGO_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
-  const finalUrl = qrUrl.replace("size=240x240", "size=1000x1000");
+async function downloadQR(qrUrl, type, fullName, bibNumber) {
+
+  const LOGO_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png"; // เปลี่ยนลิงก์โลโก้ของคุณ
+
+  const finalUrl = qrUrl.replace("size=240x240", "size=800x800");
 
   const qrImg = new Image();
   const logoImg = new Image();
@@ -271,38 +274,85 @@ async function downloadQR(qrUrl, type) {
   ]);
 
   const canvas = document.createElement("canvas");
-  const size = 1000;
-  canvas.width = size;
-  canvas.height = size;
+
+  const cardWidth = 900;
+  const cardHeight = 1300;
+
+  canvas.width = cardWidth;
+  canvas.height = cardHeight;
 
   const ctx = canvas.getContext("2d");
 
-  // วาด QR Code
-  ctx.drawImage(qrImg, 0, 0, size, size);
+  /* ========= วาด Rounded Card พื้นหลัง ========= */
+  ctx.fillStyle = "#ffffff";
+  roundRect(ctx, 0, 0, cardWidth, cardHeight, 40, true, false);
 
-  // ขนาดโลโก้ (20% ของ QR)
-  const logoSize = size * 0.22;
+  /* ========= วาดโลโก้ ========= */
+  const logoSize = 220;
+  const logoX = (cardWidth - logoSize) / 2;
+  const logoY = 40;
 
-  // วางบนมุมขวาบน
-  const x = size - logoSize - 20;
-  const y = 20;
+  ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
 
-  ctx.drawImage(logoImg, x, y, logoSize, logoSize);
+  /* ========= ข้อความ ชื่อ + BIB ========= */
+  ctx.fillStyle = "#000";
+  ctx.textAlign = "center";
 
-  // แปลงเป็น JPG/PNG
+  ctx.font = "bold 42px Prompt";
+  ctx.fillText(fullName, cardWidth / 2, logoY + logoSize + 80);
+
+  ctx.font = "bold 38px Prompt";
+  ctx.fillStyle = "#555";
+  ctx.fillText("BIB: " + bibNumber, cardWidth / 2, logoY + logoSize + 140);
+
+  /* ========= เส้นแบ่ง ========= */
+  ctx.strokeStyle = "#ddd";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(80, logoY + logoSize + 170);
+  ctx.lineTo(cardWidth - 80, logoY + logoSize + 170);
+  ctx.stroke();
+
+  /* ========= QR CODE ========= */
+  const qrSize = 600;
+  const qrX = (cardWidth - qrSize) / 2;
+  const qrY = logoY + logoSize + 230;
+
+  ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+
+  /* ========= บันทึกไฟล์ ========= */
   const mime = type === "jpg" ? "image/jpeg" : "image/png";
   const dataURL = canvas.toDataURL(mime, 1.0);
 
-  // ดาวน์โหลดไฟล์ลงเครื่องทันที
   const link = document.createElement("a");
   link.href = dataURL;
-  link.download = `QR_BIB.${type}`;
+  link.download = `QR_${bibNumber}.${type}`;
   document.body.appendChild(link);
   link.click();
   link.remove();
 }
 
-
+/* ================= Helper: วาดกรอบมน ================= */
+function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
+  if (typeof stroke === 'undefined') stroke = true;
+  if (typeof radius === 'undefined') radius = 5;
+  if (typeof radius === 'number') {
+    radius = {tl: radius, tr: radius, br: radius, bl: radius};
+  }
+  ctx.beginPath();
+  ctx.moveTo(x + radius.tl, y);
+  ctx.lineTo(x + width - radius.tr, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius.tr);
+  ctx.lineTo(x + width, y + height - radius.br);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius.br, y + height);
+  ctx.lineTo(x + radius.bl, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius.bl);
+  ctx.lineTo(x, y + radius.tl);
+  ctx.quadraticCurveTo(x, y, x + radius.tl, y);
+  ctx.closePath();
+  if (fill) ctx.fill();
+  if (stroke) ctx.stroke();
+}
 
   
 applyLanguage();
