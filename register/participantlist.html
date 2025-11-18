@@ -31,9 +31,11 @@
     text-align: left; line-height: 1.6;
   }
   .label { color: #facc15; font-weight: bold; }
+
   .slip {
     width: 100%; max-width: 320px; margin-top: 10px; border-radius: 10px;
   }
+
   .status-approved { color: #4ade80; font-weight: bold; }
   .status-pending { color: #facc15; font-weight: bold; }
   .status-rejected { color: #ef4444; font-weight: bold; }
@@ -48,7 +50,6 @@
   TH / EN
 </button>
 
-
 <p id="desc">กรอกเลขบัตรประชาชนหรือหมายเลข Passport</p>
 
 <input type="text" id="nationalId" placeholder="กรอกเลขบัตร/Passport">
@@ -57,12 +58,19 @@
 <div id="result"></div>
 
 <script>
+/* ===================== CONFIG ===================== */
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const SUPABASE_KEY ="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+/* ภาษาเริ่มต้น */
 let lang = "th";
 
+/* เก็บข้อมูลล่าสุด */
+let lastData = null;
+let lastBib = null;
+
+/* ===================== MULTILANGUAGE ===================== */
 const text = {
   th: {
     title: "🔍 ตรวจสอบสถานะการสมัคร",
@@ -78,9 +86,6 @@ const text = {
     type: "ประเภท",
     regAt: "ลงทะเบียนเมื่อ",
     status: "สถานะการสมัคร",
-    approved: "ชำระเงินแล้ว",
-    pending: "รอตรวจสอบ",
-    rejected: "ไม่ผ่าน",
     bib: "หมายเลขประจำตัว",
     qr: "QR Code สำหรับรับป้ายหมายเลข"
   },
@@ -98,23 +103,26 @@ const text = {
     type: "Category",
     regAt: "Registered At",
     status: "Status",
-    approved: "Approved",
-    pending: "Pending",
-    rejected: "Rejected",
     bib: "BIB Number",
     qr: "QR Code for Bib Collection"
   }
 };
 
-function setLang(l){
-  lang = l;
-  document.getElementById("title").innerText = text[l].title;
-  document.getElementById("desc").innerText = text[l].desc;
-  document.getElementById("nationalId").placeholder = text[l].placeholder;
-  document.getElementById("searchBtn").innerText = text[l].search;
+function applyLanguage(){
+  document.getElementById("title").innerText = text[lang].title;
+  document.getElementById("desc").innerText = text[lang].desc;
+  document.getElementById("nationalId").placeholder = text[lang].placeholder;
+  document.getElementById("searchBtn").innerText = text[lang].search;
+
+  renderResult(); // ⭐ เปลี่ยนภาษาผลลัพธ์ด้วย
 }
 
-/* ✅ ฟังก์ชันเวลาไทย -- คืนกลับมาให้แล้ว */
+function toggleLang(){
+  lang = (lang === "th") ? "en" : "th";
+  applyLanguage();
+}
+
+/* ===================== เวลาไทย ===================== */
 function formatTime(t){
   if (!t) return "-";
   return new Date(t).toLocaleString("th-TH", {
@@ -128,26 +136,18 @@ function formatTime(t){
   });
 }
 
-
-
-function formatBib(num){
-  return "TOP" + String(num).padStart(3, "0");
-}
-
+/* ===================== SEARCH ===================== */
 async function searchData(){
   const natId = document.getElementById("nationalId").value.trim();
-  const result = document.getElementById("result");
+  const resultBox = document.getElementById("result");
 
   if (!natId){
-    result.innerHTML = `<p style="color:#ef4444">${text[lang].notfound}</p>`;
+    resultBox.innerHTML = `<p style="color:#ef4444">${text[lang].notfound}</p>`;
     return;
   }
 
-  result.innerHTML = `<p style="color:#facc15">${text[lang].loading}</p>`;
+  resultBox.innerHTML = `<p style="color:#facc15">${text[lang].loading}</p>`;
 
-  /* ============================
-     ดึงข้อมูลผู้สมัคร
-  ============================= */
   const { data, error } = await sb
     .from("bangwad")
     .select("*")
@@ -155,13 +155,11 @@ async function searchData(){
     .maybeSingle();
 
   if (error || !data){
-    result.innerHTML = `<p style="color:#ef4444">${text[lang].notfound}</p>`;
+    resultBox.innerHTML = `<p style="color:#ef4444">${text[lang].notfound}</p>`;
     return;
   }
 
-  /* ============================
-     คำนวณ BIB ตามลำดับ id
-  ============================= */
+  /* ===== คำนวณ BIB ===== */
   const { data: allRows } = await sb
     .from("bangwad")
     .select("id")
@@ -170,35 +168,36 @@ async function searchData(){
   const index = allRows.findIndex(r => r.id === data.id);
   const bib = "TOP" + String(index + 1).padStart(3, "0");
 
-  /* ============================
-     สถานะจาก table (ตรงตามจริง)
-  ============================= */
-  let displayStatus = data.status ?? "-";     // ถ้า null ให้เป็น "-"
+  lastData = data;
+  lastBib = bib;
+
+  renderResult();
+}
+
+/* ===================== RENDER RESULT ===================== */
+function renderResult(){
+  if (!lastData) return;
+
+  const data = lastData;
+  const bib = lastBib;
+  const result = document.getElementById("result");
+
+  /* ====== สถานะจาก Table ตรง ๆ ====== */
+  let displayStatus = data.status ?? "-";
   let rawStatus = displayStatus.toLowerCase();
 
-  /* สีของสถานะ */
-  let statusClass = "status-pending";         // default = เหลือง
-
+  let statusClass = "status-pending";
   if (rawStatus === "approved") statusClass = "status-approved";
   else if (rawStatus === "rejected") statusClass = "status-rejected";
 
-  /* ============================
-     QR CODE
-  ============================= */
+  /* ====== QR ====== */
   const qrLink = `https://okeitaos.github.io/BangwadCharityRun/checkin.html?bib=${bib}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrLink)}`;
 
-  /* ============================
-     แสดงผล HTML
-  ============================= */
   result.innerHTML = `
     <div class="card">
       <p><span class="label">${text[lang].bib}:</span> ${bib}</p>
-
-      <p><span class="label">${text[lang].name}:</span> 
-        ${data.first_name} ${data.last_name}
-      </p>
-
+      <p><span class="label">${text[lang].name}:</span> ${data.first_name} ${data.last_name}</p>
       <p><span class="label">${text[lang].age}:</span> ${data.age}</p>
       <p><span class="label">${text[lang].phone}:</span> ${data.phone}</p>
       <p><span class="label">${text[lang].email}:</span> ${data.email}</p>
@@ -209,41 +208,20 @@ async function searchData(){
         <span class="${statusClass}">${displayStatus}</span>
       </p>
 
-      <p><span class="label">${text[lang].regAt}:</span> 
-        ${formatTime(data.created_at)}
-      </p>
+      <p><span class="label">${text[lang].regAt}:</span> ${formatTime(data.created_at)}</p>
 
       ${data.slip_url ? `<img src="${data.slip_url}" class="slip">` : ""}
 
       <div style="text-align:center;margin-top:25px;">
         <p class="label">${text[lang].qr}</p>
-        <img src="${qrUrl}" 
-             style="width:240px;height:240px;border-radius:10px;">
+        <img src="${qrUrl}" style="width:240px;height:240px;border-radius:10px;">
       </div>
     </div>
   `;
 }
 
-// Toggle ภาษา
-function toggleLang(){
-  lang = (lang === "th") ? "en" : "th";
-  applyLanguage();
-}
-
-// เปลี่ยนข้อความบนหน้าจอ
-function applyLanguage(){
-  document.getElementById("title").innerText = text[lang].title;
-  document.getElementById("desc").innerText = text[lang].desc;
-  document.getElementById("nationalId").placeholder = text[lang].placeholder;
-  document.getElementById("searchBtn").innerText = text[lang].search;
-}
-
-// เรียกตอนโหลดหน้า
 applyLanguage();
-
-
 </script>
-
 
 </body>
 </html>
