@@ -92,12 +92,20 @@ const SUPABASE_KEY =
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ✅ ฟังก์ชันแปลงเวลาให้เป็นเวลาไทยแบบ 100% */
+// function formatThaiTime(dateString) {
+//   return new Intl.DateTimeFormat("th-TH", {
+//     dateStyle: "short",
+//     timeStyle: "medium",
+//     timeZone: "Asia/Bangkok"
+//   }).format(new Date(dateString));
+// }
 function formatThaiTime(dateString) {
-  return new Intl.DateTimeFormat("th-TH", {
-    dateStyle: "short",
-    timeStyle: "medium",
-    timeZone: "Asia/Bangkok"
-  }).format(new Date(dateString));
+  const iso = dateString.replace(" ", "T") + "Z";
+
+  return new Date(iso).toLocaleString("th-TH", {
+    timeZone: "Asia/Bangkok",
+    hour12: false
+  });
 }
 
 async function searchData() {
