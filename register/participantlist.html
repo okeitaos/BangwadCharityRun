@@ -24,7 +24,6 @@
     background: #3b82f6; color: #fff; padding: 12px 25px; border-radius: 25px;
     border: none; font-size: 1rem; font-weight: bold; margin-top: 10px; cursor: pointer;
   }
-  button:hover { opacity: 0.85; }
   .lang-btn { margin: 10px 5px; padding: 8px 16px; border-radius: 20px; background: #475569; }
   .card {
     background: rgba(255,255,255,0.08); padding: 20px; margin-top: 20px;
@@ -57,7 +56,7 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";  // ← ใส่ anon key ของคุณ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let lang = "th";
@@ -117,8 +116,8 @@ function formatTime(t){
   return new Date(t).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
 }
 
-function formatBib(id){
-  return "TOP" + String(id).padStart(3, "0");
+function formatBib(num){
+  return "TOP" + String(num).padStart(3, "0");
 }
 
 async function searchData(){
@@ -132,6 +131,7 @@ async function searchData(){
 
   result.innerHTML = `<p style="color:#facc15">${text[lang].loading}</p>`;
 
+  // 1) ดึงข้อมูลผู้สมัคร
   const { data, error } = await sb
     .from("bangwad")
     .select("*")
@@ -143,21 +143,26 @@ async function searchData(){
     return;
   }
 
-  // BIB = TOP + running number
-  const bib = formatBib(data.id);
+  // 2) ดึง id ทั้งหมดเรียง ASC
+  const { data: allRows } = await sb
+    .from("bangwad")
+    .select("id")
+    .order("id", { ascending: true });
+
+  // 3) หา index
+  const index = allRows.findIndex(r => r.id === data.id);
+
+  // 4) BIB = อันดับตามคิว
+  const bib = formatBib(index + 1);
 
   // Status Color
   let statusClass = "status-pending";
   if (data.status === "approved") statusClass = "status-approved";
   if (data.status === "rejected") statusClass = "status-rejected";
 
-  // QR Code จาก BIB
-// ลิงก์หน้าเช็คอิน (แก้ URL ให้เป็นของจริง)
-const qrLink = `https://okeitaos.github.io/BangwadCharityRun/checkin.html?bib=${bib}`;
-
-// QR Code ใช้ลิงก์สำหรับสแกนรับบิบ
-const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrLink)}`;
-
+  // QR Code → สำหรับหน้างาน Check-in
+  const qrLink = `https://okeitaos.github.io/BangwadCharityRun/checkin.html?bib=${bib}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrLink)}`;
 
   result.innerHTML = `
     <div class="card">
