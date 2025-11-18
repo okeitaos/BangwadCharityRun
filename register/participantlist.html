@@ -45,12 +45,12 @@
     cursor: pointer;
   }
 
-  button:hover { opacity: 0.85; }
-
-  .lang-btn {
-    background: #475569;
-    margin-bottom: 15px;
+  #langBtn {
+    background: #22c55e;
+    margin-bottom: 20px;
   }
+
+  button:hover { opacity: 0.85; }
 
   .card {
     background: rgba(255,255,255,0.08);
@@ -81,8 +81,8 @@
 
 <body>
 
-<button class="lang-btn" onclick="switchLang()">
-  🌏 <span id="langBtnText">English</span>
+<button id="langBtn" onclick="switchLang()">
+  <span id="langBtnText">English</span>
 </button>
 
 <h1 id="title">🔍 ตรวจสอบสถานะการสมัคร</h1>
@@ -95,11 +95,17 @@
 <div id="result"></div>
 
 <script>
-/* ==============================
-   LANGUAGE SYSTEM
-============================== */
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY =
+"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 let lang = "th";
 
+// ===========================
+// MULTI LANGUAGE DATA
+// ===========================
 const textData = {
   th: {
     title: "🔍 ตรวจสอบสถานะการสมัคร",
@@ -108,7 +114,7 @@ const textData = {
     searchBtn: "ค้นหา",
     noCid: "❌ กรุณากรอกเลขบัตรประชาชนหรือพาสปอร์ต",
     searching: "⏳ กำลังค้นหา...",
-    notFound: "❌ ไม่พบข้อมูลของเลขบัตรนี้",
+    notFound: "❌ ไม่พบข้อมูลของเลขนี้",
     labels: {
       name: "ชื่อ",
       age: "อายุ",
@@ -121,8 +127,8 @@ const textData = {
   },
   en: {
     title: "🔍 Check Registration Status",
-    desc: "Enter your national ID to search",
-    placeholder: "Enter 13-digit national ID",
+    desc: "Enter your National ID or Passport No.",
+    placeholder: "Enter National ID or Passport Number",
     searchBtn: "Search",
     noCid: "❌ Please enter National ID or Passport Number",
     searching: "⏳ Searching...",
@@ -134,65 +140,72 @@ const textData = {
       email: "Email",
       category: "Category",
       status: "Status",
-      created: "Registered at",
+      created: "Registered At",
     }
   }
 };
 
+// ===========================
+// SWITCH LANGUAGE
+// ===========================
 function switchLang() {
   lang = lang === "th" ? "en" : "th";
-  document.getElementById("langBtnText").innerText = lang === "th" ? "English" : "ภาษาไทย";
 
-  document.getElementById("title").innerText = textData[lang].title;
-  document.getElementById("desc").innerText = textData[lang].desc;
-  document.getElementById("nationalId").placeholder = textData[lang].placeholder;
-  document.getElementById("searchBtn").innerText = textData[lang].searchBtn;
+  document.getElementById("langBtnText").innerText =
+    lang === "th" ? "English" : "ภาษาไทย";
+
+  const t = textData[lang];
+
+  document.getElementById("title").innerText = t.title;
+  document.getElementById("desc").innerText = t.desc;
+  document.getElementById("nationalId").placeholder = t.placeholder;
+  document.getElementById("searchBtn").innerText = t.searchBtn;
 }
 
-/* ==============================
-   SUPABASE QUERY
-============================== */
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
+// ===========================
+// SEARCH FUNCTION
+// ===========================
 async function searchData() {
+  const t = textData[lang];
   const nationalId = document.getElementById("nationalId").value.trim();
   const result = document.getElementById("result");
 
   if (!nationalId) {
-    result.innerHTML = `<p style="color:#ef4444;">${textData[lang].noCid}</p>`;
+    result.innerHTML = `<p style="color:#ef4444;">${t.noCid}</p>`;
     return;
   }
 
-  result.innerHTML = `<p style="color:#facc15;">${textData[lang].searching}</p>`;
+  result.innerHTML = `<p style="color:#facc15;">${t.searching}</p>`;
 
+  // รองรับทั้ง citizen_id + passport
   const { data, error } = await sb
     .from("bangwad")
     .select("*")
-    .eq("national_id", nationalId)
+    .or(`national_id.eq.${nationalId},passport.eq.${nationalId}`)
     .maybeSingle();
 
   if (error || !data) {
-    result.innerHTML = `<p style="color:#ef4444;">${textData[lang].notFound}</p>`;
+    result.innerHTML = `<p style="color:#ef4444;">${t.notFound}</p>`;
     return;
   }
 
-  const t = textData[lang].labels;
-
+  // สีสถานะ
   let statusColor = "status-pending";
   if (data.status === "approved") statusColor = "status-approved";
   if (data.status === "rejected") statusColor = "status-rejected";
 
+  const L = t.labels;
+
   result.innerHTML = `
     <div class="card">
-      <p><span class="label">${t.name}:</span> ${data.first_name} ${data.last_name}</p>
-      <p><span class="label">${t.age}:</span> ${data.age}</p>
-      <p><span class="label">${t.phone}:</span> ${data.phone}</p>
-      <p><span class="label">${t.email}:</span> ${data.email}</p>
-      <p><span class="label">${t.category}:</span> ${data.category}</p>
-      <p><span class="label">${t.status}:</span> <span class="${statusColor}">${data.status}</span></p>
-      <p><span class="label">${t.created}:</span> ${new Date(data.created_at).toLocaleString("th-TH")}</p>
+      <p><span class="label">${L.name}:</span> ${data.first_name} ${data.last_name}</p>
+      <p><span class="label">${L.age}:</span> ${data.age}</p>
+      <p><span class="label">${L.phone}:</span> ${data.phone}</p>
+      <p><span class="label">${L.email}:</span> ${data.email}</p>
+      <p><span class="label">${L.category}:</span> ${data.category}</p>
+      <p><span class="label">${L.status}:</span> <span class="${statusColor}">${data.status}</span></p>
+      <p><span class="label">${L.created}:</span> ${new Date(data.created_at).toLocaleString("th-TH")}</p>
+
       ${data.slip_url ? `<img src="${data.slip_url}" class="slip">` : ""}
     </div>
   `;
