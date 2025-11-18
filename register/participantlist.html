@@ -237,7 +237,7 @@ function renderResult(){
         </p>
 
         <div style="margin-top:12px;">
-         <button onclick="downloadQR('${qrUrl}', 'jpg', '${data.first_name} ${data.last_name}', '${bib}')"
+        <button onclick="downloadQR('${qrUrl}', 'jpg', '${data.first_name} ${data.last_name}', '${bib}')"
    style="background:#14b8a6;padding:10px 20px;border-radius:10px;margin:5px;color:white;">
   JPG
 </button>
@@ -247,6 +247,7 @@ function renderResult(){
   PNG
 </button>
 
+
         </div>
       </div>
     </div>
@@ -254,10 +255,8 @@ function renderResult(){
 }
 
 async function downloadQR(qrUrl, type, fullName, bibNumber) {
-
-  const LOGO_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png"; // เปลี่ยนลิงก์โลโก้ของคุณ
-
-  const finalUrl = qrUrl.replace("size=240x240", "size=800x800");
+  const LOGO_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
+  const finalUrl = qrUrl.replace("size=240x240", "size=900x900");
 
   const qrImg = new Image();
   const logoImg = new Image();
@@ -275,67 +274,72 @@ async function downloadQR(qrUrl, type, fullName, bibNumber) {
 
   const canvas = document.createElement("canvas");
 
-  const cardWidth = 900;
-  const cardHeight = 1300;
+  const W = 1200; 
+  const H = 1800;
 
-  canvas.width = cardWidth;
-  canvas.height = cardHeight;
+  canvas.width = W;
+  canvas.height = H;
 
   const ctx = canvas.getContext("2d");
 
-  /* ========= วาด Rounded Card พื้นหลัง ========= */
+  /* ========= Background ========= */
+  const radius = 44;
   ctx.fillStyle = "#ffffff";
-  roundRect(ctx, 0, 0, cardWidth, cardHeight, 40, true, false);
+  roundRect(ctx, 0, 0, W, H, radius, true, false);
 
-  /* ========= วาดโลโก้ ========= */
-  const logoSize = 220;
-  const logoX = (cardWidth - logoSize) / 2;
-  const logoY = 40;
+  /* ========= Header (Dark Blue) ========= */
+  ctx.fillStyle = "#0f172a";
+  roundRect(ctx, 0, 0, W, 420, {tl: radius, tr: radius, br: 0, bl: 0}, true, false);
 
+  /* ========= Logo ========= */
+  const logoSize = 240;
+  const logoX = (W - logoSize) / 2;
+  const logoY = 60;
   ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
 
-  /* ========= ข้อความ ชื่อ + BIB ========= */
-  ctx.fillStyle = "#000";
+  /* ========= Title ========= */
+  ctx.fillStyle = "#facc15";
+  ctx.font = "bold 58px Prompt";
   ctx.textAlign = "center";
+  ctx.fillText("BANGWAD CHARITY RUN 2025", W / 2, 360);
 
-  ctx.font = "bold 42px Prompt";
-  ctx.fillText(fullName, cardWidth / 2, logoY + logoSize + 80);
+  /* ========= Name & BIB ========= */
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "bold 70px Prompt";
+  ctx.fillText(fullName, W / 2, 540);
 
-  ctx.font = "bold 38px Prompt";
-  ctx.fillStyle = "#555";
-  ctx.fillText("BIB: " + bibNumber, cardWidth / 2, logoY + logoSize + 140);
+  ctx.fillStyle = "#475569";
+  ctx.font = "bold 60px Prompt";
+  ctx.fillText("BIB : " + bibNumber, W / 2, 620);
 
-  /* ========= เส้นแบ่ง ========= */
-  ctx.strokeStyle = "#ddd";
+  /* ========= Divider ========= */
+  ctx.strokeStyle = "#e2e8f0";
   ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.moveTo(80, logoY + logoSize + 170);
-  ctx.lineTo(cardWidth - 80, logoY + logoSize + 170);
+  ctx.moveTo(140, 680);
+  ctx.lineTo(W - 140, 680);
   ctx.stroke();
 
   /* ========= QR CODE ========= */
-  const qrSize = 600;
-  const qrX = (cardWidth - qrSize) / 2;
-  const qrY = logoY + logoSize + 230;
+  const qrSize = 860;
+  const qrX = (W - qrSize) / 2;
+  const qrY = 740;
 
   ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
-  /* ========= บันทึกไฟล์ ========= */
+  /* ========= Save ========= */
   const mime = type === "jpg" ? "image/jpeg" : "image/png";
   const dataURL = canvas.toDataURL(mime, 1.0);
 
   const link = document.createElement("a");
   link.href = dataURL;
-  link.download = `QR_${bibNumber}.${type}`;
+  link.download = `BIB_${bibNumber}.${type}`;
   document.body.appendChild(link);
   link.click();
   link.remove();
 }
-
-/* ================= Helper: วาดกรอบมน ================= */
 function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
   if (typeof stroke === 'undefined') stroke = true;
-  if (typeof radius === 'undefined') radius = 5;
   if (typeof radius === 'number') {
     radius = {tl: radius, tr: radius, br: radius, bl: radius};
   }
@@ -353,6 +357,8 @@ function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
   if (fill) ctx.fill();
   if (stroke) ctx.stroke();
 }
+
+
 
   
 applyLanguage();
