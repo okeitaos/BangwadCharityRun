@@ -125,16 +125,21 @@ function toggleLang(){
 /* ===================== เวลาไทย ===================== */
 function formatTime(t){
   if (!t) return "-";
-  return new Date(t).toLocaleString("th-TH", {
-    timeZone: "Asia/Bangkok",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit"
-  });
+  const date = new Date(t);
+
+  // แปลงเป็นเวลาประเทศไทยแบบแมนนวล (GMT+7)
+  const thaiTime = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+
+  const yy = thaiTime.getFullYear();
+  const mm = String(thaiTime.getMonth() + 1).padStart(2, "0");
+  const dd = String(thaiTime.getDate()).padStart(2, "0");
+  const hh = String(thaiTime.getHours()).padStart(2, "0");
+  const mi = String(thaiTime.getMinutes()).padStart(2, "0");
+  const ss = String(thaiTime.getSeconds()).padStart(2, "0");
+
+  return `${dd}/${mm}/${yy} ${hh}:${mi}:${ss}`;
 }
+
 
 /* ===================== SEARCH DATA ===================== */
 async function searchData(){
