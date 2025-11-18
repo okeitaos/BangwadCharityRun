@@ -132,7 +132,7 @@ async function searchData(){
 
   result.innerHTML = `<p style="color:#facc15">${text[lang].loading}</p>`;
 
-  // ดึงข้อมูลของคนนี้
+  // ดึงข้อมูลของผู้สมัคร
   const { data, error } = await sb
     .from("bangwad")
     .select("*")
@@ -144,9 +144,7 @@ async function searchData(){
     return;
   }
 
-  /* ===============================
-     คำนวณ BIB จาก index + padding
-  =============================== */
+  /* ============ BIB ============ */
   const { data: allRows } = await sb
     .from("bangwad")
     .select("id")
@@ -155,33 +153,25 @@ async function searchData(){
   const index = allRows.findIndex(r => r.id === data.id);
   const bib = "TOP" + String(index + 1).padStart(3, "0");
 
-  /* ===============================
-     แปลงสถานะจากฐานข้อมูล
-     (ใช้คอลัมน์: status)
-  =============================== */
-  let rawStatus = (data.status || "").toLowerCase();  // กัน null
-  let statusKey = "pending"; // default
+  /* ============ STATUS (ตาม table 100%) ============ */
+  let rawStatus = (data.status || "").toLowerCase();
 
-  if (rawStatus === "approved") statusKey = "approved";
-  else if (rawStatus === "rejected") statusKey = "rejected";
-  else statusKey = "pending";
+  // ถ้าสตริงไม่ตรง 3 ตัวนี้ ให้ถือว่า pending
+  if (!["approved", "pending", "rejected"].includes(rawStatus)) {
+    rawStatus = "pending";
+  }
 
-  /* ===============================
-     class สีตามสถานะ
-  =============================== */
+  let statusKey = rawStatus;
+
   let statusClass = "status-pending";
   if (statusKey === "approved") statusClass = "status-approved";
   if (statusKey === "rejected") statusClass = "status-rejected";
 
-  /* ===============================
-     QR CODE
-  =============================== */
+  /* ============ QR CODE ============ */
   const qrLink = `https://okeitaos.github.io/BangwadCharityRun/checkin.html?bib=${bib}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrLink)}`;
 
-  /* ===============================
-     แสดงผล HTML
-  =============================== */
+  /* ============ OUTPUT HTML ============ */
   result.innerHTML = `
     <div class="card">
       <p><span class="label">${text[lang].bib}:</span> ${bib}</p>
@@ -206,6 +196,7 @@ async function searchData(){
     </div>
   `;
 }
+
 
 </script>
 
