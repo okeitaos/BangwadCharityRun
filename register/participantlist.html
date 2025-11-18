@@ -44,8 +44,10 @@
 
 <h1 id="title">🔍 ตรวจสอบสถานะการสมัคร</h1>
 
-<button class="lang-btn" onclick="setLang('th')">ไทย</button>
-<button class="lang-btn" onclick="setLang('en')">English</button>
+<button id="toggleLangBtn" class="lang-btn" onclick="toggleLang()">
+  TH / EN
+</button>
+
 
 <p id="desc">กรอกเลขบัตรประชาชนหรือหมายเลข Passport</p>
 
@@ -222,6 +224,22 @@ async function searchData(){
   `;
 }
 
+// Toggle ภาษา
+function toggleLang(){
+  lang = (lang === "th") ? "en" : "th";
+  applyLanguage();
+}
+
+// เปลี่ยนข้อความบนหน้าจอ
+function applyLanguage(){
+  document.getElementById("title").innerText = text[lang].title;
+  document.getElementById("desc").innerText = text[lang].desc;
+  document.getElementById("nationalId").placeholder = text[lang].placeholder;
+  document.getElementById("searchBtn").innerText = text[lang].search;
+}
+
+// เรียกตอนโหลดหน้า
+applyLanguage();
 
 
 </script>
