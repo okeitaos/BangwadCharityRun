@@ -181,7 +181,7 @@ async function searchData() {
   const { data, error } = await sb
     .from("bangwad")
     .select("*")
-    .or(`national_id.eq.${nationalId},passport.eq.${nationalId}`)
+    .eq("national_id", nationalId)
     .maybeSingle();
 
   if (error || !data) {
