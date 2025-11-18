@@ -252,17 +252,56 @@ function renderResult(){
   `;
 }
 
-  function downloadQR(url, type){
-  // เพิ่มขนาดภาพใหญ่ขึ้น (800x800)
-  const finalUrl = url.replace("size=500x500", `size=800x800&format=${type}`);
+async function downloadQR(qrUrl, type) {
+  const LOGO_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
+  const finalUrl = qrUrl.replace("size=240x240", "size=1000x1000");
 
+  const qrImg = new Image();
+  const logoImg = new Image();
+
+  qrImg.crossOrigin = "Anonymous";
+  logoImg.crossOrigin = "Anonymous";
+
+  qrImg.src = finalUrl;
+  logoImg.src = LOGO_URL;
+
+  await Promise.all([
+    new Promise(r => qrImg.onload = r),
+    new Promise(r => logoImg.onload = r)
+  ]);
+
+  const canvas = document.createElement("canvas");
+  const size = 1000;
+  canvas.width = size;
+  canvas.height = size;
+
+  const ctx = canvas.getContext("2d");
+
+  // วาด QR Code
+  ctx.drawImage(qrImg, 0, 0, size, size);
+
+  // ขนาดโลโก้ (20% ของ QR)
+  const logoSize = size * 0.22;
+
+  // วางบนมุมขวาบน
+  const x = size - logoSize - 20;
+  const y = 20;
+
+  ctx.drawImage(logoImg, x, y, logoSize, logoSize);
+
+  // แปลงเป็น JPG/PNG
+  const mime = type === "jpg" ? "image/jpeg" : "image/png";
+  const dataURL = canvas.toDataURL(mime, 1.0);
+
+  // ดาวน์โหลดไฟล์ลงเครื่องทันที
   const link = document.createElement("a");
-  link.href = finalUrl;
+  link.href = dataURL;
   link.download = `QR_BIB.${type}`;
   document.body.appendChild(link);
   link.click();
   link.remove();
 }
+
 
 
   
