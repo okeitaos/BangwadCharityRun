@@ -114,8 +114,23 @@ function setLang(l){
 
 /* ✅ ฟังก์ชันเวลาไทย -- คืนกลับมาให้แล้ว */
 function formatTime(t){
-  return new Date(t).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
+  if (!t) return "-";
+  return new Date(t).toLocaleString("th-TH", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
 }
+
+/* ฟังก์ชัน searchData() */
+async function searchData(){
+   ...
+}
+
 
 function formatBib(num){
   return "TOP" + String(num).padStart(3, "0");
