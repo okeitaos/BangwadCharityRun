@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Staff Check-in Dashboard</title>
+<title>STAFF CHECK-IN | Bangwad Charity Run</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
@@ -11,45 +11,135 @@
 <style>
   body {
     font-family: "Prompt", sans-serif;
-    background: #0f172a;
+    background: #0b1120;
     color: #fff;
+    margin: 0;
+    padding: 0;
+  }
+
+  header {
+    background: #1e293b;
     padding: 20px;
     text-align: center;
+    border-bottom: 2px solid #334155;
   }
-  h1 { color: #facc15; }
-  #reader { width: 320px; margin: 20px auto; }
+
+  header h1 {
+    margin: 0;
+    color: #facc15;
+    font-size: 1.9rem;
+    letter-spacing: 1px;
+  }
+
+  .lang-box {
+    margin-top: 10px;
+  }
+  .lang-box button {
+    background:#334155;
+    padding:7px 16px;
+    border-radius: 8px;
+    border:none;
+    margin:4px;
+    color:#fff;
+    cursor:pointer;
+  }
+
+  #scanBox {
+    text-align: center;
+    padding: 20px;
+  }
+
+  #reader {
+    width: 90%;
+    max-width: 320px;
+    margin: auto;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 0 20px rgba(250,204,21,0.3);
+  }
+
+  #scanText {
+    margin-top: 15px;
+    font-size: 1.1rem;
+    color: #facc15;
+  }
+
   .card {
     background: rgba(255,255,255,0.08);
     padding: 20px;
-    border-radius: 15px;
-    max-width: 420px;
+    border-radius: 20px;
+    max-width: 450px;
     margin: 20px auto;
-    text-align: left;
+    box-shadow: 0 0 15px rgba(0,0,0,0.4);
+    animation: fadeIn 0.4s;
   }
-  .label { color:#facc15; font-weight:bold; }
-  button {
-    width: 100%; padding: 14px; border-radius: 10px;
-    border: none; margin-top: 15px; cursor:pointer;
-    font-size: 1.1rem; font-weight:bold;
-    background:#22c55e; color:white;
+
+  .label {
+    font-weight: bold;
+    color: #38bdf8;
   }
-  button:disabled {
+
+  .value {
+    font-size: 1.1rem;
+  }
+
+  .status-chip {
+    display:inline-block;
+    padding:6px 12px;
+    border-radius:12px;
+    margin-left:5px;
+    font-weight:bold;
+  }
+  .checked { background:#22c55e; color:#fff; }
+  .notchecked { background:#ef4444; color:#fff; }
+
+  .btn-checkin {
+    width:100%;
+    padding:15px;
+    border-radius:12px;
+    font-size:1.3rem;
+    border:none;
+    cursor:pointer;
+    margin-top:15px;
+    background:#22c55e;
+    color:white;
+  }
+  .btn-checkin:disabled {
     background:#475569;
-    cursor:not-allowed;
+  }
+
+  .btn-reset {
+    background:#3b82f6;
+    padding:12px 20px;
+    border-radius:10px;
+    border:none;
+    font-size:1rem;
+    color:white;
+    margin-top:8px;
+    cursor:pointer;
+  }
+
+  @keyframes fadeIn {
+    from { opacity:0; transform:translateY(10px); }
+    to { opacity:1; transform:translateY(0); }
   }
 </style>
 </head>
 
 <body>
 
-<h1 id="title">📷 Staff Check-in</h1>
+<header>
+  <h1 id="title">📷 STAFF CHECK-IN</h1>
+  <div class="lang-box">
+    <button onclick="setLang('th')">ไทย</button>
+    <button onclick="setLang('en')">English</button>
+  </div>
+</header>
 
-<button onclick="setLang('th')">ไทย</button>
-<button onclick="setLang('en')">English</button>
-
-<div id="reader"></div>
-
-<h2 id="scanText" style="margin-top:10px;">สแกน QR จากผู้สมัคร</h2>
+<div id="scanBox">
+  <div id="reader"></div>
+  <div id="scanText">สแกน QR จากผู้สมัคร</div>
+</div>
 
 <div id="result"></div>
 
@@ -58,7 +148,7 @@
    CONFIG
 ============================= */
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* =============================
@@ -68,7 +158,7 @@ let lang = "th";
 
 const text = {
   th:{
-    title:"📷 ระบบเช็คอินสำหรับเจ้าหน้าที่",
+    title:"📷 ระบบเช็คอินเจ้าหน้าที่",
     scan:"สแกน QR จากผู้สมัคร",
     bib:"หมายเลขประจำตัว",
     name:"ชื่อ",
@@ -82,14 +172,14 @@ const text = {
   },
   en:{
     title:"📷 Staff Check-in System",
-    scan:"Scan runner QR",
+    scan:"Scan QR Code",
     bib:"BIB Number",
     name:"Name",
     phone:"Phone",
     category:"Category",
     status:"Check-in Status",
     checked:"Checked-in",
-    notchecked:"Not Checked-in",
+    notchecked:"Not checked-in",
     btn:"Confirm Check-in",
     success:"✔ Check-in Success"
   }
@@ -109,42 +199,36 @@ function startScanner(){
 
   scanner.start(
     { facingMode: "environment" },
-    { fps: 10, qrbox: { width: 250, height: 250 } },
-    async function(decodedText) {
-      console.log("QR:", decodedText);
-
-      // Expecting ?bib=TOP001
-      const bib = decodedText.split("bib=")[1];
-      if (bib) {
+    { fps: 10, qrbox: 250 },
+    decoded => {
+      if(decoded.includes("bib=")){
         scanner.stop();
+        const bib = decoded.split("bib=")[1];
         loadRunner(bib);
       }
     },
-    function(error){ /* ignore scan errors */ }
+    err => {}
   );
 }
 
 /* =============================
-   LOAD RUNNER DATA
+   LOAD RUNNER
 ============================= */
 async function loadRunner(bib){
   document.getElementById("result").innerHTML =
-    `<p style='color:#facc15'>⏳ Loading...</p>`;
+    `<p style='color:#facc15'>กำลังโหลด...</p>`;
 
-  const bibNumber = parseInt(bib.replace("TOP",""));
+  const bibNum = parseInt(bib.replace("TOP",""));
 
-  // load all rows sorted by id
   const { data: allRows } = await sb
     .from("bangwad")
     .select("id")
     .order("id");
 
-  const row = allRows[bibNumber - 1];
-
-  if (!row){
+  const row = allRows[bibNum - 1];
+  if(!row){
     document.getElementById("result").innerHTML =
-      `<p style="color:#ef4444">❌ BIB ไม่ถูกต้อง</p>`;
-    startScanner();
+      `<p style="color:#ef4444">BIB ไม่พบในระบบ</p>`;
     return;
   }
 
@@ -160,37 +244,38 @@ async function loadRunner(bib){
 /* =============================
    RENDER CARD
 ============================= */
-function renderCard(data, bib){
-  const checked = data.checkin_status === "checked";
+function renderCard(d, bib){
+  const checked = d.checkin_status === "checked";
 
   document.getElementById("result").innerHTML = `
     <div class="card">
-      <p><span class="label">${text[lang].bib}:</span> ${bib}</p>
-      <p><span class="label">${text[lang].name}:</span> ${data.first_name} ${data.last_name}</p>
-      <p><span class="label">${text[lang].phone}:</span> ${data.phone}</p>
-      <p><span class="label">${text[lang].category}:</span> ${data.category}</p>
+      <p><span class="label">${text[lang].bib}:</span> 
+         <span class="value">${bib}</span>
+      </p>
+      <p><span class="label">${text[lang].name}:</span> ${d.first_name} ${d.last_name}</p>
+      <p><span class="label">${text[lang].phone}:</span> ${d.phone}</p>
+      <p><span class="label">${text[lang].category}:</span> ${d.category}</p>
 
       <p><span class="label">${text[lang].status}:</span>
-        ${checked ? text[lang].checked : text[lang].notchecked}
+        <span class="status-chip ${checked?'checked':'notchecked'}">
+          ${checked ? text[lang].checked : text[lang].notchecked}
+        </span>
       </p>
 
-      <button 
+      <button class="btn-checkin"
         id="btnCheck"
-        onclick="doCheckIn(${data.id})"
-        ${checked ? "disabled" : ""}>
-        ${text[lang].btn}
+        onclick="doCheckIn(${d.id})"
+        ${checked ? "disabled" : ""} >
+        ${checked ? text[lang].success : text[lang].btn}
       </button>
     </div>
 
-    <button onclick="location.reload()" 
-      style="margin-top:15px;background:#3b82f6">
-      🔄 สแกนใหม่
-    </button>
+    <button class="btn-reset" onclick="location.reload()">🔄 สแกนใหม่</button>
   `;
 }
 
 /* =============================
-   CHECK-IN
+   DO CHECK-IN
 ============================= */
 async function doCheckIn(id){
   await sb
@@ -201,8 +286,9 @@ async function doCheckIn(id){
     })
     .eq("id", id);
 
-  document.getElementById("btnCheck").innerText = text[lang].success;
-  document.getElementById("btnCheck").disabled = true;
+  const btn = document.getElementById("btnCheck");
+  btn.innerText = text[lang].success;
+  btn.disabled = true;
 }
 
 setLang("th");
