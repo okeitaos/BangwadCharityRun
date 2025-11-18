@@ -56,7 +56,7 @@
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";  // ← ใส่ anon key ของคุณ
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let lang = "th";
@@ -112,6 +112,7 @@ function setLang(l){
   document.getElementById("searchBtn").innerText = text[l].search;
 }
 
+/* ✅ ฟังก์ชันเวลาไทย -- คืนกลับมาให้แล้ว */
 function formatTime(t){
   return new Date(t).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
 }
@@ -131,7 +132,6 @@ async function searchData(){
 
   result.innerHTML = `<p style="color:#facc15">${text[lang].loading}</p>`;
 
-  // 1) ดึงข้อมูลผู้สมัคร
   const { data, error } = await sb
     .from("bangwad")
     .select("*")
@@ -143,24 +143,20 @@ async function searchData(){
     return;
   }
 
-  // 2) ดึง id ทั้งหมดเรียง ASC
+  // ดึงลำดับทั้งหมด
   const { data: allRows } = await sb
     .from("bangwad")
     .select("id")
     .order("id", { ascending: true });
 
-  // 3) หา index
+  // หาอันดับ
   const index = allRows.findIndex(r => r.id === data.id);
-
-  // 4) BIB = อันดับตามคิว
   const bib = formatBib(index + 1);
 
-  // Status Color
   let statusClass = "status-pending";
   if (data.status === "approved") statusClass = "status-approved";
   if (data.status === "rejected") statusClass = "status-rejected";
 
-  // QR Code → สำหรับหน้างาน Check-in
   const qrLink = `https://okeitaos.github.io/BangwadCharityRun/checkin.html?bib=${bib}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrLink)}`;
 
@@ -172,14 +168,10 @@ async function searchData(){
       <p><span class="label">${text[lang].phone}:</span> ${data.phone}</p>
       <p><span class="label">${text[lang].email}:</span> ${data.email}</p>
       <p><span class="label">${text[lang].type}:</span> ${data.category}</p>
-
       <p><span class="label">${text[lang].status}:</span>
         <span class="${statusClass}">${text[lang][data.status]}</span>
       </p>
-
-      <p><span class="label">${text[lang].regAt}:</span>
-        ${formatTime(data.created_at)}
-      </p>
+      <p><span class="label">${text[lang].regAt}:</span> ${formatTime(data.created_at)}</p>
 
       ${data.slip_url ? `<img src="${data.slip_url}" class="slip">` : ""}
 
@@ -191,6 +183,7 @@ async function searchData(){
   `;
 }
 </script>
+
 
 </body>
 </html>
