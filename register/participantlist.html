@@ -60,7 +60,7 @@
 <script>
 /* ===================== CONFIG ===================== */
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY ="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ภาษาเริ่มต้น */
@@ -114,7 +114,7 @@ function applyLanguage(){
   document.getElementById("nationalId").placeholder = text[lang].placeholder;
   document.getElementById("searchBtn").innerText = text[lang].search;
 
-  renderResult(); // ⭐ เปลี่ยนภาษาผลลัพธ์ด้วย
+  renderResult(); // ⭐ อัปเดตผลลัพธ์ด้วย
 }
 
 function toggleLang(){
@@ -136,7 +136,7 @@ function formatTime(t){
   });
 }
 
-/* ===================== SEARCH ===================== */
+/* ===================== SEARCH DATA ===================== */
 async function searchData(){
   const natId = document.getElementById("nationalId").value.trim();
   const resultBox = document.getElementById("result");
@@ -182,7 +182,7 @@ function renderResult(){
   const bib = lastBib;
   const result = document.getElementById("result");
 
-  /* ====== สถานะจาก Table ตรง ๆ ====== */
+  /* สถานะตาม table ตรง ๆ */
   let displayStatus = data.status ?? "-";
   let rawStatus = displayStatus.toLowerCase();
 
@@ -190,7 +190,7 @@ function renderResult(){
   if (rawStatus === "approved") statusClass = "status-approved";
   else if (rawStatus === "rejected") statusClass = "status-rejected";
 
-  /* ====== QR ====== */
+  /* QR CODE */
   const qrLink = `https://okeitaos.github.io/BangwadCharityRun/checkin.html?bib=${bib}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrLink)}`;
 
@@ -208,7 +208,9 @@ function renderResult(){
         <span class="${statusClass}">${displayStatus}</span>
       </p>
 
-      <p><span class="label">${text[lang].regAt}:</span> ${formatTime(data.created_at)}</p>
+      <p><span class="label">${text[lang].regAt}:</span> 
+        ${formatTime(data.created_at)}
+      </p>
 
       ${data.slip_url ? `<img src="${data.slip_url}" class="slip">` : ""}
 
