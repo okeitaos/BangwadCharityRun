@@ -45,11 +45,6 @@
     cursor: pointer;
   }
 
-  #langBtn {
-    background: #22c55e;
-    margin-bottom: 20px;
-  }
-
   button:hover { opacity: 0.85; }
 
   .card {
@@ -81,15 +76,10 @@
 
 <body>
 
-<button id="langBtn" onclick="switchLang()">
-  <span id="langBtnText">English</span>
-</button>
+<h1>🔍 ตรวจสอบสถานะการสมัคร</h1>
+<p>กรอกเลขบัตรประชาชน หรือ เลข Passport</p>
 
-<h1 id="title">🔍 ตรวจสอบสถานะการสมัคร</h1>
-
-<p id="desc">กรอกเลขบัตรประชาชนเพื่อค้นหา</p>
-
-<input type="text" id="nationalId" placeholder="กรอกเลขบัตรประชาชน 13 หลัก">
+<input type="text" id="nationalId" placeholder="กรอกเลขบัตร / Passport">
 <button onclick="searchData()" id="searchBtn">ค้นหา</button>
 
 <div id="result"></div>
@@ -101,83 +91,28 @@ const SUPABASE_KEY =
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let lang = "th";
-
-// ===========================
-// MULTI LANGUAGE DATA
-// ===========================
-const textData = {
-  th: {
-    title: "🔍 ตรวจสอบสถานะการสมัคร",
-    desc: "กรอกเลขบัตรประชาชนเพื่อค้นหา",
-    placeholder: "กรอกเลขบัตรประชาชน 13 หลัก",
-    searchBtn: "ค้นหา",
-    noCid: "❌ กรุณากรอกเลขบัตรประชาชนหรือพาสปอร์ต",
-    searching: "⏳ กำลังค้นหา...",
-    notFound: "❌ ไม่พบข้อมูลของเลขนี้",
-    labels: {
-      name: "ชื่อ",
-      age: "อายุ",
-      phone: "เบอร์โทร",
-      email: "อีเมล",
-      category: "ประเภท",
-      status: "สถานะการสมัคร",
-      created: "ลงทะเบียนเมื่อ",
-    }
-  },
-  en: {
-    title: "🔍 Check Registration Status",
-    desc: "Enter your National ID or Passport No.",
-    placeholder: "Enter National ID or Passport Number",
-    searchBtn: "Search",
-    noCid: "❌ Please enter National ID or Passport Number",
-    searching: "⏳ Searching...",
-    notFound: "❌ No data found",
-    labels: {
-      name: "Name",
-      age: "Age",
-      phone: "Phone",
-      email: "Email",
-      category: "Category",
-      status: "Status",
-      created: "Registered At",
-    }
-  }
-};
-
-// ===========================
-// SWITCH LANGUAGE
-// ===========================
-function switchLang() {
-  lang = lang === "th" ? "en" : "th";
-
-  document.getElementById("langBtnText").innerText =
-    lang === "th" ? "English" : "ภาษาไทย";
-
-  const t = textData[lang];
-
-  document.getElementById("title").innerText = t.title;
-  document.getElementById("desc").innerText = t.desc;
-  document.getElementById("nationalId").placeholder = t.placeholder;
-  document.getElementById("searchBtn").innerText = t.searchBtn;
+/* ✅ ฟังก์ชันแปลงเวลาให้เป็นเวลาไทยแบบ 100% */
+function formatThaiTime(dateString) {
+  return new Intl.DateTimeFormat("th-TH", {
+    dateStyle: "short",
+    timeStyle: "medium",
+    timeZone: "Asia/Bangkok"
+  }).format(new Date(dateString));
 }
 
-// ===========================
-// SEARCH FUNCTION
-// ===========================
 async function searchData() {
-  const t = textData[lang];
   const nationalId = document.getElementById("nationalId").value.trim();
   const result = document.getElementById("result");
 
   if (!nationalId) {
-    result.innerHTML = `<p style="color:#ef4444;">${t.noCid}</p>`;
+    result.innerHTML = `<p style="color:#ef4444;">❌ กรุณากรอกเลขบัตรหรือเลข Passport</p>`;
     return;
   }
 
-  result.innerHTML = `<p style="color:#facc15;">${t.searching}</p>`;
+  result.innerHTML = `<p style="color:#facc15;">⏳ กำลังค้นหา...</p>`;
 
-  // รองรับทั้ง citizen_id + passport
+  // ✔ ค้นจากคอลัมเดียว national_id
+  //   เพราะคุณใช้ช่องเดียวกันสำหรับบัตร + passport
   const { data, error } = await sb
     .from("bangwad")
     .select("*")
@@ -185,26 +120,25 @@ async function searchData() {
     .maybeSingle();
 
   if (error || !data) {
-    result.innerHTML = `<p style="color:#ef4444;">${t.notFound}</p>`;
+    result.innerHTML = `<p style="color:#ef4444;">❌ ไม่พบข้อมูลของเลขนี้</p>`;
     return;
   }
 
-  // สีสถานะ
+  // กำหนดสีสถานะ
   let statusColor = "status-pending";
   if (data.status === "approved") statusColor = "status-approved";
   if (data.status === "rejected") statusColor = "status-rejected";
 
-  const L = t.labels;
-
   result.innerHTML = `
     <div class="card">
-      <p><span class="label">${L.name}:</span> ${data.first_name} ${data.last_name}</p>
-      <p><span class="label">${L.age}:</span> ${data.age}</p>
-      <p><span class="label">${L.phone}:</span> ${data.phone}</p>
-      <p><span class="label">${L.email}:</span> ${data.email}</p>
-      <p><span class="label">${L.category}:</span> ${data.category}</p>
-      <p><span class="label">${L.status}:</span> <span class="${statusColor}">${data.status}</span></p>
-      <p><span class="label">${L.created}:</span> ${new Date(data.created_at).toLocaleString("th-TH")}</p>
+      <p><span class="label">ชื่อ:</span> ${data.first_name} ${data.last_name}</p>
+      <p><span class="label">อายุ:</span> ${data.age}</p>
+      <p><span class="label">เบอร์โทร:</span> ${data.phone}</p>
+      <p><span class="label">อีเมล:</span> ${data.email}</p>
+      <p><span class="label">ประเภท:</span> ${data.category}</p>
+      <p><span class="label">สถานะการสมัคร:</span> <span class="${statusColor}">${data.status}</span></p>
+
+      <p><span class="label">ลงทะเบียนเมื่อ:</span> ${formatThaiTime(data.created_at)}</p>
 
       ${data.slip_url ? `<img src="${data.slip_url}" class="slip">` : ""}
     </div>
