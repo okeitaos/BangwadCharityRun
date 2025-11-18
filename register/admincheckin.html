@@ -111,7 +111,6 @@
   <option value="TOP100WOMEN">TOP100 WOMEN</option>
 </select>
 
-
     <button onclick="exportExcel()">⬇ Export Excel</button>
   </div>
 
@@ -140,13 +139,12 @@
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let allData = [];
 
 /* =============================
-   LOAD DATA
+   LOAD DATA (พร้อมตรวจ error)
 ============================= */
 async function loadData() {
   const { data, error } = await sb.from("bangwad").select("*").order("id");
@@ -161,11 +159,14 @@ async function loadData() {
     return;
   }
 
-  // ใส่ BIB TOP001, TOP002...
-  allData = data.map((d, i) => ({
+  allData = data.map((d, i) => {
+  const bibNumber = String(i + 1).padStart(3, "0"); // ทำให้เป็น 001, 002, 003
+  return {
     ...d,
-    bib: "TOP" + String(i + 1).padStart(3, "0")
-  }));
+    bib: "TOP" + bibNumber
+  };
+});
+
 
   updateStats();
   renderTable();
@@ -190,39 +191,39 @@ function updateStats() {
    RENDER TABLE
 ============================= */
 function renderTable() {
-  if (allData.length === 0) return;
+  if (!allData || allData.length === 0) return;
 
   const status = document.getElementById("filterStatus").value;
   const category = document.getElementById("filterCategory").value;
 
   let rows = [...allData];
 
-  // Filter status
   if (status === "checked") rows = rows.filter(r => r.checkin_status === "checked");
   if (status === "not") rows = rows.filter(r => r.checkin_status !== "checked");
 
-  // Filter category
-  if (category !== "all") rows = rows.filter(r => r.category === category);
+  if (category !== "all") rows = rows.filter(r => r.category == category);
 
-  // Build table HTML
-  const html = rows.map(r => `
-    <tr>
-      <td>${r.bib}</td>
-      <td>${r.first_name} ${r.last_name}</td>
-      <td>${r.phone}</td>
-      <td>${r.category}</td>
-      <td style="color:${r.checkin_status === "checked" ? "#22c55e" : "#ef4444"}">
-          ${r.checkin_status === "checked" ? "✓ เช็คอินแล้ว" : "ยังไม่เช็คอิน"}
-      </td>
-      <td>${r.checkin_time ? new Date(r.checkin_time).toLocaleString("th-TH") : "-"}</td>
-    </tr>
-  `).join("");
+  let html = "";
+  rows.forEach(r => {
+    html += `
+      <tr>
+        <td>${r.bib}</td>
+        <td>${r.first_name} ${r.last_name}</td>
+        <td>${r.phone}</td>
+        <td>${r.category}</td>
+        <td style="color:${r.checkin_status === "checked" ? "#22c55e" : "#ef4444"}">
+            ${r.checkin_status === "checked" ? "✓ เช็คอินแล้ว" : "ยังไม่เช็คอิน"}
+        </td>
+        <td>${r.checkin_time ? new Date(r.checkin_time).toLocaleString("th-TH") : "-"}</td>
+      </tr>
+    `;
+  });
 
   document.getElementById("tableBody").innerHTML = html;
 }
 
 /* =============================
-   EXPORT EXCEL (ตาม filter)
+   EXPORT EXCEL
 ============================= */
 function exportExcel() {
   const status = document.getElementById("filterStatus").value;
@@ -230,81 +231,58 @@ function exportExcel() {
 
   let rows = [...allData];
 
-  if (status === "checked") rows = rows.filter(r => r.checkin_status === "checked");
-  if (status === "not") rows = rows.filter(r => r.checkin_status !== "checked");
-  if (category !== "all") rows = rows.filter(r => r.category === category);
+  // กรองสถานะ
+  if (status === "checked") 
+    rows = rows.filter(r => r.checkin_status === "checked");
 
-  // สร้าง HTML Table พร้อมสี
-  let html = `
-    <table border="1" style="border-collapse:collapse;">
-      <tr style="background:#1e293b; color:white;">
-        <th>BIB</th>
-        <th>First Name</th>
-        <th>Last Name</th>
-        <th>Phone</th>
-        <th>Category</th>
-        <th>Status</th>
-        <th>Check-in Time</th>
-      </tr>
-  `;
+  if (status === "not") 
+    rows = rows.filter(r => r.checkin_status !== "checked");
 
-  rows.forEach(r => {
-    const bg =
-      r.category === "TOP100MEN" ? "#DBF3FF" :
-      r.category === "TOP100WOMEN" ? "#FFE4F0" :
-      "white";
+  // กรองประเภท (TOP100MEN / TOP100WOMEN)
+  if (category !== "all")
+    rows = rows.filter(r => r.category === category);
 
-    html += `
-      <tr style="background:${bg};">
-        <td>${r.bib}</td>
-        <td>${r.first_name}</td>
-        <td>${r.last_name}</td>
-        <td>${r.phone}</td>
-        <td>${r.category}</td>
-        <td>${r.checkin_status === "checked" ? "Checked" : "Not Checked"}</td>
-        <td>${r.checkin_time ? new Date(r.checkin_time).toLocaleString("th-TH") : "-"}</td>
-      </tr>
-    `;
-  });
+  // จัดเฉพาะข้อมูลที่จะ export
+  const exportData = rows.map(r => ({
+    BIB: r.bib,
+    FirstName: r.first_name,
+    LastName: r.last_name,
+    Phone: r.phone,
+    Category: r.category,
+    CheckInStatus: r.checkin_status === "checked" ? "Checked" : "Not Checked",
+    CheckInTime: r.checkin_time ? new Date(r.checkin_time).toLocaleString("th-TH") : "-"
+  }));
 
-  html += "</table>";
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Check-in");
 
-  const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "bangwad-checkin-colored.xls";
-  a.click();
-
-  URL.revokeObjectURL(url);
+  XLSX.writeFile(workbook, "bangwad-checkin-filtered.xlsx");
 }
 
 /* =============================
-   REALTIME AUTO UPDATE (แก้แล้ว)
+   REALTIME AUTO UPDATE
 ============================= */
 sb
-  .channel("realtime:public:bangwad")
+  .channel('realtime:bangwad')
   .on(
-    "postgres_changes",
+    'postgres_changes',
     {
-      event: "*",
-      schema: "public",
-      table: "bangwad"
+      event: '*',
+      schema: 'public',
+      table: 'bangwad'
     },
     payload => {
       console.log("Realtime update:", payload);
+
+      // โหลดใหม่ทุกครั้งที่มีการเปลี่ยนแปลง
       loadData();
     }
   )
   .subscribe();
 
-/* =============================
-   START
-============================= */
 loadData();
 </script>
-
 
 </body>
 </html>
