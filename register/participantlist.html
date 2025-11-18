@@ -3,11 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title id="title">ตรวจสอบสถานะการสมัคร | Bangwad Charity Run</title>
-
+<title>ตรวจสอบสถานะการสมัคร | Bangwad Charity Run</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <style>
   body {
@@ -17,259 +14,172 @@
     padding: 20px;
     text-align: center;
   }
-
-  h1 { color: #facc15; }
-
-  .lang-btn {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    background: #334155;
-    padding: 8px 15px;
-    border-radius: 20px;
-    color: #fff;
-    border: none;
-    font-weight: bold;
-  }
-
+  h1 { color: #facc15; margin-bottom: 20px; }
   input {
-    width: 90%;
-    max-width: 360px;
-    padding: 12px;
-    margin: 10px 0;
-    border-radius: 10px;
-    border: none;
-    background: rgba(255,255,255,0.1);
-    color: #fff;
-    text-align: center;
+    width: 90%; max-width: 360px; padding: 12px; margin: 10px 0;
+    border-radius: 10px; border: none; background: rgba(255,255,255,0.1);
+    color: #fff; text-align: center; font-size: 1rem;
   }
-
   button {
-    background: #3b82f6;
-    color: #fff;
-    padding: 12px 25px;
-    border-radius: 25px;
-    border: none;
-    margin-top: 10px;
-    cursor: pointer;
+    background: #3b82f6; color: #fff; padding: 12px 25px; border-radius: 25px;
+    border: none; font-size: 1rem; font-weight: bold; margin-top: 10px; cursor: pointer;
   }
-
+  button:hover { opacity: 0.85; }
+  .lang-btn { margin: 10px 5px; padding: 8px 16px; border-radius: 20px; background: #475569; }
   .card {
-    background: rgba(255,255,255,0.08);
-    padding: 20px;
-    margin-top: 20px;
-    border-radius: 15px;
-    max-width: 420px;
-    margin-left: auto;
-    margin-right: auto;
-    text-align: left;
-    line-height: 1.6;
+    background: rgba(255,255,255,0.08); padding: 20px; margin-top: 20px;
+    border-radius: 15px; max-width: 420px; margin-left: auto; margin-right: auto;
+    text-align: left; line-height: 1.6;
   }
-
   .label { color: #facc15; font-weight: bold; }
-
+  .slip {
+    width: 100%; max-width: 320px; margin-top: 10px; border-radius: 10px;
+  }
   .status-approved { color: #4ade80; font-weight: bold; }
   .status-pending { color: #facc15; font-weight: bold; }
   .status-rejected { color: #ef4444; font-weight: bold; }
-
 </style>
 </head>
 
 <body>
 
-<button class="lang-btn" onclick="toggleLang()">EN</button>
+<h1 id="title">🔍 ตรวจสอบสถานะการสมัคร</h1>
 
-<h1 id="header">🔍 ตรวจสอบสถานะการสมัคร</h1>
+<button class="lang-btn" onclick="setLang('th')">ไทย</button>
+<button class="lang-btn" onclick="setLang('en')">English</button>
 
-<p id="desc">กรอกเลขบัตรประชาชน หรือ Passport</p>
+<p id="desc">กรอกเลขบัตรประชาชนหรือหมายเลข Passport</p>
 
-<input type="text" id="nationalId" placeholder="กรอกเลขเพื่อค้นหา">
-
+<input type="text" id="nationalId" placeholder="กรอกเลขบัตร/Passport">
 <button onclick="searchData()" id="searchBtn">ค้นหา</button>
 
 <div id="result"></div>
 
 <script>
-/* ===============================
-   🌏 ระบบขยายภาษา TH / EN
-================================ */
-let lang = "TH";
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let lang = "th";
 
 const text = {
-  TH: {
-    title: "ตรวจสอบสถานะการสมัคร | Bangwad Charity Run",
-    header: "🔍 ตรวจสอบสถานะการสมัคร",
-    desc: "กรอกเลขบัตรประชาชน หรือ Passport",
-    placeholder: "กรอกเลขเพื่อค้นหา",
+  th: {
+    title: "🔍 ตรวจสอบสถานะการสมัคร",
+    desc: "กรอกเลขบัตรประชาชนหรือหมายเลข Passport",
+    placeholder: "กรอกเลขบัตร/Passport",
     search: "ค้นหา",
     notfound: "❌ ไม่พบข้อมูลของเลขนี้",
     loading: "⏳ กำลังค้นหา...",
-    id: "หมายเลขประจำตัว",
     name: "ชื่อ",
+    age: "อายุ",
+    phone: "เบอร์โทร",
+    email: "อีเมล",
     type: "ประเภท",
-    status: "สถานะ",
-    regAt: "สมัครเมื่อ",
-    download: "🖨️ ดาวน์โหลดใบยืนยัน",
-    share: "💚 แชร์ผ่าน LINE",
-    approved: "ผ่านการยืนยัน",
+    regAt: "ลงทะเบียนเมื่อ",
+    status: "สถานะการสมัคร",
+    approved: "ชำระเงินแล้ว",
     pending: "รอตรวจสอบ",
-    rejected: "ไม่ผ่านการตรวจสอบ",
+    rejected: "ไม่ผ่าน",
+    bib: "หมายเลขประจำตัว",
+    qr: "QR Code สำหรับรับป้ายหมายเลข"
   },
-  EN: {
-    title: "Registration Status Checker | Bangwad Charity Run",
-    header: "🔍 Registration Status Checker",
-    desc: "Enter your National ID or Passport number",
-    placeholder: "Enter ID to search",
+  en: {
+    title: "🔍 Check Registration Status",
+    desc: "Enter National ID or Passport Number",
+    placeholder: "Enter National ID / Passport",
     search: "Search",
-    notfound: "❌ No data found for this ID",
+    notfound: "❌ No data found",
     loading: "⏳ Searching...",
-    id: "Bib Number",
     name: "Name",
+    age: "Age",
+    phone: "Phone",
+    email: "Email",
     type: "Category",
-    status: "Status",
     regAt: "Registered At",
-    download: "🖨️ Download Confirmation",
-    share: "💚 Share via LINE",
+    status: "Status",
     approved: "Approved",
     pending: "Pending",
     rejected: "Rejected",
+    bib: "BIB Number",
+    qr: "QR Code for Bib Collection"
   }
 };
 
-function applyLang() {
-  document.getElementById("title").innerText = text[lang].title;
-  document.getElementById("header").innerText = text[lang].header;
-  document.getElementById("desc").innerText = text[lang].desc;
-  document.getElementById("nationalId").placeholder = text[lang].placeholder;
-  document.getElementById("searchBtn").innerText = text[lang].search;
-  document.querySelector(".lang-btn").innerText = lang === "TH" ? "EN" : "TH";
+function setLang(l){
+  lang = l;
+  document.getElementById("title").innerText = text[l].title;
+  document.getElementById("desc").innerText = text[l].desc;
+  document.getElementById("nationalId").placeholder = text[l].placeholder;
+  document.getElementById("searchBtn").innerText = text[l].search;
 }
 
-function toggleLang() {
-  lang = lang === "TH" ? "EN" : "TH";
-  applyLang();
+function formatTime(t){
+  return new Date(t).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
 }
 
-applyLang();
-
-/* ===============================
-   🔗 Supabase
-================================ */
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY ="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-/* 🇹🇭 เวลาไทย */
-function formatThaiTime(dateString) {
-  return new Intl.DateTimeFormat("th-TH", {
-    dateStyle: "short",
-    timeStyle: "medium",
-    timeZone: "Asia/Bangkok"
-  }).format(new Date(dateString));
+function formatBib(id){
+  return "TOP" + String(id).padStart(3, "0");
 }
 
-/* EN Time */
-function formatEnTime(dateString) {
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Bangkok"
-  }).format(new Date(dateString));
-}
-
-/* TOPxxx */
-function formatTopId(id) {
-  return "TOP" + id.toString().padStart(3,"0");
-}
-
-/* ===============================
-   📤 แชร์ LINE
-================================ */
-function shareLine(data) {
-  const topId = formatTopId(data.id);
-  const url = location.href;
-
-  const msg =
-`${lang==="TH" ? "Bangwad Charity Run 2025" : "Bangwad Charity Run 2025"}
-${text[lang].id}: ${topId}
-${text[lang].name}: ${data.first_name} ${data.last_name}
-${text[lang].type}: ${data.category}
-${text[lang].status}: ${data.status}`;
-
-  window.location.href = `https://line.me/R/share?text=${encodeURIComponent(msg + "\n" + url)}`;
-}
-
-/* ===============================
-   🖨️ PDF
-================================ */
-async function generatePDF(data) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-
-  const topId = formatTopId(data.id);
-
-  const time = lang==="TH" ? formatThaiTime(data.created_at) : formatEnTime(data.created_at);
-
-  doc.setFontSize(18);
-  doc.text("Bangwad Charity Run 2025", 105, 20, { align: "center" });
-
-  doc.setFontSize(14);
-  doc.text(text[lang].id + ": " + topId, 20, 40);
-  doc.text(text[lang].name + ": " + data.first_name + " " + data.last_name, 20, 50);
-  doc.text(text[lang].type + ": " + data.category, 20, 60);
-  doc.text(text[lang].regAt + ": " + time, 20, 70);
-
-  doc.save(`BCR_${topId}.pdf`);
-}
-
-/* ===============================
-   🔎 Search
-================================ */
-async function searchData() {
-  const nationalId = document.getElementById("nationalId").value.trim();
+async function searchData(){
+  const natId = document.getElementById("nationalId").value.trim();
   const result = document.getElementById("result");
 
-  if (!nationalId) {
-    result.innerHTML = `<p style="color:#ef4444;">❌ ${text[lang].notfound}</p>`;
+  if (!natId){
+    result.innerHTML = `<p style="color:#ef4444">${text[lang].notfound}</p>`;
     return;
   }
 
-  result.innerHTML = `<p style="color:#facc15;">${text[lang].loading}</p>`;
+  result.innerHTML = `<p style="color:#facc15">${text[lang].loading}</p>`;
 
   const { data, error } = await sb
     .from("bangwad")
     .select("*")
-    .eq("national_id", nationalId)
+    .eq("national_id", natId)
     .maybeSingle();
 
-  if (error || !data) {
-    result.innerHTML = `<p style="color:#ef4444;">${text[lang].notfound}</p>`;
+  if (error || !data){
+    result.innerHTML = `<p style="color:#ef4444">${text[lang].notfound}</p>`;
     return;
   }
 
+  // BIB = TOP + running number
+  const bib = formatBib(data.id);
+
+  // Status Color
   let statusClass = "status-pending";
   if (data.status === "approved") statusClass = "status-approved";
   if (data.status === "rejected") statusClass = "status-rejected";
 
-  const topId = formatTopId(data.id);
-  const time = lang==="TH" ? formatThaiTime(data.created_at) : formatEnTime(data.created_at);
+  // QR Code จาก BIB
+  const qrText = `BIB:${bib} | Bangwad Charity Run`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrText)}`;
 
   result.innerHTML = `
     <div class="card">
-      <p><span class="label">${text[lang].id}:</span> ${topId}</p>
+      <p><span class="label">${text[lang].bib}:</span> ${bib}</p>
       <p><span class="label">${text[lang].name}:</span> ${data.first_name} ${data.last_name}</p>
+      <p><span class="label">${text[lang].age}:</span> ${data.age}</p>
+      <p><span class="label">${text[lang].phone}:</span> ${data.phone}</p>
+      <p><span class="label">${text[lang].email}:</span> ${data.email}</p>
       <p><span class="label">${text[lang].type}:</span> ${data.category}</p>
-      <p><span class="label">${text[lang].status}:</span> <span class="${statusClass}">${data.status}</span></p>
-      <p><span class="label">${text[lang].regAt}:</span> ${time}</p>
 
-      <button onclick='generatePDF(${JSON.stringify(data)})'>
-        ${text[lang].download}
-      </button>
+      <p><span class="label">${text[lang].status}:</span>
+        <span class="${statusClass}">${text[lang][data.status]}</span>
+      </p>
 
-      <button onclick='shareLine(${JSON.stringify(data)})' style="background:#06C755;">
-        ${text[lang].share}
-      </button>
-    </div>`;
+      <p><span class="label">${text[lang].regAt}:</span>
+        ${formatTime(data.created_at)}
+      </p>
+
+      ${data.slip_url ? `<img src="${data.slip_url}" class="slip">` : ""}
+
+      <div style="text-align:center;margin-top:25px;">
+        <p class="label">${text[lang].qr}</p>
+        <img src="${qrUrl}" style="width:240px;height:240px;border-radius:10px;">
+      </div>
+    </div>
+  `;
 }
 </script>
 
