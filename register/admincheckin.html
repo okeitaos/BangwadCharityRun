@@ -126,7 +126,9 @@
         <th>เวลาเช็คอิน</th>
       </tr>
     </thead>
-    <tbody id="tableBody"></tbody>
+    <tbody id="tableBody">
+      <tr><td colspan="6" style="text-align:center;padding:20px;">⏳ กำลังโหลด...</td></tr>
+    </tbody>
   </table>
 
 </div>
@@ -137,20 +139,32 @@
 ============================= */
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXNhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let allData = [];
 
 /* =============================
-   LOAD DATA
+   LOAD DATA (พร้อมตรวจ error)
 ============================= */
 async function loadData() {
-  const { data } = await sb.from("bangwad").select("*").order("id");
+  const { data, error } = await sb.from("bangwad").select("*").order("id");
+
+  if (error || !data) {
+    console.error("SUPABASE ERROR:", error);
+
+    document.getElementById("tableBody").innerHTML =
+      `<tr><td colspan="6" style="color:#ef4444;text-align:center;">
+         ❌ โหลดข้อมูลไม่ได้ (401 / Policy ไม่ครบ)
+       </td></tr>`;
+    return;
+  }
+
   allData = data.map((d, i) => ({
     ...d,
     bib: "TOP" + (i + 1)
   }));
+
   updateStats();
   renderTable();
 }
@@ -174,10 +188,12 @@ function updateStats() {
    RENDER TABLE
 ============================= */
 function renderTable() {
+  if (!allData || allData.length === 0) return;
+
   const status = document.getElementById("filterStatus").value;
   const category = document.getElementById("filterCategory").value;
 
-  let rows = allData;
+  let rows = [...allData];
 
   if (status === "checked") rows = rows.filter(r => r.checkin_status === "checked");
   if (status === "not") rows = rows.filter(r => r.checkin_status !== "checked");
@@ -214,7 +230,6 @@ function exportExcel() {
   XLSX.writeFile(workbook, "bangwad-checkin.xlsx");
 }
 
-/* START */
 loadData();
 </script>
 
