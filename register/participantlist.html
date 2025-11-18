@@ -197,11 +197,43 @@ function renderResult(){
   const qrLink = `https://okeitaos.github.io/BangwadCharityRun/checkin.html?bib=${bib}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(qrLink)}`;
 
-  // ข้อความดาวน์โหลด
   const downloadText = (lang === "th")
       ? "ดาวน์โหลด QR CODE (JPG หรือ PNG)"
       : "Download the QR CODE (JPG or PNG)";
 
+  /* ===============================
+     ❗ BLOCK IF NOT APPROVED
+  =============================== */
+  if (rawStatus !== "approved") {
+    result.innerHTML = `
+      <div class="card">
+
+        <p><span class="label">${text[lang].bib}:</span> ${bib}</p>
+        <p><span class="label">${text[lang].name}:</span> ${data.first_name} ${data.last_name}</p>
+        <p><span class="label">${text[lang].status}:</span>
+          <span class="status-rejected">${displayStatus}</span>
+        </p>
+
+        <p style="margin-top:10px;">
+          <span class="label">${text[lang].regAt}:</span> ${formatTime(data.created_at)}
+        </p>
+
+        <p style="color:#ef4444; font-weight:bold; margin-top:25px; text-align:center;">
+          ${
+            lang === "th"
+            ? "คุณยังไม่ชำระเงิน / ไม่ได้รับการอนุมัติ<br>ไม่สามารถรับบิบได้"
+            : "Payment not verified / Not approved<br>You cannot collect your BIB yet."
+          }
+        </p>
+
+      </div>
+    `;
+    return; // ❗หยุด ไม่แสดง QR
+  }
+
+  /* ===============================
+     ✔ APPROVED → แสดง QR + Download
+  =============================== */
   result.innerHTML = `
     <div class="card">
       <p><span class="label">${text[lang].bib}:</span> ${bib}</p>
@@ -227,9 +259,11 @@ function renderResult(){
         <img id="qrImg" src="${qrUrl}" style="width:240px;height:240px;border-radius:10px;">
 
         <p style="margin-top:15px; font-size:1rem; color:#facc15;">
-          ${lang === "th" 
-              ? "นำ QR CODE นี้ ไปรับบิบ" 
-              : "Bring this QR CODE to collect your BIB"}
+          ${
+            lang === "th"
+            ? "นำ QR CODE นี้ ไปรับบิบ"
+            : "Bring this QR CODE to collect your BIB"
+          }
         </p>
 
         <p style="margin-top:8px; font-size:0.9rem; color:#38bdf8;">
@@ -237,22 +271,22 @@ function renderResult(){
         </p>
 
         <div style="margin-top:12px;">
-        <button onclick="downloadQR('${qrUrl}', 'jpg', '${data.first_name} ${data.last_name}', '${bib}')"
-   style="background:#14b8a6;padding:10px 20px;border-radius:10px;margin:5px;color:white;">
-  JPG
-</button>
+          <button onclick="downloadQR('${qrUrl}', 'jpg', '${data.first_name} ${data.last_name}', '${bib}')"
+            style="background:#14b8a6;padding:10px 20px;border-radius:10px;margin:5px;color:white;">
+            JPG
+          </button>
 
-<button onclick="downloadQR('${qrUrl}', 'png', '${data.first_name} ${data.last_name}', '${bib}')"
-   style="background:#0ea5e9;padding:10px 20px;border-radius:10px;margin:5px;color:white;">
-  PNG
-</button>
-
-
+          <button onclick="downloadQR('${qrUrl}', 'png', '${data.first_name} ${data.last_name}', '${bib}')"
+            style="background:#0ea5e9;padding:10px 20px;border-radius:10px;margin:5px;color:white;">
+            PNG
+          </button>
         </div>
+
       </div>
     </div>
   `;
 }
+
 
 async function downloadQR(qrUrl, type, fullName, bibNumber) {
   const LOGO_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
