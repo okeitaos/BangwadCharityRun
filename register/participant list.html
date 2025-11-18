@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ตรวจสอบสถานะการสมัคร | Bangwad Charity Run</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  body {
+    font-family: "Prompt", sans-serif;
+    background: #0f172a;
+    color: #fff;
+    padding: 20px;
+    text-align: center;
+  }
+
+  h1 {
+    color: #facc15;
+    margin-bottom: 20px;
+  }
+
+  input {
+    width: 90%;
+    max-width: 360px;
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 10px;
+    border: none;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    text-align: center;
+    font-size: 1rem;
+  }
+
+  button {
+    background: #3b82f6;
+    color: #fff;
+    padding: 12px 25px;
+    border-radius: 25px;
+    border: none;
+    font-size: 1rem;
+    font-weight: bold;
+    margin-top: 10px;
+    cursor: pointer;
+  }
+
+  button:hover { opacity: 0.85; }
+
+  .card {
+    background: rgba(255,255,255,0.08);
+    padding: 20px;
+    margin-top: 20px;
+    border-radius: 15px;
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: left;
+    line-height: 1.6;
+  }
+
+  .label { color: #facc15; font-weight: bold; }
+
+  .slip {
+    width: 100%;
+    max-width: 320px;
+    margin-top: 10px;
+    border-radius: 10px;
+  }
+
+  .status-approved { color: #4ade80; font-weight: bold; }
+  .status-pending { color: #facc15; font-weight: bold; }
+  .status-rejected { color: #ef4444; font-weight: bold; }
+</style>
+</head>
+
+<body>
+
+<h1>🔍 ตรวจสอบสถานะการสมัคร</h1>
+
+<p>กรอกเลขบัตรประชาชนเพื่อค้นหา</p>
+
+<input type="text" id="nationalId" placeholder="กรอกเลขบัตรประชาชน 13 หลัก">
+<button onclick="searchData()">ค้นหา</button>
+
+<div id="result"></div>
+
+<script>
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";   // ใส่ anon key
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function searchData() {
+  const nationalId = document.getElementById("nationalId").value.trim();
+  const result = document.getElementById("result");
+
+  if (!nationalId) {
+    result.innerHTML = `<p style="color:#ef4444;">❌ กรุณากรอกเลขบัตรประชาชน</p>`;
+    return;
+  }
+
+  result.innerHTML = `<p style="color:#facc15;">⏳ กำลังค้นหา...</p>`;
+
+  const { data, error } = await sb
+    .from("bangwad")
+    .select("*")
+    .eq("national_id", nationalId)
+    .maybeSingle();
+
+  if (error || !data) {
+    result.innerHTML = `<p style="color:#ef4444;">❌ ไม่พบข้อมูลของเลขบัตรนี้</p>`;
+    return;
+  }
+
+  // กำหนดสีสถานะ
+  let statusColor = "status-pending";
+  if (data.status === "approved") statusColor = "status-approved";
+  if (data.status === "rejected") statusColor = "status-rejected";
+
+  result.innerHTML = `
+    <div class="card">
+      <p><span class="label">ชื่อ:</span> ${data.first_name} ${data.last_name}</p>
+      <p><span class="label">อายุ:</span> ${data.age}</p>
+      <p><span class="label">เบอร์โทร:</span> ${data.phone}</p>
+      <p><span class="label">อีเมล:</span> ${data.email}</p>
+      <p><span class="label">ประเภท:</span> ${data.category}</p>
+      <p><span class="label">สถานะชำระเงิน:</span> <span class="${statusColor}">${data.status}</span></p>
+      <p><span class="label">ลงทะเบียนเมื่อ:</span> ${new Date(data.created_at).toLocaleString("th-TH")}</p>
+
+      ${data.slip_url ? `<img src="${data.slip_url}" class="slip">` : ""}
+    </div>
+  `;
+}
+</script>
+
+</body>
+</html>
