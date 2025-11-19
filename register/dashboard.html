@@ -7,18 +7,100 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
-  .rank-finisher { background-color: #d1fae5; } /* เขียวอ่อน */
-  .rank-running { background-color: #fef9c3; }  /* เหลืองอ่อน */
-  .rank-dnf { background-color: #fee2e2; }      /* แดงอ่อน */
-  .active-tab { background-color: #2563eb !important; color: white !important; }
-  .popup-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 50; }
-  .popup { background: white; padding: 20px; border-radius: 10px; width: 95%; max-width: 550px; max-height: 85vh; overflow-y: auto; }
-  @keyframes blinkSlow {
-    0%,100% { background-color: inherit; }
-    50% { background-color: rgba(253,230,138,0.5); }
+  body {
+    background:#0b1120;
+    color:#fff;
+    font-family:"Prompt", sans-serif;
   }
-  .blink-slow { animation: blinkSlow 2.5s infinite; }
+
+  /* กล่องหลัก */
+  .dashboard-card {
+    background: rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 20px;
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.45);
+    backdrop-filter: blur(6px);
+  }
+
+  /* Tabs */
+  .type-tab {
+    background: rgba(255,255,255,0.10);
+    color:#fff;
+    border:1px solid rgba(255,255,255,0.15);
+  }
+  .active-tab {
+    background:#2563eb !important;
+    color:#fff !important;
+    border-color:#2563eb !important;
+  }
+
+  /* Search bar */
+  #searchInput {
+    background:rgba(255,255,255,0.12);
+    color:#fff;
+    border:1px solid rgba(255,255,255,0.15);
+  }
+  #searchInput::placeholder { color:#cbd5e1; }
+
+  /* ตาราง */
+  table {
+    color:#fff;
+  }
+  thead tr {
+    background:#1e293b !important;
+    color:#f1f5f9 !important;
+  }
+  tbody tr {
+    background:rgba(255,255,255,0.04);
+  }
+  tbody tr:hover {
+    background:rgba(255,255,255,0.12);
+  }
+
+  /* สีสถานะ */
+  .rank-finisher { background:rgba(34,197,94,0.25) !important; } /* เขียว */
+  .rank-running  { background:rgba(250,204,21,0.25) !important; } /* เหลือง */
+  .rank-dnf      { background:rgba(239,68,68,0.25) !important; } /* แดง */
+
+  /* Popup */
+  .popup-bg { 
+    position: fixed; inset:0; background:rgba(0,0,0,0.65); 
+    display:none; justify-content:center; align-items:center; z-index:50;
+  }
+  .popup {
+    background:rgba(255,255,255,0.07);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:16px;
+    padding:20px;
+    width:95%; max-width:550px;
+    color:#fff;
+    box-shadow:0 4px 30px rgba(0,0,0,0.4);
+    backdrop-filter:blur(8px);
+  }
+
+  .popup table thead tr {
+    background:rgba(255,255,255,0.10);
+    color:#fff;
+  }
+  .popup table tbody tr {
+    background:rgba(255,255,255,0.05);
+  }
+
+  /* ปุ่ม */
+  button {
+    transition:0.12s;
+  }
+  #closePopup {
+    background:#1e293b;
+    border:1px solid rgba(255,255,255,0.15);
+  }
+  #closePopup:hover {
+    background:#334155;
+  }
+
 </style>
+
 </head>
 <body class="bg-gray-100 min-h-screen p-6">
 
