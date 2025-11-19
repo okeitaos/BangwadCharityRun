@@ -74,14 +74,8 @@
     animation: fadeIn 0.4s;
   }
 
-  .label {
-    font-weight: bold;
-    color: #38bdf8;
-  }
-
-  .value {
-    font-size: 1.1rem;
-  }
+  .label { font-weight: bold; color: #38bdf8; }
+  .value { font-size: 1.1rem; }
 
   .status-chip {
     display:inline-block;
@@ -104,9 +98,7 @@
     background:#22c55e;
     color:white;
   }
-  .btn-checkin:disabled {
-    background:#475569;
-  }
+  .btn-checkin:disabled { background:#475569; }
 
   .btn-reset {
     background:#3b82f6;
@@ -166,7 +158,7 @@
   </div>
 </header>
 
-<!-- LOGIN -->
+<!-- LOGIN BOX -->
 <div id="loginBox" style="display:none;">
   <h2>🔐 STAFF LOGIN</h2>
   <input id="email" type="email" placeholder="Email">
@@ -175,7 +167,7 @@
   <p id="loginMsg" style="margin-top:10px;color:#f87171;"></p>
 </div>
 
-<!-- SCANNER -->
+<!-- SCAN BOX -->
 <div id="scanBox" style="display:none;">
   <div id="reader"></div>
   <div id="scanText">สแกน QR จากผู้สมัคร</div>
@@ -184,17 +176,23 @@
 <div id="result"></div>
 
 <script>
-/* =============================
-   CONFIG
-============================= */
+/* CONFIG */
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* =============================
-   NEW: LOGIN SYSTEM (เพิ่มเข้าไปใหม่)
+   SECURE LOGIN SYSTEM
 ============================= */
+async function waitAuth() {
+  return new Promise(resolve => {
+    setTimeout(resolve, 100);
+  });
+}
+
 async function checkAdmin() {
+  await waitAuth();
+
   const { data: sessionData } = await sb.auth.getSession();
   const session = sessionData.session;
 
@@ -205,21 +203,23 @@ async function checkAdmin() {
 
   const uid = session.user.id;
 
-  const { data } = await sb
+  const { data: admin } = await sb
     .from("adminrace")
     .select("*")
     .eq("id", uid)
     .maybeSingle();
 
-  if (!data || data.is_admin !== true) {
-    document.getElementById("loginMsg").innerText =
-      "⛔ ไม่มีสิทธิ์ใช้งานหน้านี้";
+  if (!admin || admin.is_admin !== true) {
+    document.getElementById("loginMsg").innerHTML =
+      "⛔ คุณไม่มีสิทธิ์เข้าหน้านี้";
     document.getElementById("loginBox").style.display = "block";
     return;
   }
 
+  document.getElementById("loginBox").style.display = "none";
   document.getElementById("scanBox").style.display = "block";
-  startScanner(); // ← ฟังก์ชันเก่า (ไม่ลบ)
+
+  startScanner();
 }
 
 async function login() {
@@ -227,7 +227,10 @@ async function login() {
   const password = document.getElementById("password").value.trim();
   const msg = document.getElementById("loginMsg");
 
-  let { error } = await sb.auth.signInWithPassword({ email, password });
+  const { error } = await sb.auth.signInWithPassword({
+    email,
+    password
+  });
 
   if (error) {
     msg.innerText = "❌ " + error.message;
@@ -237,25 +240,23 @@ async function login() {
   location.reload();
 }
 
+sb.auth.onAuthStateChange((event) => {
+  if (event === "SIGNED_IN") location.reload();
+});
+
 /* =============================
-   ฟังก์ชันเดิมทั้งหมดอยู่ครบ
+   LANGUAGE
 ============================= */
-
 let lang = "th";
-
 const text = {
   th:{ title:"📷 ระบบเช็คอินเจ้าหน้าที่", scan:"สแกน QR จากผู้สมัคร",
-       bib:"หมายเลขประจำตัว", name:"ชื่อ", phone:"เบอร์โทร",
-       category:"ประเภท", status:"สถานะเช็คอิน",
-       checked:"เช็คอินแล้ว", notchecked:"ยังไม่เช็คอิน",
-       btn:"ยืนยันเช็คอิน", success:"✔ เช็คอินสำเร็จ"
-  },
+    bib:"หมายเลขประจำตัว", name:"ชื่อ", phone:"เบอร์โทร", category:"ประเภท",
+    status:"สถานะเช็คอิน", checked:"เช็คอินแล้ว", notchecked:"ยังไม่เช็คอิน",
+    btn:"ยืนยันเช็คอิน", success:"✔ เช็คอินสำเร็จ" },
   en:{ title:"📷 Staff Check-in System", scan:"Scan QR Code",
-       bib:"BIB Number", name:"Name", phone:"Phone",
-       category:"Category", status:"Check-in Status",
-       checked:"Checked-in", notchecked:"Not checked-in",
-       btn:"Confirm Check-in", success:"✔ Check-in Success"
-  }
+    bib:"BIB Number", name:"Name", phone:"Phone", category:"Category",
+    status:"Check-in Status", checked:"Checked-in", notchecked:"Not checked-in",
+    btn:"Confirm Check-in", success:"✔ Check-in Success" }
 };
 
 function setLang(l){
@@ -264,6 +265,9 @@ function setLang(l){
   document.getElementById("scanText").innerText = text[l].scan;
 }
 
+/* =============================
+   QR SCANNER (ของเดิม)
+============================= */
 function startScanner(){
   const scanner = new Html5Qrcode("reader");
 
@@ -320,10 +324,10 @@ function renderCard(d, bib){
         <p><span class="label">${text[lang].phone}:</span> ${d.phone}</p>
         <p><span class="label">${text[lang].category}:</span> ${d.category}</p>
 
-        <p style="text-align:center; color:#ef4444; font-weight:bold; margin-top:25px;">
-          ${lang==="th"
-            ?"❌ ผู้สมัครรายนี้ยังไม่ได้รับการอนุมัติ<br>ไม่สามารถเช็คอินได้"
-            :"❌ This participant is not approved<br>Check-in is not allowed"}
+        <p style="text-align:center;color:#ef4444;font-weight:bold;margin-top:25px;">
+          ${lang==="th" ?
+            "❌ ผู้สมัครรายนี้ยังไม่ได้รับการอนุมัติ<br>ไม่สามารถเช็คอินได้" :
+            "❌ This participant is not approved<br>Check-in is not allowed"}
         </p>
       </div>
 
@@ -371,11 +375,8 @@ async function doCheckIn(id){
   btn.disabled = true;
 }
 
-/* START APP */
-document.addEventListener("DOMContentLoaded", () => {
-  setLang("th");
-  checkAdmin();
-});
+setLang("th");
+checkAdmin();
 </script>
 
 </body>
