@@ -8,111 +8,132 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
   body {
-    font-family: "Prompt", sans-serif;
-    background: #0f172a;        /* พื้นหลังเข้มเหมือนทุกหน้า */
-    color: #e5e7eb;             /* สีตัวหนังสืออ่อนบนพื้นเข้ม */
+    background:#0b1120;
+    color:#fff;
+    font-family:"Prompt", sans-serif;
   }
 
-  h1, h2 {
-    color: white;
+  /* ====== Blink Styles (เหมือน adminrace) ====== */
+  @keyframes blinkGold { 
+    0%,100%{background-color:#1e3a8a;} 
+    50%{background-color:#facc15;} 
+  }
+  @keyframes blinkYellow { 
+    0%,100%{background-color:#1e3a8a;} 
+    50%{background-color:#fde047;} 
+  }
+  @keyframes blinkSlowGold { 
+    0%,100%{background-color:#1e3a8a;} 
+    50%{background-color:#facc15;} 
   }
 
-  /* กล่องหลัก */
-  .content-box {
-    background: white;
-    color: #111827;
+  .blink-finisher { animation: blinkGold 2s infinite; }
+  .blink-dnf { animation: blinkYellow 2s infinite; }
+  .blink-slow-finisher { animation: blinkSlowGold 3s infinite; }
+
+  /* ====== Glass Card ====== */
+  .glass-card {
+    background: rgba(255,255,255,0.07);
     border-radius: 16px;
     padding: 20px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    backdrop-filter: blur(6px);
   }
 
-  /* ปุ่ม Tabs */
-  .type-tab {
-    background: #1e293b;
-    color: #e2e8f0;
-    border-radius: 8px;
-    transition: 0.2s;
-  }
-  .type-tab:hover {
-    background: #334155;
-  }
-  .active-tab {
-    background: #2563eb !important;
-    color: white !important;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-  }
-
-  /* input search */
-  input {
-    background: #ffffff;
-    color: #111827;
-    border-radius: 10px;
-    padding: 10px;
-    border: 1px solid #cbd5e1;
-  }
-
-  /* ตาราง */
+  /* ====== Table Style ====== */
   table {
-    background: white;
-    color: #111827;
-    border-radius: 12px;
-    overflow: hidden;
+    width: 100%;
+    border-collapse: collapse;
+    color:white;
   }
   thead tr {
-    background: #f1f5f9 !important;
-    color: #1e293b;
+    background: rgba(255,255,255,0.1);
+  }
+  th, td {
+    padding: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
   }
   tbody tr:hover {
-    background: #f8fafc !important;
+    background: rgba(255,255,255,0.05);
   }
 
-  /* สีตามสถานะ */
-  .rank-finisher { background-color: #d1fae5 !important; }
-  .rank-running  { background-color: #fef9c3 !important; }
-  .rank-dnf      { background-color: #fee2e2 !important; }
-
-  /* popup */
-  .popup-bg {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.6);
-    display: none;
-    justify-content: center;
-    align-items: center;
-    z-index: 50;
+  /* ====== Popup ====== */
+  .popup-bg { 
+    position: fixed; inset: 0; 
+    background: rgba(0,0,0,0.7); 
+    display: none; 
+    justify-content: center; 
+    align-items: center; 
+    z-index: 999;
   }
-  .popup {
-    background: white;
-    color: #111827;
-    border-radius: 16px;
-    padding: 22px;
-    max-width: 550px;
-    width: 95%;
-    max-height: 85vh;
-    overflow-y: auto;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.35);
+  .popup { 
+    background: rgba(255,255,255,0.1); 
+    backdrop-filter: blur(6px);
+    border:1px solid rgba(255,255,255,0.1);
+    color:white;
+    padding: 20px; 
+    border-radius: 16px; 
+    width: 95%; 
+    max-width: 600px; 
+    max-height: 85vh; 
+    overflow-y: auto; 
   }
 
-  /* ปุ่ม popup */
-  #closePopup {
-    background: #1e293b;
-    color: white;
-    border-radius: 10px;
-    padding: 10px;
+  /* ====== Tabs ====== */
+  .type-tab {
+    background:#1e293b;
+    color:white;
+    border-radius:8px;
+    padding:8px 14px;
   }
-  #closePopup:hover {
-    background: #334155;
+  .active-tab {
+    background:#2563eb !important;
+    color:white;
   }
 
-  /* blink effect */
-  @keyframes blinkSlow {
-    0%,100% { background-color: inherit; }
-    50% { background-color: rgba(253,230,138,0.45); }
+  /* ====== Toast ====== */
+  #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; }
+  .toast {
+    background: #1e293b; color:#fff; padding:10px 16px;
+    border-radius:10px; margin-top:8px;
+    opacity:0; transform:translateY(20px);
+    animation: fadeInUp .4s forwards;
+    box-shadow:0 4px 10px rgba(0,0,0,0.3);
   }
-  .blink-slow {
-    animation: blinkSlow 2.5s infinite;
+  @keyframes fadeInUp { to {opacity:1; transform:translateY(0);} }
+
+  /* ====== Inputs ====== */
+  input {
+    background:#1e293b;
+    color:white;
+    border:1px solid rgba(255,255,255,0.2);
+    padding:10px;
+    border-radius:8px;
+  }
+  input::placeholder {
+    color:rgba(255,255,255,0.5);
+  }
+
+  /* ====== Buttons ====== */
+  button {
+    border:none;
+    cursor:pointer;
+  }
+  .btn-primary {
+    background:#3b82f6;
+    color:white;
+    padding:10px 16px;
+    border-radius:8px;
+  }
+  .btn-danger {
+    background:#ef4444;
+    padding:10px 16px;
+    border-radius:8px;
+    color:white;
   }
 </style>
+
 
 </head>
 <body class="bg-gray-100 min-h-screen p-6">
