@@ -7,18 +7,113 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
-  .rank-finisher { background-color: #d1fae5; } /* เขียวอ่อน */
-  .rank-running { background-color: #fef9c3; }  /* เหลืองอ่อน */
-  .rank-dnf { background-color: #fee2e2; }      /* แดงอ่อน */
-  .active-tab { background-color: #2563eb !important; color: white !important; }
-  .popup-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 50; }
-  .popup { background: white; padding: 20px; border-radius: 10px; width: 95%; max-width: 550px; max-height: 85vh; overflow-y: auto; }
+  body {
+    font-family: "Prompt", sans-serif;
+    background: #0f172a;        /* พื้นหลังเข้มเหมือนทุกหน้า */
+    color: #e5e7eb;             /* สีตัวหนังสืออ่อนบนพื้นเข้ม */
+  }
+
+  h1, h2 {
+    color: white;
+  }
+
+  /* กล่องหลัก */
+  .content-box {
+    background: white;
+    color: #111827;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+  }
+
+  /* ปุ่ม Tabs */
+  .type-tab {
+    background: #1e293b;
+    color: #e2e8f0;
+    border-radius: 8px;
+    transition: 0.2s;
+  }
+  .type-tab:hover {
+    background: #334155;
+  }
+  .active-tab {
+    background: #2563eb !important;
+    color: white !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  }
+
+  /* input search */
+  input {
+    background: #ffffff;
+    color: #111827;
+    border-radius: 10px;
+    padding: 10px;
+    border: 1px solid #cbd5e1;
+  }
+
+  /* ตาราง */
+  table {
+    background: white;
+    color: #111827;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  thead tr {
+    background: #f1f5f9 !important;
+    color: #1e293b;
+  }
+  tbody tr:hover {
+    background: #f8fafc !important;
+  }
+
+  /* สีตามสถานะ */
+  .rank-finisher { background-color: #d1fae5 !important; }
+  .rank-running  { background-color: #fef9c3 !important; }
+  .rank-dnf      { background-color: #fee2e2 !important; }
+
+  /* popup */
+  .popup-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 50;
+  }
+  .popup {
+    background: white;
+    color: #111827;
+    border-radius: 16px;
+    padding: 22px;
+    max-width: 550px;
+    width: 95%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.35);
+  }
+
+  /* ปุ่ม popup */
+  #closePopup {
+    background: #1e293b;
+    color: white;
+    border-radius: 10px;
+    padding: 10px;
+  }
+  #closePopup:hover {
+    background: #334155;
+  }
+
+  /* blink effect */
   @keyframes blinkSlow {
     0%,100% { background-color: inherit; }
-    50% { background-color: rgba(253,230,138,0.5); }
+    50% { background-color: rgba(253,230,138,0.45); }
   }
-  .blink-slow { animation: blinkSlow 2.5s infinite; }
+  .blink-slow {
+    animation: blinkSlow 2.5s infinite;
+  }
 </style>
+
 </head>
 <body class="bg-gray-100 min-h-screen p-6">
 
@@ -38,7 +133,7 @@
 </div>
 
 <!-- Table -->
-<div id="runner-list" class="max-w-5xl mx-auto bg-white p-4 rounded-lg shadow">
+<div id="runner-list" class="max-w-5xl mx-auto content-box mt-4">
   <table class="w-full text-sm text-left border-collapse">
     <thead>
       <tr class="bg-gray-200">
