@@ -3,59 +3,151 @@
 <head>
 <meta charset="UTF-8">
 <title>🏁 ระบบกรรมการสนาม (Auto Reason + Show Latest Reason)</title>
+
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
 <style>
+  body {
+    background: #0b1120;
+    color: #fff;
+    font-family: "Prompt", sans-serif;
+  }
+
+  /* ===== BANNER แบบ C ===== */
+  .top-banner {
+    width: 100%;
+    background: linear-gradient(90deg, #0f172a, #1e293b);
+    border-bottom: 4px solid #facc15;
+    display: flex;
+    align-items: center;
+    padding: 14px 20px;
+    gap: 16px;
+  }
+  .top-banner img {
+    height: 70px;
+  }
+  .top-banner-title {
+    font-size: 1.7rem;
+    font-weight: bold;
+    color: #facc15;
+    letter-spacing: 1px;
+  }
+
+  /* ===== CARD ===== */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.07);
+    padding: 25px;
+    border-radius: 18px;
+    box-shadow: 0 0 25px rgba(0,0,0,0.45);
+  }
+
+  /* ===== RUNNER CARD ===== */
+  .runner-card {
+    background: rgba(255,255,255,0.09);
+    border-left: 4px solid #3b82f6;
+    padding: 15px;
+    border-radius: 14px;
+  }
+
+  /* Blink effect */
   @keyframes blinkGold { 0%,100%{background-color:#d1fae5;} 50%{background-color:#fef3c7;} }
   @keyframes blinkYellow { 0%,100%{background-color:#fff9c4;} 50%{background-color:#fde68a;} }
   @keyframes blinkSlowGold { 0%,100%{background-color:#fef3c7;} 50%{background-color:#fde68a;} }
   .blink-finisher { animation: blinkGold 1.8s infinite; }
   .blink-dnf { animation: blinkYellow 1.8s infinite; }
   .blink-slow-finisher { animation: blinkSlowGold 3s infinite; }
+
+  /* Toast */
   #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; }
-  .toast { background: #333; color: #fff; padding: 10px 16px; border-radius: 8px; margin-top: 8px; min-width: 250px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); opacity: 0; transform: translateY(20px); animation: fadeInUp 0.4s forwards; }
-  @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+  .toast { background: #333; color:#fff; padding:10px 16px; border-radius:8px;
+           margin-top:8px; box-shadow:0 2px 6px rgba(0,0,0,0.2);
+           opacity:0; transform:translateY(20px);
+           animation:fadeInUp .4s forwards; }
+  @keyframes fadeInUp { to{opacity:1; transform:translateY(0);} }
 </style>
 </head>
-<body class="bg-gray-100 p-6">
 
-<div class="max-w-5xl mx-auto bg-white rounded-lg shadow p-6">
-  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Auto Reason + เหตุผลล่าสุด)</h1>
 
-  <!-- 🔐 Login -->
-  <div id="login-section">
-    <input id="email" type="email" placeholder="อีเมลกรรมการ" class="border p-2 w-full rounded mb-2">
-    <input id="password" type="password" placeholder="รหัสผ่าน" class="border p-2 w-full rounded mb-2">
-    <button id="loginBtn" class="bg-blue-600 text-white px-4 py-2 rounded w-full">เข้าสู่ระบบ</button>
-  </div>
+<body>
 
-  <!-- 🧑‍⚖️ Admin Section -->
-  <div id="admin-section" class="hidden">
-    <div class="flex justify-between items-center mb-2">
-      <h2 class="text-lg font-semibold">จัดการสถานะนักวิ่ง</h2>
-      <button id="logoutBtn" class="bg-red-500 text-white px-3 py-1 rounded">ออกจากระบบ</button>
+<!-- =============================
+        🔶 BANNER แบบ C
+============================= -->
+<div class="top-banner">
+  <img src="https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png">
+  <div class="top-banner-title">BANGWAD CHARITY RUN 2025 — STAFF JUDGE SYSTEM</div>
+</div>
+
+
+<!-- =============================
+        MAIN CONTAINER
+============================= -->
+<div class="max-w-5xl mx-auto p-6">
+
+  <div class="glass-card">
+
+    <h1 class="text-2xl font-bold mb-4 text-center text-yellow-300">
+      🏁 ระบบกรรมการสนาม (Auto Reason + เหตุผลล่าสุด)
+    </h1>
+
+    <!-- 🔐 Login -->
+    <div id="login-section">
+      <input id="email" type="email" placeholder="อีเมลกรรมการ"
+        class="border p-2 w-full rounded mb-2 text-black">
+      <input id="password" type="password" placeholder="รหัสผ่าน"
+        class="border p-2 w-full rounded mb-2 text-black">
+
+      <button id="loginBtn"
+        class="bg-blue-600 text-white px-4 py-2 rounded w-full hover:bg-blue-700">
+        เข้าสู่ระบบ
+      </button>
     </div>
 
-    <!-- ช่องค้นหา -->
-    <div class="flex flex-wrap gap-2 mb-4">
-      <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อ, Tag ID หรือ BIB เพื่อค้นหา..." class="border p-2 rounded flex-grow">
-      <button id="clearBtn" class="bg-gray-300 px-3 py-2 rounded">ล้าง</button>
-      <button id="showAllBtn" class="bg-blue-500 text-white px-3 py-2 rounded">แสดงทั้งหมด</button>
-      <button id="showRunningBtn" class="bg-green-600 text-white px-3 py-2 rounded">เฉพาะ RUNNING</button>
+    <!-- 🧑‍⚖️ Admin Section -->
+    <div id="admin-section" class="hidden">
+      <div class="flex justify-between items-center mb-2">
+        <h2 class="text-lg font-semibold">จัดการสถานะนักวิ่ง</h2>
+        <button id="logoutBtn"
+          class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">
+          ออกจากระบบ
+        </button>
+      </div>
+
+      <!-- ช่องค้นหา -->
+      <div class="flex flex-wrap gap-2 mb-4">
+        <input id="searchInput" type="text"
+          placeholder="🔍 พิมพ์ชื่อ, Tag ID หรือ BIB เพื่อค้นหา..."
+          class="border p-2 rounded flex-grow text-black">
+
+        <button id="clearBtn" class="bg-gray-300 text-black px-3 py-2 rounded">ล้าง</button>
+        <button id="showAllBtn" class="bg-blue-500 text-white px-3 py-2 rounded">แสดงทั้งหมด</button>
+        <button id="showRunningBtn" class="bg-green-600 text-white px-3 py-2 rounded">เฉพาะ RUNNING</button>
+      </div>
+
+      <p id="lastUpdate" class="text-xs text-gray-300 mb-4">อัปเดตล่าสุด: -</p>
+      <div id="runnerList" class="space-y-3"></div>
     </div>
 
-    <p id="lastUpdate" class="text-xs text-gray-500 mb-4">อัปเดตล่าสุด: -</p>
-    <div id="runnerList" class="space-y-3"></div>
   </div>
+
 </div>
 
 <!-- เสียงแจ้งเตือน -->
-<audio id="alertDnf" preload="auto" src="https://cdn.jsdelivr.net/gh/napthedev/sounds@main/warning-beep.mp3"></audio>
-<audio id="alertFinisher" preload="auto" src="https://cdn.jsdelivr.net/gh/napthedev/sounds@main/win.mp3"></audio>
+<audio id="alertDnf" preload="auto"
+  src="https://cdn.jsdelivr.net/gh/napthedev/sounds@main/warning-beep.mp3"></audio>
+<audio id="alertFinisher" preload="auto"
+  src="https://cdn.jsdelivr.net/gh/napthedev/sounds@main/win.mp3"></audio>
 
-<!-- Popup แจ้งเตือน -->
 <div id="toast-container"></div>
 
+
+
+
+<!-- =======================================================
+      ⛔ IMPORTANT: ฟังก์ชันทั้งหมดด้านล่าง = "ของเดิม"
+      ❗ ไม่ถูกลบ ไม่ถูกแก้ ไม่ถูกแตะเลย
+======================================================== -->
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
@@ -241,5 +333,6 @@ document.getElementById("loginBtn").onclick = async () => {
   autoLogin(data.user);
 };
 </script>
+
 </body>
 </html>
