@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>🏁 ระบบกรรมการสนาม (Auto Reason + Show Latest Reason)</title>
+<title>🏁 ระบบกรรมการสนาม (Auto Reason + Latest Reason)</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
@@ -45,86 +45,72 @@
 </style>
 </head>
 
+<body class="p-6">
 
-<body>
+<!-- กล่องใหญ่ -->
+<div class="max-w-5xl mx-auto glass-card">
 
-<!-- =============================
-        🔶 BANNER แบบ C
-============================= -->
-<div class="top-banner">
-  <img src="https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png">
-  <div class="top-banner-title">BANGWAD CHARITY RUN 2025 — STAFF JUDGE SYSTEM</div>
-</div>
+  <h1 class="text-2xl font-bold text-center mb-4 text-yellow-300">
+    🏁 ระบบกรรมการสนาม (Auto Reason + เหตุผลล่าสุด)
+  </h1>
 
+  <!-- LOGIN -->
+  <div id="login-section">
+    <input id="email" type="email" placeholder="อีเมลกรรมการ"
+      class="w-full p-3 mb-2 rounded bg-[#1e293b] border border-gray-600 text-white">
 
-<!-- =============================
-        MAIN CONTAINER
-============================= -->
-<div class="max-w-5xl mx-auto p-6">
+    <input id="password" type="password" placeholder="รหัสผ่าน"
+      class="w-full p-3 mb-2 rounded bg-[#1e293b] border border-gray-600 text-white">
 
-  <div class="glass-card">
+    <button id="loginBtn"
+      class="w-full bg-blue-600 py-3 rounded text-white text-lg mt-2">
+      เข้าสู่ระบบ
+    </button>
+  </div>
 
-    <h1 class="text-2xl font-bold mb-4 text-center text-yellow-300">
-      🏁 ระบบกรรมการสนาม (Auto Reason + เหตุผลล่าสุด)
-    </h1>
+  <!-- ADMIN SECTION -->
+  <div id="admin-section" class="hidden">
 
-    <!-- 🔐 Login -->
-    <div id="login-section">
-      <input id="email" type="email" placeholder="อีเมลกรรมการ"
-        class="border p-2 w-full rounded mb-2 text-black">
-      <input id="password" type="password" placeholder="รหัสผ่าน"
-        class="border p-2 w-full rounded mb-2 text-black">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold text-blue-300">จัดการสถานะนักวิ่ง</h2>
 
-      <button id="loginBtn"
-        class="bg-blue-600 text-white px-4 py-2 rounded w-full hover:bg-blue-700">
-        เข้าสู่ระบบ
+      <button id="logoutBtn"
+        class="bg-red-600 px-3 py-2 rounded text-white">
+        ออกจากระบบ
       </button>
     </div>
 
-    <!-- 🧑‍⚖️ Admin Section -->
-    <div id="admin-section" class="hidden">
-      <div class="flex justify-between items-center mb-2">
-        <h2 class="text-lg font-semibold">จัดการสถานะนักวิ่ง</h2>
-        <button id="logoutBtn"
-          class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">
-          ออกจากระบบ
-        </button>
-      </div>
+    <!-- Search -->
+    <div class="flex flex-wrap gap-2 mb-4">
+      <input id="searchInput"
+        placeholder="🔍 ค้นหาชื่อ, Tag ID หรือ BIB..."
+        class="flex-grow p-3 rounded bg-[#1e293b] border border-gray-600 text-white">
 
-      <!-- ช่องค้นหา -->
-      <div class="flex flex-wrap gap-2 mb-4">
-        <input id="searchInput" type="text"
-          placeholder="🔍 พิมพ์ชื่อ, Tag ID หรือ BIB เพื่อค้นหา..."
-          class="border p-2 rounded flex-grow text-black">
+      <button id="clearBtn" class="px-4 py-2 bg-gray-500 rounded text-white">
+        ล้าง
+      </button>
 
-        <button id="clearBtn" class="bg-gray-300 text-black px-3 py-2 rounded">ล้าง</button>
-        <button id="showAllBtn" class="bg-blue-500 text-white px-3 py-2 rounded">แสดงทั้งหมด</button>
-        <button id="showRunningBtn" class="bg-green-600 text-white px-3 py-2 rounded">เฉพาะ RUNNING</button>
-      </div>
+      <button id="showAllBtn" class="px-4 py-2 bg-blue-600 rounded text-white">
+        แสดงทั้งหมด
+      </button>
 
-      <p id="lastUpdate" class="text-xs text-gray-300 mb-4">อัปเดตล่าสุด: -</p>
-      <div id="runnerList" class="space-y-3"></div>
+      <button id="showRunningBtn" class="px-4 py-2 bg-green-600 rounded text-white">
+        เฉพาะ RUNNING
+      </button>
     </div>
 
-  </div>
+    <p id="lastUpdate" class="text-sm text-gray-400 mb-4">อัปเดตล่าสุด: -</p>
 
+    <div id="runnerList" class="space-y-4"></div>
+  </div>
 </div>
 
 <!-- เสียงแจ้งเตือน -->
-<audio id="alertDnf" preload="auto"
-  src="https://cdn.jsdelivr.net/gh/napthedev/sounds@main/warning-beep.mp3"></audio>
-<audio id="alertFinisher" preload="auto"
-  src="https://cdn.jsdelivr.net/gh/napthedev/sounds@main/win.mp3"></audio>
+<audio id="alertDnf" preload="auto" src="https://cdn.jsdelivr.net/gh/napthedev/sounds@main/warning-beep.mp3"></audio>
+<audio id="alertFinisher" preload="auto" src="https://cdn.jsdelivr.net/gh/napthedev/sounds@main/win.mp3"></audio>
 
 <div id="toast-container"></div>
 
-
-
-
-<!-- =======================================================
-      ⛔ IMPORTANT: ฟังก์ชันทั้งหมดด้านล่าง = "ของเดิม"
-      ❗ ไม่ถูกลบ ไม่ถูกแก้ ไม่ถูกแตะเลย
-======================================================== -->
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
