@@ -28,12 +28,8 @@
     margin: 0;
     color: #facc15;
     font-size: 1.9rem;
-    letter-spacing: 1px;
   }
 
-  .lang-box {
-    margin-top: 10px;
-  }
   .lang-box button {
     background:#334155;
     padding:7px 16px;
@@ -44,7 +40,37 @@
     cursor:pointer;
   }
 
+  #loginBox {
+    max-width: 360px;
+    margin: 60px auto;
+    background: rgba(255,255,255,0.07);
+    padding: 25px;
+    border-radius: 15px;
+    text-align: center;
+  }
+  #loginBox input {
+    width: 90%;
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 10px;
+    border: none;
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    text-align: center;
+  }
+  #loginBox button {
+    background:#3b82f6;
+    padding:12px 20px;
+    border:none;
+    color:white;
+    border-radius:10px;
+    margin-top:15px;
+    cursor:pointer;
+    width: 100%;
+  }
+
   #scanBox {
+    display:none;
     text-align: center;
     padding: 20px;
   }
@@ -74,15 +100,7 @@
     animation: fadeIn 0.4s;
   }
 
-  .label {
-    font-weight: bold;
-    color: #38bdf8;
-  }
-
-  .value {
-    font-size: 1.1rem;
-  }
-
+  .label { font-weight: bold; color: #38bdf8; }
   .status-chip {
     display:inline-block;
     padding:6px 12px;
@@ -104,6 +122,7 @@
     background:#22c55e;
     color:white;
   }
+
   .btn-checkin:disabled {
     background:#475569;
   }
@@ -118,11 +137,6 @@
     margin-top:8px;
     cursor:pointer;
   }
-
-  @keyframes fadeIn {
-    from { opacity:0; transform:translateY(10px); }
-    to { opacity:1; transform:translateY(0); }
-  }
 </style>
 </head>
 
@@ -136,6 +150,16 @@
   </div>
 </header>
 
+<!-- LOGIN -->
+<div id="loginBox">
+  <h2>🔐 STAFF LOGIN</h2>
+  <input id="email" type="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
+  <button onclick="login()">เข้าสู่ระบบ</button>
+  <p id="loginMsg" style="margin-top:10px;color:#f87171;"></p>
+</div>
+
+<!-- SCANNER -->
 <div id="scanBox">
   <div id="reader"></div>
   <div id="scanText">สแกน QR จากผู้สมัคร</div>
@@ -145,11 +169,72 @@
 
 <script>
 /* =============================
-   CONFIG
+   SUPABASE CONFIG
 ============================= */
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; 
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+
+/* =============================
+   AUTH SYSTEM
+============================= */
+async function checkAuth() {
+  const { data: { session } } = await sb.auth.getSession();
+
+  if (!session) {
+    showLogin();
+    return;
+  }
+  verifyAdmin(session.user);
+}
+
+async function verifyAdmin(user) {
+  const { data } = await sb
+    .from("adminrace")
+    .select("is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!data || !data.is_admin) {
+    sb.auth.signOut();
+    showLogin("⛔ ไม่มีสิทธิ์เข้าใช้งาน");
+    return;
+  }
+
+  startStaffMode();
+}
+
+function showLogin(msg="") {
+  loginBox.style.display = "block";
+  scanBox.style.display = "none";
+  loginMsg.innerHTML = msg;
+}
+
+async function login() {
+  const emailVal = email.value.trim();
+  const passVal = password.value.trim();
+  loginMsg.innerHTML = "⏳ Processing...";
+
+  const { data, error } = await sb.auth.signInWithPassword({
+    email: emailVal,
+    password: passVal
+  });
+
+  if (error) {
+    loginMsg.innerHTML = "❌ " + error.message;
+    return;
+  }
+
+  verifyAdmin(data.user);
+}
+
+function startStaffMode() {
+  loginBox.style.display = "none";
+  scanBox.style.display = "block";
+  startScanner();
+}
 
 /* =============================
    MULTI LANGUAGE
@@ -157,38 +242,23 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let lang = "th";
 
 const text = {
-  th:{
-    title:"📷 ระบบเช็คอินเจ้าหน้าที่",
-    scan:"สแกน QR จากผู้สมัคร",
-    bib:"หมายเลขประจำตัว",
-    name:"ชื่อ",
-    phone:"เบอร์โทร",
-    category:"ประเภท",
-    status:"สถานะเช็คอิน",
-    checked:"เช็คอินแล้ว",
-    notchecked:"ยังไม่เช็คอิน",
-    btn:"ยืนยันเช็คอิน",
-    success:"✔ เช็คอินสำเร็จ"
-  },
-  en:{
-    title:"📷 Staff Check-in System",
-    scan:"Scan QR Code",
-    bib:"BIB Number",
-    name:"Name",
-    phone:"Phone",
-    category:"Category",
-    status:"Check-in Status",
-    checked:"Checked-in",
-    notchecked:"Not checked-in",
-    btn:"Confirm Check-in",
-    success:"✔ Check-in Success"
-  }
+  th:{ title:"📷 ระบบเช็คอินเจ้าหน้าที่", scan:"สแกน QR จากผู้สมัคร",
+       bib:"หมายเลขประจำตัว", name:"ชื่อ", phone:"เบอร์โทร",
+       category:"ประเภท", status:"สถานะเช็คอิน",
+       checked:"เช็คอินแล้ว", notchecked:"ยังไม่เช็คอิน",
+       btn:"ยืนยันเช็คอิน", success:"✔ เช็คอินสำเร็จ" },
+
+  en:{ title:"📷 Staff Check-in System", scan:"Scan QR Code",
+       bib:"BIB Number", name:"Name", phone:"Phone",
+       category:"Category", status:"Check-in Status",
+       checked:"Checked-in", notchecked:"Not checked-in",
+       btn:"Confirm Check-in", success:"✔ Check-in Success" }
 };
 
 function setLang(l){
   lang = l;
-  document.getElementById("title").innerText = text[l].title;
-  document.getElementById("scanText").innerText = text[l].scan;
+  title.innerText = text[l].title;
+  scanText.innerText = text[l].scan;
 }
 
 /* =============================
@@ -206,8 +276,7 @@ function startScanner(){
         const bib = decoded.split("bib=")[1];
         loadRunner(bib);
       }
-    },
-    err => {}
+    }
   );
 }
 
@@ -215,8 +284,7 @@ function startScanner(){
    LOAD RUNNER
 ============================= */
 async function loadRunner(bib){
-  document.getElementById("result").innerHTML =
-    `<p style='color:#facc15'>กำลังโหลด...</p>`;
+  result.innerHTML = `<p style='color:#facc15'>กำลังโหลด...</p>`;
 
   const bibNum = parseInt(bib.replace("TOP",""));
 
@@ -227,8 +295,7 @@ async function loadRunner(bib){
 
   const row = allRows[bibNum - 1];
   if(!row){
-    document.getElementById("result").innerHTML =
-      `<p style="color:#ef4444">BIB ไม่พบในระบบ</p>`;
+    result.innerHTML = `<p style="color:#ef4444">BIB ไม่พบในระบบ</p>`;
     return;
   }
 
@@ -245,46 +312,30 @@ async function loadRunner(bib){
    RENDER CARD
 ============================= */
 function renderCard(d, bib){
-  const isApproved = d.status && d.status.toLowerCase() === "approved";
+  const isApproved = d.status?.toLowerCase() === "approved";
   const checked = d.checkin_status === "checked";
 
-  // กรณีไม่ approved → แจ้งเตือนทันที
   if (!isApproved) {
-    document.getElementById("result").innerHTML = `
+    result.innerHTML = `
       <div class="card">
-
         <p><span class="label">${text[lang].bib}:</span> ${bib}</p>
         <p><span class="label">${text[lang].name}:</span> ${d.first_name} ${d.last_name}</p>
         <p><span class="label">${text[lang].phone}:</span> ${d.phone}</p>
         <p><span class="label">${text[lang].category}:</span> ${d.category}</p>
 
-        <p><span class="label">${text[lang].status}:</span>
-          <span class="status-rejected">${d.status ?? "-"}</span>
+        <p style="text-align:center; color:#ef4444; margin-top:25px;">
+          ${lang==="th" ? "❌ ผู้สมัครยังไม่ได้รับการอนุมัติ" : "❌ Not approved"}
         </p>
-
-        <p style="text-align:center; color:#ef4444; font-weight:bold; margin-top:25px;">
-          ${
-            lang === "th"
-            ? "❌ ผู้สมัครรายนี้ยังไม่ได้รับการอนุมัติ<br>ไม่สามารถเช็คอินได้"
-            : "❌ This participant is not approved<br>Check-in is not allowed"
-          }
-        </p>
-
       </div>
 
       <button class="btn-reset" onclick="location.reload()">🔄 สแกนใหม่</button>
     `;
-    return; // ❗ ห้ามเช็คอิน
+    return;
   }
 
-  // ================================
-  //  APPROVED → แสดงปกติ
-  // ================================
-  document.getElementById("result").innerHTML = `
+  result.innerHTML = `
     <div class="card">
-      <p><span class="label">${text[lang].bib}:</span> 
-         <span class="value">${bib}</span>
-      </p>
+      <p><span class="label">${text[lang].bib}:</span> ${bib}</p>
       <p><span class="label">${text[lang].name}:</span> ${d.first_name} ${d.last_name}</p>
       <p><span class="label">${text[lang].phone}:</span> ${d.phone}</p>
       <p><span class="label">${text[lang].category}:</span> ${d.category}</p>
@@ -295,10 +346,9 @@ function renderCard(d, bib){
         </span>
       </p>
 
-      <button class="btn-checkin"
-        id="btnCheck"
+      <button class="btn-checkin" id="btnCheck"
         onclick="doCheckIn(${d.id})"
-        ${checked ? "disabled" : ""} >
+        ${checked ? "disabled" : ""}>
         ${checked ? text[lang].success : text[lang].btn}
       </button>
     </div>
@@ -307,26 +357,34 @@ function renderCard(d, bib){
   `;
 }
 
-
 /* =============================
-   DO CHECK-IN
+   UPDATE CHECK-IN
 ============================= */
 async function doCheckIn(id){
-  await sb
+  const { error } = await sb
     .from("bangwad")
     .update({
       checkin_status:"checked",
-      checkin_time: new Date().toISOString()
+      checkin_time:new Date().toISOString()
     })
     .eq("id", id);
+
+  if (error) {
+    alert("❌ ERROR: " + error.message);
+    console.log(error);
+    return;
+  }
 
   const btn = document.getElementById("btnCheck");
   btn.innerText = text[lang].success;
   btn.disabled = true;
 }
 
+/* =============================
+   START
+============================= */
 setLang("th");
-startScanner();
+checkAuth();   // ← ไม่ signOut อีกแล้ว
 </script>
 
 </body>
