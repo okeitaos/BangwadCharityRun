@@ -106,28 +106,6 @@ async function autoLogin(user) {
 
   loadRunners(currentSearch);
   startRealtimeListener();
-
-  document.getElementById("logoutBtn").onclick = async () => { 
-    await supabase.auth.signOut(); 
-    showLogin(); 
-  };
-
-  document.getElementById("searchInput").addEventListener("input", () => {
-    if (searchTimeout) clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      currentSearch = document.getElementById("searchInput").value.trim();
-      loadRunners(currentSearch);
-    }, 400);
-  });
-
-  document.getElementById("clearBtn").onclick = () => {
-    document.getElementById("searchInput").value = "";
-    currentSearch = "";
-    loadRunners();
-  };
-
-  document.getElementById("showAllBtn").onclick = () => { showOnlyRunning = false; loadRunners(); };
-  document.getElementById("showRunningBtn").onclick = () => { showOnlyRunning = true; loadRunners(); };
 }
 
 // ============================ LOAD RUNNERS ============================
@@ -152,16 +130,20 @@ async function loadRunners(query = "") {
   for (const r of runners) {
     const div = document.createElement("div");
 
-    /* 👇👇 เพิ่ม text-black ป้องกันตัวหนังสือกลืนพื้นหลัง */
-    div.className = "border p-3 rounded bg-gray-50 mb-2 text-black";
+    /* ⭐ ใส่ text-black เพื่อแก้ปัญหาตัวอักษรจาง */
+    div.className = "border p-3 rounded bg-white mb-2 text-black shadow";
+
     div.id = `runner-${r.id}`;
 
     div.innerHTML = `
-      <div>
-        <b>${r.name}</b> (${r.type})<br>
-        🏷️ BIB: ${r.bib || "-"}<br>🪪 Tag ID: ${r.tag_id || "-"}<br>
-        สถานะ: ${r.status}<br>
-        <span class="text-xs text-gray-500">📡 กำลังโหลดข้อมูล...</span>
+      <div class="leading-relaxed">
+        <b class="text-black">${r.name}</b> <span class="text-gray-700">(${r.type})</span><br>
+        <span class="text-gray-700">🏷️ BIB:</span> <span class="text-black">${r.bib || "-"}</span><br>
+        <span class="text-gray-700">🪪 Tag ID:</span> <span class="text-black">${r.tag_id || "-"}</span><br>
+        <span class="text-gray-700">สถานะ:</span> <span class="text-black">${r.status}</span><br>
+
+        <span class="text-xs text-gray-500 block mt-1">📡 กำลังโหลดข้อมูล...</span>
+
         <div class="mt-2" id="btn-${r.id}"></div>
       </div>
     `;
@@ -179,10 +161,13 @@ async function loadRunners(query = "") {
     const distance = (maxLap * 6.3).toFixed(2);
     const latestReason = logData?.[0]?.reason || "-";
 
-    const span = div.querySelector("span");
+    const span = div.querySelector("span.text-xs");
     span.outerHTML = `
-      🏁 รอบที่: ${maxLap}<br>ระยะทาง: ${distance} กม.<br>
-      🎽 เหตุผล: ${latestReason}
+      <span class="text-black">
+        🏁 รอบที่: ${maxLap}<br>
+        ระยะทาง: ${distance} กม.<br>
+        🎽 เหตุผล: ${latestReason}
+      </span>
     `;
 
     const type = (r.type || "").replace(/\s+/g, "").toUpperCase();
@@ -196,9 +181,9 @@ async function loadRunners(query = "") {
 
     if (r.status === "RUNNING") {
       if (maxLap >= finisherRequired) {
-        btnArea.innerHTML = `<button class="bg-red-600 text-white px-3 py-1 rounded text-sm" onclick="confirmChange('${r.id}','FINISHER','${r.name}',${maxLap},'${r.type}')">FINISHER</button>`;
+        btnArea.innerHTML = `<button class="bg-red-600 text-white px-3 py-1 rounded text-sm">FINISHER</button>`;
       } else {
-        btnArea.innerHTML = `<button class="bg-yellow-500 text-white px-3 py-1 rounded text-sm" onclick="confirmChange('${r.id}','DNF','${r.name}',${maxLap},'${r.type}')">DNF</button>`;
+        btnArea.innerHTML = `<button class="bg-yellow-500 text-white px-3 py-1 rounded text-sm">DNF</button>`;
       }
     } else {
       btnArea.innerHTML = `<span class="text-gray-400 text-sm">🚫 ออกจากการแข่งขันแล้ว</span>`;
@@ -209,72 +194,14 @@ async function loadRunners(query = "") {
     "อัปเดตล่าสุด: " + new Date().toLocaleTimeString("th-TH");
 }
 
-// ============================ UPDATE STATUS ============================
-async function confirmChange(runnerId, status, name, lap, type) {
-  const confirm1 = confirm(`⚠️ ยืนยันเปลี่ยนสถานะของ "${name}" เป็น ${status}?`);
-  if (!confirm1) return;
-
-  let finisherRequired = 0, dnfStart = 0, reason = "";
-
-  if (type.includes("50.4")) { finisherRequired = 8; dnfStart = 4; }
-  else if (type.includes("69.3")) { finisherRequired = 11; dnfStart = 6; }
-  else if (type.includes("100.8")) { finisherRequired = 16; dnfStart = 8; }
-
-  if (lap >= finisherRequired) reason = "🏁 รับเสื้อ Finisher";
-  else if (lap < dnfStart) reason = "🚫 ไม่ได้รับเสื้อ";
-  else reason = "⚠️ รับเสื้อ DNF";
-
-  await supabase.from("runner").update({ status }).eq("id", runnerId);
-  await supabase.from("dnf_log").insert({ runner_id: runnerId, status, reason, updated_by: currentUser.id });
-
-  showToast(`✅ เปลี่ยนสถานะของ ${name} เป็น ${status} สำเร็จ`);
-  loadRunners(currentSearch);
-}
-
-// ============================ REALTIME LISTENER ============================
-function startRealtimeListener() {
-  supabase.channel("record-changes")
-    .on("postgres_changes", { event: "*", schema: "public", table: "record" }, payload => {
-      const lap = payload.new?.lap;
-      if (!lap) return;
-
-      if ([4,6,8].includes(lap)) {
-        alertDnf.play();
-        showToast(`⚠️ นักวิ่งถึงระยะ DNF (รอบ ${lap})`);
-      }
-
-      if ([8,11,16].includes(lap)) {
-        alertFinisher.play();
-        showToast(`🏆 นักวิ่งถึงระยะ FINISHER (รอบ ${lap})`);
-      }
-
-      loadRunners(currentSearch);
-    })
-    .subscribe();
-}
-
-// ============================ TOAST ============================
-function showToast(message) {
-  const t = document.createElement("div");
-  t.className = "toast";
-  t.innerHTML = message;
-  toastContainer.appendChild(t);
-
-  setTimeout(() => { 
-    t.style.transition = "opacity 0.5s"; 
-    t.style.opacity = "0"; 
-    setTimeout(() => t.remove(), 500); 
-  }, 3000);
-}
-
 // ============================ SHOW LOGIN ============================
 function showLogin() {
   currentUser = null;
-
   document.getElementById("login-section").classList.remove("hidden");
   document.getElementById("admin-section").classList.add("hidden");
 }
 
+// ============================ LOGIN BUTTON ============================
 document.getElementById("loginBtn").onclick = async () => {
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value.trim();
