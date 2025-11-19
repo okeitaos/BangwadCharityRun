@@ -166,21 +166,16 @@
   </div>
 </header>
 
-<!-- ==========================
-      LOGIN BOX (NEW)
-=========================== -->
+<!-- LOGIN -->
 <div id="loginBox" style="display:none;">
   <h2>🔐 STAFF LOGIN</h2>
   <input id="email" type="email" placeholder="Email">
   <input id="password" type="password" placeholder="Password">
   <button onclick="login()">เข้าสู่ระบบ</button>
-
   <p id="loginMsg" style="margin-top:10px;color:#f87171;"></p>
 </div>
 
-<!-- ==========================
-      SCANNER + RESULT
-=========================== -->
+<!-- SCANNER -->
 <div id="scanBox" style="display:none;">
   <div id="reader"></div>
   <div id="scanText">สแกน QR จากผู้สมัคร</div>
@@ -197,10 +192,11 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* =============================
-   LOGIN SYSTEM
+   NEW: LOGIN SYSTEM (เพิ่มเข้าไปใหม่)
 ============================= */
 async function checkAdmin() {
-  const session = (await sb.auth.getSession()).data.session;
+  const { data: sessionData } = await sb.auth.getSession();
+  const session = sessionData.session;
 
   if (!session) {
     document.getElementById("loginBox").style.display = "block";
@@ -222,9 +218,8 @@ async function checkAdmin() {
     return;
   }
 
-  // OK → แสดงหน้าแสกน
   document.getElementById("scanBox").style.display = "block";
-  startScanner();
+  startScanner(); // ← ฟังก์ชันเก่า (ไม่ลบ)
 }
 
 async function login() {
@@ -232,10 +227,7 @@ async function login() {
   const password = document.getElementById("password").value.trim();
   const msg = document.getElementById("loginMsg");
 
-  let { data, error } = await sb.auth.signInWithPassword({
-    email,
-    password
-  });
+  let { error } = await sb.auth.signInWithPassword({ email, password });
 
   if (error) {
     msg.innerText = "❌ " + error.message;
@@ -245,39 +237,24 @@ async function login() {
   location.reload();
 }
 
-checkAdmin();
-
 /* =============================
-   MULTI LANGUAGE (ของเก่า)
+   ฟังก์ชันเดิมทั้งหมดอยู่ครบ
 ============================= */
+
 let lang = "th";
 
 const text = {
-  th:{
-    title:"📷 ระบบเช็คอินเจ้าหน้าที่",
-    scan:"สแกน QR จากผู้สมัคร",
-    bib:"หมายเลขประจำตัว",
-    name:"ชื่อ",
-    phone:"เบอร์โทร",
-    category:"ประเภท",
-    status:"สถานะเช็คอิน",
-    checked:"เช็คอินแล้ว",
-    notchecked:"ยังไม่เช็คอิน",
-    btn:"ยืนยันเช็คอิน",
-    success:"✔ เช็คอินสำเร็จ"
+  th:{ title:"📷 ระบบเช็คอินเจ้าหน้าที่", scan:"สแกน QR จากผู้สมัคร",
+       bib:"หมายเลขประจำตัว", name:"ชื่อ", phone:"เบอร์โทร",
+       category:"ประเภท", status:"สถานะเช็คอิน",
+       checked:"เช็คอินแล้ว", notchecked:"ยังไม่เช็คอิน",
+       btn:"ยืนยันเช็คอิน", success:"✔ เช็คอินสำเร็จ"
   },
-  en:{
-    title:"📷 Staff Check-in System",
-    scan:"Scan QR Code",
-    bib:"BIB Number",
-    name:"Name",
-    phone:"Phone",
-    category:"Category",
-    status:"Check-in Status",
-    checked:"Checked-in",
-    notchecked:"Not checked-in",
-    btn:"Confirm Check-in",
-    success:"✔ Check-in Success"
+  en:{ title:"📷 Staff Check-in System", scan:"Scan QR Code",
+       bib:"BIB Number", name:"Name", phone:"Phone",
+       category:"Category", status:"Check-in Status",
+       checked:"Checked-in", notchecked:"Not checked-in",
+       btn:"Confirm Check-in", success:"✔ Check-in Success"
   }
 };
 
@@ -287,9 +264,6 @@ function setLang(l){
   document.getElementById("scanText").innerText = text[l].scan;
 }
 
-/* =============================
-  QR SCANNER + FUNCTION (ของเดิม)
-============================= */
 function startScanner(){
   const scanner = new Html5Qrcode("reader");
 
@@ -397,7 +371,11 @@ async function doCheckIn(id){
   btn.disabled = true;
 }
 
-setLang("th");
+/* START APP */
+document.addEventListener("DOMContentLoaded", () => {
+  setLang("th");
+  checkAdmin();
+});
 </script>
 
 </body>
