@@ -374,7 +374,10 @@ async function doCheckIn(id){
 }
 
 setLang("th");
-checkAuth();
+// บังคับให้ Login ใหม่ทุกครั้ง
+sb.auth.signOut();
+showLogin();
+
 </script>
 
 </body>
