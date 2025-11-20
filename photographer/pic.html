@@ -9,12 +9,11 @@
 
 <style>
   body {
-  background: radial-gradient(circle at top, rgba(0, 90, 255, 0.25), #0f172a 70%);
-  margin: 0;
-  overflow: hidden;
-  font-family: "Prompt", sans-serif;
-}
-
+    background: radial-gradient(circle at top, rgba(0, 90, 255, 0.25), #0a0a0a 70%);
+    margin: 0;
+    overflow: hidden;
+    font-family: "Prompt", sans-serif;
+  }
 
   .title {
     position: fixed;
@@ -40,8 +39,11 @@
     box-shadow: 0 0 15px rgba(255,215,0,0.4);
     text-align: center;
     opacity: 0;
-    animation: fadeIn 1.3s ease forwards;
+    transition: opacity 1.2s ease;
   }
+
+  .fade-in { opacity: 1; }
+  .fade-out { opacity: 0; }
 
   .floating-card img {
     width: 100%;
@@ -49,20 +51,16 @@
     object-fit: cover;
     border-radius: 14px;
     box-shadow: 0px 6px 20px rgba(0,0,0,0.5);
-    animation: floatY 6s ease-in-out infinite,
-               tilt 5s ease-in-out infinite,
-               curve 7s ease-in-out infinite;
+    animation: 
+      floatY 6s ease-in-out infinite,
+      tilt 5s ease-in-out infinite,
+      curve 7s ease-in-out infinite;
   }
 
   .name {
     margin-top: 6px;
     color: #fff;
     font-weight: 600;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: scale(0.8); }
-    to { opacity: 1; transform: scale(1); }
   }
 
   @keyframes floatY {
@@ -100,6 +98,8 @@ const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let photos = [];
+let photoQueue = [];
+const MAX_FLOATING = 5;  // ★ จำนวนรูปที่ลอยพร้อมกัน ★
 
 async function loadPhotographers() {
   const { data, error } = await db
@@ -113,35 +113,72 @@ async function loadPhotographers() {
   }
 
   photos = data;
-  spawnCard();
-  setInterval(spawnCard, 8000);
+  createShuffleQueue();
+
+  // สร้างรูปแรก 5 รูป
+  for (let i = 0; i < MAX_FLOATING; i++) {
+    spawnCard();
+  }
+
+  // ทุก 8 วินาที เปลี่ยนรูป 1 ใบ
+  setInterval(replaceOneCard, 8000);
 }
 
-function spawnCard() {
-  if (photos.length === 0) return;
+/* ★ Shuffle แบบไม่ซ้ำ ★ */
+function createShuffleQueue() {
+  photoQueue = [...photos];
 
-  const item = photos[Math.floor(Math.random() * photos.length)];
-  if (!item.picture_url) return;
+  for (let i = photoQueue.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [photoQueue[i], photoQueue[j]] = [photoQueue[j], photoQueue[i]];
+  }
+}
+
+function getNextPhoto() {
+  if (photoQueue.length === 0) createShuffleQueue();
+  return photoQueue.pop();
+}
+
+/* ★ แสดงรูปใหม่ ★ */
+function spawnCard() {
+  const item = getNextPhoto();
+  if (!item || !item.picture_url) return;
 
   const name = item.display_name || `${item.first_name} ${item.last_name}`;
-  createFloatingCard(item.picture_url, name);
-}
 
-function createFloatingCard(imageUrl, name) {
   const card = document.createElement("div");
   card.classList.add("floating-card");
 
-  card.style.left = Math.random() * (window.innerWidth - 180) + "px";
-  card.style.top = Math.random() * (window.innerHeight - 220) + "px";
+  card.style.left = Math.random() * (window.innerWidth - 200) + "px";
+  card.style.top = Math.random() * (window.innerHeight - 260) + "px";
 
   card.innerHTML = `
-    <img src="${imageUrl}">
+    <img src="${item.picture_url}">
     <div class="name">${name}</div>
   `;
 
   document.body.appendChild(card);
 
-  setTimeout(() => card.remove(), 20000);
+  // Fade-in
+  setTimeout(() => card.classList.add("fade-in"), 50);
+
+  return card;
+}
+
+/* ★ เปลี่ยนรูปใบหนึ่งออก แล้วเพิ่มรูปใหม่เข้ามาแทน ★ */
+function replaceOneCard() {
+  const cards = document.querySelectorAll(".floating-card");
+  if (cards.length === 0) return;
+
+  const removeCard = cards[Math.floor(Math.random() * cards.length)];
+
+  removeCard.classList.remove("fade-in");
+  removeCard.classList.add("fade-out");
+
+  setTimeout(() => {
+    removeCard.remove();
+    spawnCard();
+  }, 1200);
 }
 
 loadPhotographers();
