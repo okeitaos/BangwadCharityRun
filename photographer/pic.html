@@ -11,8 +11,8 @@
   body {
     background: #000000;
     margin: 0;
-    overflow-x: hidden;
-    font-family: "Prompt", sans-serif;
+    overflow: hidden;
+    font-family: "Prompt";
   }
 
   .title {
@@ -20,64 +20,38 @@
     top: 20px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 44px;
+    font-size: 42px;
+    color: #ffffff;
     font-weight: 800;
-    color: white;
-    text-shadow: 0 0 15px rgba(255,255,255,0.9);
-    z-index: 100;
-    pointer-events: none;
-  }
-
-  .gallery {
-    position: absolute;
-    top: 120px;
-    left: 0;
-    width: 100%;
-    display: grid;
-    gap: 30px;
-    padding: 40px;
-    justify-content: center;
-    grid-template-columns: repeat(auto-fill, 160px);
-    z-index: 1;
+    text-shadow: 0 0 20px rgba(255,255,255,0.7);
+    z-index: 1000;
   }
 
   .card {
+    position: absolute;
     width: 150px;
+    padding: 4px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.2);
+    backdrop-filter: blur(10px);
     text-align: center;
-    animation: fadeIn 1s ease;
+    z-index: 10;
   }
 
   .card img {
     width: 150px;
     height: 150px;
     object-fit: cover;
-    border-radius: 14px;
-    animation: floatY 6s ease-in-out infinite, tilt 6s ease-in-out infinite;
-    box-shadow: 0 0 15px rgba(255,255,255,0.4);
+    border-radius: 12px;
   }
 
   .name {
-    color: white;
-    font-size: 16px;
+    color: #fff;
     font-weight: 700;
-    margin-top: 6px;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: scale(0.8); }
-    to { opacity: 1; transform: scale(1); }
-  }
-
-  @keyframes floatY {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-18px); }
-    100% { transform: translateY(0px); }
-  }
-
-  @keyframes tilt {
-    0% { transform: rotate(-1.5deg); }
-    50% { transform: rotate(1.5deg); }
-    100% { transform: rotate(-1.5deg); }
+    margin-top: 5px;
+    font-size: 15px;
+    text-shadow: 0px 2px 4px #000;
   }
 </style>
 </head>
@@ -86,83 +60,182 @@
 
 <h1 class="title">📸 Photographer Official</h1>
 
-<div id="gallery" class="gallery"></div>
-
 <script>
-/* -----------------------------------------
+/* ----------------------------------------------------
    CONFIG
---------------------------------------------*/
+-----------------------------------------------------*/
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // เปลี่ยน
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";                  // เปลี่ยน
 
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* -----------------------------------------
-   LOAD INITIAL DATA
---------------------------------------------*/
-async function loadData() {
+/* ----------------------------------------------------
+   GLOBAL STATE
+-----------------------------------------------------*/
+let cards = [];   // physics objects
+let dataList = []; // all approved rows
+
+/* ----------------------------------------------------
+   SAFE POSITION (ไม่ซ้อนตอนเกิด)
+-----------------------------------------------------*/
+function getSafePosition() {
+  let attempt = 0;
+
+  while (attempt < 80) {
+    let x = Math.random() * (window.innerWidth - 200);
+    let y = 120 + Math.random() * (window.innerHeight - 260);
+
+    let overlap = false;
+
+    for (let c of cards) {
+      if (
+        Math.abs(c.x - x) < 170 &&
+        Math.abs(c.y - y) < 210
+      ) {
+        overlap = true;
+        break;
+      }
+    }
+
+    if (!overlap) return { x, y };
+
+    attempt++;
+  }
+
+  return { x: 50, y: 150 };
+}
+
+/* ----------------------------------------------------
+   SPAWN CARD
+-----------------------------------------------------*/
+function spawnCard(item) {
+  const card = document.createElement("div");
+  card.classList.add("card");
+
+  const name = item.display_name || `${item.first_name} ${item.last_name}`;
+
+  card.innerHTML = `
+    <img src="${item.picture_url}">
+    <div class="name">${name}</div>
+  `;
+
+  document.body.appendChild(card);
+
+  const pos = getSafePosition();
+
+  const obj = {
+    el: card,
+    x: pos.x,
+    y: pos.y,
+    vx: (Math.random() * 2 - 1) * 0.8,
+    vy: (Math.random() * 2 - 1) * 0.8,
+    w: 160,
+    h: 200,
+  };
+
+  card.style.left = obj.x + "px";
+  card.style.top = obj.y + "px";
+
+  cards.push(obj);
+}
+
+/* ----------------------------------------------------
+   REMOVE OLD CARDS FROM DOM
+-----------------------------------------------------*/
+function clearCards() {
+  for (let c of cards) c.el.remove();
+  cards = [];
+}
+
+/* ----------------------------------------------------
+   RENDER ALL APPROVED PHOTOS
+-----------------------------------------------------*/
+function renderAll() {
+  clearCards();
+  dataList.forEach(spawnCard);  
+}
+
+/* ----------------------------------------------------
+   PHYSICS UPDATE (ชนแล้วเด้ง)
+-----------------------------------------------------*/
+function updatePhysics() {
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+
+  for (let i = 0; i < cards.length; i++) {
+    const A = cards[i];
+
+    A.x += A.vx;
+    A.y += A.vy;
+
+    if (A.x < 0 || A.x + A.w > W) A.vx *= -1;
+    if (A.y < 100 || A.y + A.h > H) A.vy *= -1;
+
+    for (let j = i + 1; j < cards.length; j++) {
+      const B = cards[j];
+
+      if (
+        A.x < B.x + B.w &&
+        A.x + A.w > B.x &&
+        A.y < B.y + B.h &&
+        A.y + A.h > B.y
+      ) {
+        let tv = A.vx;
+        let ty = A.vy;
+
+        A.vx = B.vx;
+        A.vy = B.vy;
+
+        B.vx = tv;
+        B.vy = ty;
+      }
+    }
+
+    A.el.style.left = A.x + "px";
+    A.el.style.top = A.y + "px";
+  }
+
+  requestAnimationFrame(updatePhysics);
+}
+
+/* ----------------------------------------------------
+   LOAD INITIAL APPROVED
+-----------------------------------------------------*/
+async function loadInitial() {
   const { data } = await db
     .from("photographer_registration")
     .select("*")
     .eq("status", "approved");
 
-  renderGallery(data);
+  dataList = data;
+  renderAll();
 }
 
-/* -----------------------------------------
-   RENDER GALLERY (SHOW ALL, NO DUPLICATE)
---------------------------------------------*/
-function renderGallery(list) {
-  const gallery = document.getElementById("gallery");
-  gallery.innerHTML = ""; // clear ทั้งหมดก่อน
-
-  list.forEach(item => {
-    if (!item.picture_url) return;
-
-    const name = item.display_name || `${item.first_name} ${item.last_name}`;
-
-    const card = document.createElement("div");
-    card.className = "card";
-
-    card.innerHTML = `
-      <img src="${item.picture_url}">
-      <div class="name">${name}</div>
-    `;
-
-    gallery.appendChild(card);
-  });
-}
-
-/* -----------------------------------------
-   REALTIME SUBSCRIBE
---------------------------------------------*/
-db.channel("realtime-photographers")
+/* ----------------------------------------------------
+   REALTIME LISTENER
+-----------------------------------------------------*/
+db.channel("realtime_photographers")
   .on(
     "postgres_changes",
-    {
-      event: "*",
-      schema: "public",
-      table: "photographer_registration",
-    },
-    async (payload) => {
-      console.log("Realtime:", payload);
-
-      // Reload approved data only
+    { event: "*", schema: "public", table: "photographer_registration" },
+    async () => {
       const { data } = await db
         .from("photographer_registration")
         .select("*")
         .eq("status", "approved");
 
-      renderGallery(data);
+      dataList = data;
+      renderAll(); // รีเรนเดอร์ใหม่ทั้งหมด
     }
   )
   .subscribe();
 
-/* -----------------------------------------
-   START
---------------------------------------------*/
-loadData();
+/* ----------------------------------------------------
+   START SYSTEM
+-----------------------------------------------------*/
+loadInitial();
+updatePhysics();
 </script>
 
 </body>
