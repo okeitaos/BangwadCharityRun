@@ -9,25 +9,10 @@
 
 <style>
   body {
+    background: #000000;
     margin: 0;
-    overflow: hidden;
+    overflow-x: hidden;
     font-family: "Prompt", sans-serif;
-    background: radial-gradient(circle at center, rgba(255,255,255,0.15), #000000 70%);
-  }
-
-  /* Spotlight effect */
-  .spotlight {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    width: 600px;
-    height: 600px;
-    transform: translate(-50%, -50%);
-    background: radial-gradient(circle, rgba(255,255,255,0.35), rgba(0,0,0,0) 70%);
-    filter: blur(60px);
-    opacity: 0.22;
-    pointer-events: none;
-    z-index: 1;
   }
 
   .title {
@@ -35,159 +20,149 @@
     top: 20px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 46px;
+    font-size: 44px;
     font-weight: 800;
-    color: #ffffff;
-    text-shadow: 0 0 18px rgba(255,255,255,0.9);
-    z-index: 10000;
+    color: white;
+    text-shadow: 0 0 15px rgba(255,255,255,0.9);
+    z-index: 100;
+    pointer-events: none;
   }
 
-  .floating-card {
+  .gallery {
     position: absolute;
-    width: 150px;
-    padding: 4px;
-    border-radius: 16px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.15);
-    backdrop-filter: blur(10px);
-    text-align: center;
-    z-index: 10;
-    transition: opacity 0.6s ease;
+    top: 120px;
+    left: 0;
+    width: 100%;
+    display: grid;
+    gap: 30px;
+    padding: 40px;
+    justify-content: center;
+    grid-template-columns: repeat(auto-fill, 160px);
+    z-index: 1;
   }
 
-  .floating-card img {
-    width: 100%;
+  .card {
+    width: 150px;
+    text-align: center;
+    animation: fadeIn 1s ease;
+  }
+
+  .card img {
+    width: 150px;
     height: 150px;
     object-fit: cover;
-    border-radius: 12px;
+    border-radius: 14px;
+    animation: floatY 6s ease-in-out infinite, tilt 6s ease-in-out infinite;
+    box-shadow: 0 0 15px rgba(255,255,255,0.4);
   }
 
   .name {
-    color: #fff;
+    color: white;
     font-size: 16px;
     font-weight: 700;
-    margin-top: 5px;
-    text-shadow: 0 2px 4px #000;
+    margin-top: 6px;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes floatY {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-18px); }
+    100% { transform: translateY(0px); }
+  }
+
+  @keyframes tilt {
+    0% { transform: rotate(-1.5deg); }
+    50% { transform: rotate(1.5deg); }
+    100% { transform: rotate(-1.5deg); }
   }
 </style>
 </head>
 
 <body>
 
-<div class="spotlight"></div>
-
 <h1 class="title">📸 Photographer Official</h1>
 
+<div id="gallery" class="gallery"></div>
+
 <script>
-/* ---------------- Config ------------------ */
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+/* -----------------------------------------
+   CONFIG
+--------------------------------------------*/
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // เปลี่ยน
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";                  // เปลี่ยน
 
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let photos = [];
-const CARDS_MAX = 10;
-let cards = []; // physics objects
-
-/* ------------ Load data from supabase ----------- */
-async function loadPhotographers() {
-  const { data, error } = await db
+/* -----------------------------------------
+   LOAD INITIAL DATA
+--------------------------------------------*/
+async function loadData() {
+  const { data } = await db
     .from("photographer_registration")
     .select("*")
     .eq("status", "approved");
 
-  if (error) return;
-
-  photos = data;
-
-  for (let i = 0; i < CARDS_MAX; i++) {
-    spawnCard();
-  }
-
-  requestAnimationFrame(updatePhysics);
+  renderGallery(data);
 }
 
-/* ------------ Create each floating card ----------- */
-function spawnCard() {
-  const item = photos[Math.floor(Math.random() * photos.length)];
-  if (!item) return;
+/* -----------------------------------------
+   RENDER GALLERY (SHOW ALL, NO DUPLICATE)
+--------------------------------------------*/
+function renderGallery(list) {
+  const gallery = document.getElementById("gallery");
+  gallery.innerHTML = ""; // clear ทั้งหมดก่อน
 
-  const name = item.display_name || `${item.first_name} ${item.last_name}`;
+  list.forEach(item => {
+    if (!item.picture_url) return;
 
-  // DOM
-  const card = document.createElement("div");
-  card.classList.add("floating-card");
+    const name = item.display_name || `${item.first_name} ${item.last_name}`;
 
-  card.innerHTML = `
-    <img src="${item.picture_url}">
-    <div class="name">${name}</div>
-  `;
+    const card = document.createElement("div");
+    card.className = "card";
 
-  document.body.appendChild(card);
+    card.innerHTML = `
+      <img src="${item.picture_url}">
+      <div class="name">${name}</div>
+    `;
 
-  // Random initial position & movement
-  const obj = {
-    el: card,
-    x: Math.random() * (window.innerWidth - 180),
-    y: Math.random() * (window.innerHeight - 220) + 100,
-    vx: (Math.random() * 2 - 1) * 1.2,
-    vy: (Math.random() * 2 - 1) * 1.2,
-    w: 160,
-    h: 200,
-  };
-
-  card.style.left = obj.x + "px";
-  card.style.top = obj.y + "px";
-
-  cards.push(obj);
+    gallery.appendChild(card);
+  });
 }
 
-/* ---------------- Physics engine ------------------ */
-function updatePhysics() {
-  const W = window.innerWidth;
-  const H = window.innerHeight;
+/* -----------------------------------------
+   REALTIME SUBSCRIBE
+--------------------------------------------*/
+db.channel("realtime-photographers")
+  .on(
+    "postgres_changes",
+    {
+      event: "*",
+      schema: "public",
+      table: "photographer_registration",
+    },
+    async (payload) => {
+      console.log("Realtime:", payload);
 
-  for (let i = 0; i < cards.length; i++) {
-    let A = cards[i];
+      // Reload approved data only
+      const { data } = await db
+        .from("photographer_registration")
+        .select("*")
+        .eq("status", "approved");
 
-    // Move
-    A.x += A.vx;
-    A.y += A.vy;
-
-    // Bounce screen edges
-    if (A.x < 0 || A.x + A.w > W) A.vx *= -1;
-    if (A.y < 100 || A.y + A.h > H) A.vy *= -1;
-
-    // Collision with other cards
-    for (let j = i + 1; j < cards.length; j++) {
-      const B = cards[j];
-
-      if (
-        A.x < B.x + B.w &&
-        A.x + A.w > B.x &&
-        A.y < B.y + B.h &&
-        A.y + A.h > B.y
-      ) {
-        // Swap velocities = bounce effect
-        let tempVx = A.vx;
-        let tempVy = A.vy;
-        A.vx = B.vx;
-        A.vy = B.vy;
-        B.vx = tempVx;
-        B.vy = tempVy;
-      }
+      renderGallery(data);
     }
+  )
+  .subscribe();
 
-    // Apply new position
-    A.el.style.left = A.x + "px";
-    A.el.style.top = A.y + "px";
-  }
-
-  requestAnimationFrame(updatePhysics);
-}
-
-loadPhotographers();
+/* -----------------------------------------
+   START
+--------------------------------------------*/
+loadData();
 </script>
 
 </body>
