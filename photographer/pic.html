@@ -5,19 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Photographer Official</title>
 
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
-   html, body {
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    background: #000000 !important;
-    overflow: hidden;
-    font-family: "Prompt", sans-serif;
-  }
-   <style>
+  /* ------------------------------------------------
+     GLOBAL BACKGROUND (ดำสนิททุกอุปกรณ์)
+  -------------------------------------------------- */
   html, body {
     margin: 0;
     padding: 0;
@@ -26,147 +20,143 @@
     font-family: "Prompt", sans-serif;
   }
 
+  /* ------------------------------------------------
+     SPOTLIGHT EFFECT (ไม่กินพื้นหลัง)
+  -------------------------------------------------- */
   .spotlight {
     position: fixed;
     top: 50%;
     left: 50%;
-    width: 450px;
-    height: 450px;
+    width: 500px;
+    height: 500px;
     transform: translate(-50%, -50%);
-    background: radial-gradient(circle, rgba(0,120,255,0.12), rgba(0,0,0,0) 70%);
+    background: radial-gradient(circle,
+                rgba(0,120,255,0.15),
+                rgba(0,0,0,0) 70%);
     filter: blur(80px);
     opacity: 0.25;
     pointer-events: none;
     z-index: 0;
   }
-</style>
 
-  /* Default (Desktop) */
+  /* ------------------------------------------------
+     TITLE (อ่านชัด)
+  -------------------------------------------------- */
+  .title {
+    position: fixed;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 42px;
+    font-weight: 900;
+    color: #ffffff;
+    z-index: 1000;
+    text-shadow: 0 0 20px rgba(255,255,255,0.9);
+  }
+
+  /* ------------------------------------------------
+     CARD STYLE (PC MODE)
+  -------------------------------------------------- */
   .card {
     position: absolute;
     width: 150px;
     padding: 4px;
     border-radius: 16px;
     background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.2);
-    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.25);
     text-align: center;
+    backdrop-filter: blur(10px);
     z-index: 10;
   }
 
   .card img {
     width: 150px;
     height: 150px;
-    object-fit: cover;
     border-radius: 12px;
+    object-fit: cover;
   }
 
   .name {
-    color: #fff;
-    font-weight: 700;
     margin-top: 4px;
+    color: #fff;
     font-size: 15px;
+    font-weight: 700;
     text-shadow: 0px 2px 4px #000;
   }
 
-  /* Mobile screens ≤ 600px */
+  /* ------------------------------------------------
+     MOBILE RESPONSIVE SIZE
+  -------------------------------------------------- */
   @media (max-width: 600px) {
-    .card {
-      width: 110px;
-    }
-    .card img {
-      width: 110px;
-      height: 110px;
-    }
-    .name {
-      font-size: 13px;
-    }
+    .card { width: 110px; }
+    .card img { width: 110px; height: 110px; }
+    .name { font-size: 13px; }
+    .title { font-size: 28px; }
   }
 
-  /* Very small screens ≤ 400px */
   @media (max-width: 400px) {
-    .card {
-      width: 90px;
-    }
-    .card img {
-      width: 90px;
-      height: 90px;
-    }
-    .name {
-      font-size: 12px;
-    }
+    .card { width: 90px; }
+    .card img { width: 90px; height: 90px; }
+    .name { font-size: 12px; }
+    .title { font-size: 24px; }
   }
 </style>
-
-
 </head>
 
 <body>
 
+<div class="spotlight"></div>
 <h1 class="title">📸 Photographer Official</h1>
 
 <script>
 /* ----------------------------------------------------
-   CONFIG
------------------------------------------------------*/
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // เปลี่ยน
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";                  // เปลี่ยน
+   CONFIG - ใส่ค่าโปรเจคของคุณ
+------------------------------------------------------ */
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; 
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ----------------------------------------------------
    GLOBAL STATE
------------------------------------------------------*/
-let cards = [];   // physics objects
-let dataList = []; // all approved rows
+------------------------------------------------------ */
+let cards = [];
+let dataList = [];
 
 /* ----------------------------------------------------
-   SAFE POSITION (ไม่ซ้อนตอนเกิด)
------------------------------------------------------*/
-function getSafePosition() {
-  let attempt = 0;
-  const padding = 20; // ระยะห่างขั้นต่ำระหว่างภาพ
+   GET SAFE POSITION (ไม่ให้ซ้อนตอนเกิด)
+------------------------------------------------------ */
+function getSafePosition(cardW, cardH) {
+  let attempts = 0;
 
-  const cardW = window.innerWidth < 480 ? 120 : 150;
-  const cardH = window.innerWidth < 480 ? 160 : 200;
-
-  while (attempt < 120) {
-    let x = Math.random() * (window.innerWidth - cardW - 20);
-    let y = 80 + Math.random() * (window.innerHeight - cardH - 100);
+  while (attempts < 80) {
+    const x = Math.random() * (window.innerWidth - cardW - 10);
+    const y = 80 + Math.random() * (window.innerHeight - cardH - 120);
 
     let overlap = false;
 
     for (let c of cards) {
       if (
-        Math.abs(c.x - x) < cardW + padding &&
-        Math.abs(c.y - y) < cardH + padding
+        Math.abs(c.x - x) < cardW + 20 &&
+        Math.abs(c.y - y) < cardH + 20
       ) {
         overlap = true;
         break;
       }
     }
 
-    if (!overlap) {
-      return { x, y };
-    }
+    if (!overlap) return { x, y };
 
-    attempt++;
+    attempts++;
   }
 
-  // fallback: จัดเรียงเป็นแถวเพื่อไม่ให้ทับกันเลย
-  const col = cards.length % 3;
-  const row = Math.floor(cards.length / 3);
-
-  return {
-    x: 30 + col * (cardW + 15),
-    y: 100 + row * (cardH + 20)
-  };
+  return { x: 30, y: 120 };
 }
 
 /* ----------------------------------------------------
-   SPAWN CARD
------------------------------------------------------*/
+   SPAWN CARD FROM DATA
+------------------------------------------------------ */
 function spawnCard(item) {
   const card = document.createElement("div");
   card.classList.add("card");
@@ -180,16 +170,20 @@ function spawnCard(item) {
 
   document.body.appendChild(card);
 
-  const pos = getSafePosition();
+  const isMobile = window.innerWidth < 600;
+  const cardW = isMobile ? (window.innerWidth < 400 ? 90 : 110) : 150;
+  const cardH = isMobile ? (window.innerWidth < 400 ? 130 : 150) : 200;
+
+  const pos = getSafePosition(cardW, cardH);
 
   const obj = {
     el: card,
     x: pos.x,
     y: pos.y,
-    vx: (Math.random() * 2 - 1) * 0.8,
-    vy: (Math.random() * 2 - 1) * 0.8,
-    w: 160,
-    h: 200,
+    vx: (Math.random() * 1.5 - 0.75),
+    vy: (Math.random() * 1.5 - 0.75),
+    w: cardW + 10,
+    h: cardH + 10
   };
 
   card.style.left = obj.x + "px";
@@ -199,24 +193,24 @@ function spawnCard(item) {
 }
 
 /* ----------------------------------------------------
-   REMOVE OLD CARDS FROM DOM
------------------------------------------------------*/
+   CLEAR CARDS
+------------------------------------------------------ */
 function clearCards() {
   for (let c of cards) c.el.remove();
   cards = [];
 }
 
 /* ----------------------------------------------------
-   RENDER ALL APPROVED PHOTOS
------------------------------------------------------*/
+   RENDER ALL APPROVED
+------------------------------------------------------ */
 function renderAll() {
   clearCards();
-  dataList.forEach(spawnCard);  
+  dataList.forEach(spawnCard);
 }
 
 /* ----------------------------------------------------
-   PHYSICS UPDATE (ชนแล้วเด้ง)
------------------------------------------------------*/
+   PHYSICS LOOP (ชนแล้วเด้ง)
+------------------------------------------------------ */
 function updatePhysics() {
   const W = window.innerWidth;
   const H = window.innerHeight;
@@ -228,7 +222,7 @@ function updatePhysics() {
     A.y += A.vy;
 
     if (A.x < 0 || A.x + A.w > W) A.vx *= -1;
-    if (A.y < 100 || A.y + A.h > H) A.vy *= -1;
+    if (A.y < 80 || A.y + A.h > H) A.vy *= -1;
 
     for (let j = i + 1; j < cards.length; j++) {
       const B = cards[j];
@@ -241,10 +235,8 @@ function updatePhysics() {
       ) {
         let tv = A.vx;
         let ty = A.vy;
-
         A.vx = B.vx;
         A.vy = B.vy;
-
         B.vx = tv;
         B.vy = ty;
       }
@@ -258,8 +250,8 @@ function updatePhysics() {
 }
 
 /* ----------------------------------------------------
-   LOAD INITIAL APPROVED
------------------------------------------------------*/
+   LOAD INITIAL DATA
+------------------------------------------------------ */
 async function loadInitial() {
   const { data } = await db
     .from("photographer_registration")
@@ -272,7 +264,7 @@ async function loadInitial() {
 
 /* ----------------------------------------------------
    REALTIME LISTENER
------------------------------------------------------*/
+------------------------------------------------------ */
 db.channel("realtime_photographers")
   .on(
     "postgres_changes",
@@ -284,14 +276,14 @@ db.channel("realtime_photographers")
         .eq("status", "approved");
 
       dataList = data;
-      renderAll(); // รีเรนเดอร์ใหม่ทั้งหมด
+      renderAll();
     }
   )
   .subscribe();
 
 /* ----------------------------------------------------
    START SYSTEM
------------------------------------------------------*/
+------------------------------------------------------ */
 loadInitial();
 updatePhysics();
 </script>
