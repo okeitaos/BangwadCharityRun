@@ -9,13 +9,27 @@
 
 <style>
   body {
-    background: #000000;
     margin: 0;
     overflow: hidden;
     font-family: "Prompt", sans-serif;
+    background: radial-gradient(circle at center, rgba(255,255,255,0.15), #000000 70%);
   }
 
-  /* --- หัวข้อหน้า --- */
+  /* Spotlight effect */
+  .spotlight {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 600px;
+    height: 600px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(255,255,255,0.35), rgba(0,0,0,0) 70%);
+    filter: blur(60px);
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 1;
+  }
+
   .title {
     position: fixed;
     top: 20px;
@@ -24,12 +38,10 @@
     font-size: 46px;
     font-weight: 800;
     color: #ffffff;
-    text-shadow: 0 0 12px rgba(255,255,255,0.9);
+    text-shadow: 0 0 18px rgba(255,255,255,0.9);
     z-index: 10000;
-    pointer-events: none;
   }
 
-  /* --- การ์ดรูป --- */
   .floating-card {
     position: absolute;
     width: 150px;
@@ -39,138 +51,73 @@
     border: 1px solid rgba(255,255,255,0.15);
     backdrop-filter: blur(10px);
     text-align: center;
-    opacity: 0;
-    transition: opacity 1.2s ease;
+    z-index: 10;
+    transition: opacity 0.6s ease;
   }
-
-  .fade-in { opacity: 1; }
-  .fade-out { opacity: 0; }
 
   .floating-card img {
     width: 100%;
     height: 150px;
     object-fit: cover;
     border-radius: 12px;
-    animation: floatY 6s ease-in-out infinite, tilt 6s ease-in-out infinite;
   }
 
   .name {
-    margin-top: 6px;
-    color: #ffffff;
+    color: #fff;
     font-size: 16px;
     font-weight: 700;
-    text-shadow: 0px 2px 4px #000;
-  }
-
-  @keyframes floatY {
-    0% { transform: translateY(0); }
-    50% { transform: translateY(-20px); }
-    100% { transform: translateY(0); }
-  }
-
-  @keyframes tilt {
-    0% { transform: rotate(-2deg); }
-    50% { transform: rotate(2deg); }
-    100% { transform: rotate(-2deg); }
+    margin-top: 5px;
+    text-shadow: 0 2px 4px #000;
   }
 </style>
 </head>
 
 <body>
 
+<div class="spotlight"></div>
+
 <h1 class="title">📸 Photographer Official</h1>
 
 <script>
-/* -----------------------------------------
-   🟦 1. CONFIG 
---------------------------------------------*/
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // <-- เปลี่ยน
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";                   // <-- เปลี่ยน
+/* ---------------- Config ------------------ */
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let photos = [];
-let queue = [];
-const MAX_FLOATING = 5;
+const CARDS_MAX = 10;
+let cards = []; // physics objects
 
-/* -----------------------------------------
-   🟦 2. โหลดข้อมูลช่างภาพ
---------------------------------------------*/
+/* ------------ Load data from supabase ----------- */
 async function loadPhotographers() {
-  const { data } = await db
+  const { data, error } = await db
     .from("photographer_registration")
     .select("*")
     .eq("status", "approved");
 
+  if (error) return;
+
   photos = data;
-  shuffleQueue();
 
-  for (let i = 0; i < MAX_FLOATING; i++) spawnCard();
-
-  setInterval(replaceOneCard, 7000);
-}
-
-/* -----------------------------------------
-   🟦 3. Shuffle ไม่ซ้ำ
---------------------------------------------*/
-function shuffleQueue() {
-  queue = [...photos];
-  for (let i = queue.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [queue[i], queue[j]] = [queue[j], queue[i]];
+  for (let i = 0; i < CARDS_MAX; i++) {
+    spawnCard();
   }
+
+  requestAnimationFrame(updatePhysics);
 }
 
-function nextPhoto() {
-  if (queue.length === 0) shuffleQueue();
-  return queue.pop();
-}
-
-/* -----------------------------------------
-   🟦 4. ตรวจไม่ให้ภาพชนกัน (Non-overlap)
---------------------------------------------*/
-function isOverlap(x, y) {
-  const cards = document.querySelectorAll(".floating-card");
-  for (let c of cards) {
-    const rect = c.getBoundingClientRect();
-    if (
-      x < rect.right + 20 &&
-      x + 150 > rect.left - 20 &&
-      y < rect.bottom + 20 &&
-      y + 200 > rect.top - 20
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function getSafePosition() {
-  let attempts = 0;
-  while (attempts < 50) {
-    const x = Math.random() * (window.innerWidth - 200);
-    const y = 120 + Math.random() * (window.innerHeight - 260);
-    if (!isOverlap(x, y)) return { x, y };
-    attempts++;
-  }
-  return { x: 50, y: 150 }; // fallback
-}
-
-/* -----------------------------------------
-   🟦 5. สร้างรูปใหม่
---------------------------------------------*/
+/* ------------ Create each floating card ----------- */
 function spawnCard() {
-  const item = nextPhoto();
-  if (!item || !item.picture_url) return;
-
-  const card = document.createElement("div");
-  card.classList.add("floating-card");
-
-  const { x, y } = getSafePosition();
-  card.style.left = x + "px";
-  card.style.top = y + "px";
+  const item = photos[Math.floor(Math.random() * photos.length)];
+  if (!item) return;
 
   const name = item.display_name || `${item.first_name} ${item.last_name}`;
+
+  // DOM
+  const card = document.createElement("div");
+  card.classList.add("floating-card");
 
   card.innerHTML = `
     <img src="${item.picture_url}">
@@ -179,26 +126,65 @@ function spawnCard() {
 
   document.body.appendChild(card);
 
-  setTimeout(() => card.classList.add("fade-in"), 50);
-  return card;
+  // Random initial position & movement
+  const obj = {
+    el: card,
+    x: Math.random() * (window.innerWidth - 180),
+    y: Math.random() * (window.innerHeight - 220) + 100,
+    vx: (Math.random() * 2 - 1) * 1.2,
+    vy: (Math.random() * 2 - 1) * 1.2,
+    w: 160,
+    h: 200,
+  };
+
+  card.style.left = obj.x + "px";
+  card.style.top = obj.y + "px";
+
+  cards.push(obj);
 }
 
-/* -----------------------------------------
-   🟦 6. เปลี่ยนรูปทีละใบ
---------------------------------------------*/
-function replaceOneCard() {
-  const cards = document.querySelectorAll(".floating-card");
-  if (cards.length === 0) return;
+/* ---------------- Physics engine ------------------ */
+function updatePhysics() {
+  const W = window.innerWidth;
+  const H = window.innerHeight;
 
-  const target = cards[Math.floor(Math.random() * cards.length)];
+  for (let i = 0; i < cards.length; i++) {
+    let A = cards[i];
 
-  target.classList.remove("fade-in");
-  target.classList.add("fade-out");
+    // Move
+    A.x += A.vx;
+    A.y += A.vy;
 
-  setTimeout(() => {
-    target.remove();
-    spawnCard();
-  }, 1200);
+    // Bounce screen edges
+    if (A.x < 0 || A.x + A.w > W) A.vx *= -1;
+    if (A.y < 100 || A.y + A.h > H) A.vy *= -1;
+
+    // Collision with other cards
+    for (let j = i + 1; j < cards.length; j++) {
+      const B = cards[j];
+
+      if (
+        A.x < B.x + B.w &&
+        A.x + A.w > B.x &&
+        A.y < B.y + B.h &&
+        A.y + A.h > B.y
+      ) {
+        // Swap velocities = bounce effect
+        let tempVx = A.vx;
+        let tempVy = A.vy;
+        A.vx = B.vx;
+        A.vy = B.vy;
+        B.vx = tempVx;
+        B.vy = tempVy;
+      }
+    }
+
+    // Apply new position
+    A.el.style.left = A.x + "px";
+    A.el.style.top = A.y + "px";
+  }
+
+  requestAnimationFrame(updatePhysics);
 }
 
 loadPhotographers();
