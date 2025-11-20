@@ -45,14 +45,12 @@
 </head>
 
 <body>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // ← เปลี่ยน
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";          // ← เปลี่ยน
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // แก้
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";          // แก้
 
-// ✔️ ถูกต้องสำหรับ Supabase JS v2
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -63,18 +61,29 @@ async function loadFloatingPhotographers() {
     .order("id", { ascending: true });
 
   if (error) {
-    console.error(error);
+    console.error("DB Error:", error);
     return;
   }
 
   data.forEach((item) => {
-    const { data: img } = db.storage
-      .from("photographers")
+
+    // ❗ ป้องกัน undefined
+    if (!item.photo_path || item.photo_path.trim() === "") {
+      console.warn("Missing photo_path for:", item);
+      return;
+    }
+
+    // ✔️ รูปแบบที่ถูกต้องของ Supabase v2
+    const { data: imgData } = db.storage
+      .from("photographers") 
       .getPublicUrl(item.photo_path);
 
-    const imgUrl = img.publicUrl;
+    if (!imgData || !imgData.publicUrl) {
+      console.error("Invalid image URL for:", item);
+      return;
+    }
 
-    createFloatingCard(imgUrl, item.name);
+    createFloatingCard(imgData.publicUrl, item.name);
   });
 }
 
@@ -99,7 +108,6 @@ function createFloatingCard(imageUrl, name) {
 
 loadFloatingPhotographers();
 </script>
-
 
 </body>
 </html>
