@@ -45,7 +45,8 @@
 </head>
 
 <body>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // แก้
@@ -57,33 +58,23 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 async function loadFloatingPhotographers() {
   const { data, error } = await db
     .from("photographer_registration")
-    .select("*")
-    .order("id", { ascending: true });
+    .select("display_name, picture_url, first_name, last_name, status")
+    .eq("status", "approved"); // ถ้าต้องการกรองเฉพาะที่อนุมัติแล้ว
 
   if (error) {
-    console.error("DB Error:", error);
+    console.error(error);
     return;
   }
 
   data.forEach((item) => {
 
-    // ❗ ป้องกัน undefined
-    if (!item.photo_path || item.photo_path.trim() === "") {
-      console.warn("Missing photo_path for:", item);
-      return;
-    }
+    // ถ้า picture_url ไม่มี ให้ข้าม
+    if (!item.picture_url) return;
 
-    // ✔️ รูปแบบที่ถูกต้องของ Supabase v2
-    const { data: imgData } = db.storage
-      .from("photographers") 
-      .getPublicUrl(item.photo_path);
+    // ชื่อที่ต้องการแสดง
+    const name = item.display_name || `${item.first_name} ${item.last_name}`;
 
-    if (!imgData || !imgData.publicUrl) {
-      console.error("Invalid image URL for:", item);
-      return;
-    }
-
-    createFloatingCard(imgData.publicUrl, item.name);
+    createFloatingCard(item.picture_url, name);
   });
 }
 
@@ -91,6 +82,7 @@ function createFloatingCard(imageUrl, name) {
   const card = document.createElement("div");
   card.classList.add("floating-card");
 
+  // สุ่มตำแหน่งบนหน้าเว็บ
   const x = Math.random() * (window.innerWidth - 150);
   const y = Math.random() * (window.innerHeight - 150);
 
@@ -108,6 +100,7 @@ function createFloatingCard(imageUrl, name) {
 
 loadFloatingPhotographers();
 </script>
+
 
 </body>
 </html>
