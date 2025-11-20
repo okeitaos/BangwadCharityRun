@@ -99,29 +99,42 @@ let dataList = []; // all approved rows
 -----------------------------------------------------*/
 function getSafePosition() {
   let attempt = 0;
+  const padding = 20; // ระยะห่างขั้นต่ำระหว่างภาพ
 
-  while (attempt < 80) {
-    let x = Math.random() * (window.innerWidth - 200);
-    let y = 120 + Math.random() * (window.innerHeight - 260);
+  const cardW = window.innerWidth < 480 ? 120 : 150;
+  const cardH = window.innerWidth < 480 ? 160 : 200;
+
+  while (attempt < 120) {
+    let x = Math.random() * (window.innerWidth - cardW - 20);
+    let y = 80 + Math.random() * (window.innerHeight - cardH - 100);
 
     let overlap = false;
 
     for (let c of cards) {
       if (
-        Math.abs(c.x - x) < 170 &&
-        Math.abs(c.y - y) < 210
+        Math.abs(c.x - x) < cardW + padding &&
+        Math.abs(c.y - y) < cardH + padding
       ) {
         overlap = true;
         break;
       }
     }
 
-    if (!overlap) return { x, y };
+    if (!overlap) {
+      return { x, y };
+    }
 
     attempt++;
   }
 
-  return { x: 50, y: 150 };
+  // fallback: จัดเรียงเป็นแถวเพื่อไม่ให้ทับกันเลย
+  const col = cards.length % 3;
+  const row = Math.floor(cards.length / 3);
+
+  return {
+    x: 30 + col * (cardW + 15),
+    y: 100 + row * (cardH + 20)
+  };
 }
 
 /* ----------------------------------------------------
