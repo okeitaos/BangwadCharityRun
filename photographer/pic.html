@@ -9,34 +9,35 @@
 
 <style>
   body {
-    background: radial-gradient(circle at top, rgba(0, 90, 255, 0.25), #0a0a0a 70%);
+    background: #000000;
     margin: 0;
     overflow: hidden;
     font-family: "Prompt", sans-serif;
   }
 
+  /* --- หัวข้อหน้า --- */
   .title {
     position: fixed;
     top: 20px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 48px;
+    font-size: 46px;
     font-weight: 800;
     color: #ffffff;
-    text-shadow: 0 0 20px rgba(255,255,255,0.4),
-                 0 0 40px rgba(0,255,255,0.3);
-    z-index: 9999;
+    text-shadow: 0 0 12px rgba(255,255,255,0.9);
+    z-index: 10000;
+    pointer-events: none;
   }
 
+  /* --- การ์ดรูป --- */
   .floating-card {
     position: absolute;
     width: 150px;
-    padding: 6px;
+    padding: 4px;
     border-radius: 16px;
-    backdrop-filter: blur(12px);
-    background: rgba(255,255,255,0.07);
-    border: 2px solid rgba(255,215,0,0.6);
-    box-shadow: 0 0 15px rgba(255,215,0,0.4);
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px);
     text-align: center;
     opacity: 0;
     transition: opacity 1.2s ease;
@@ -49,38 +50,28 @@
     width: 100%;
     height: 150px;
     object-fit: cover;
-    border-radius: 14px;
-    box-shadow: 0px 6px 20px rgba(0,0,0,0.5);
-    animation: 
-      floatY 6s ease-in-out infinite,
-      tilt 5s ease-in-out infinite,
-      curve 7s ease-in-out infinite;
+    border-radius: 12px;
+    animation: floatY 6s ease-in-out infinite, tilt 6s ease-in-out infinite;
   }
 
   .name {
     margin-top: 6px;
-    color: #fff;
-    font-weight: 600;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 700;
+    text-shadow: 0px 2px 4px #000;
   }
 
   @keyframes floatY {
     0% { transform: translateY(0); }
-    50% { transform: translateY(-25px); }
+    50% { transform: translateY(-20px); }
     100% { transform: translateY(0); }
   }
 
   @keyframes tilt {
-    0% { transform: rotate(-3deg); }
-    50% { transform: rotate(3deg); }
-    100% { transform: rotate(-3deg); }
-  }
-
-  @keyframes curve {
-    0% { transform: translateX(0); }
-    25% { transform: translateX(20px); }
-    50% { transform: translateX(0); }
-    75% { transform: translateX(-20px); }
-    100% { transform: translateX(0); }
+    0% { transform: rotate(-2deg); }
+    50% { transform: rotate(2deg); }
+    100% { transform: rotate(-2deg); }
   }
 </style>
 </head>
@@ -90,67 +81,96 @@
 <h1 class="title">📸 Photographer Official</h1>
 
 <script>
-/* ---- ตั้งค่า Supabase ---- */
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";   // << เปลี่ยน
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";                      // << เปลี่ยน
-
+/* -----------------------------------------
+   🟦 1. CONFIG 
+--------------------------------------------*/
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // <-- เปลี่ยน
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";                   // <-- เปลี่ยน
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let photos = [];
-let photoQueue = [];
-const MAX_FLOATING = 5;  // ★ จำนวนรูปที่ลอยพร้อมกัน ★
+let queue = [];
+const MAX_FLOATING = 5;
 
+/* -----------------------------------------
+   🟦 2. โหลดข้อมูลช่างภาพ
+--------------------------------------------*/
 async function loadPhotographers() {
-  const { data, error } = await db
+  const { data } = await db
     .from("photographer_registration")
     .select("*")
     .eq("status", "approved");
 
-  if (error) {
-    console.error("Error:", error);
-    return;
-  }
-
   photos = data;
-  createShuffleQueue();
+  shuffleQueue();
 
-  // สร้างรูปแรก 5 รูป
-  for (let i = 0; i < MAX_FLOATING; i++) {
-    spawnCard();
-  }
+  for (let i = 0; i < MAX_FLOATING; i++) spawnCard();
 
-  // ทุก 8 วินาที เปลี่ยนรูป 1 ใบ
-  setInterval(replaceOneCard, 8000);
+  setInterval(replaceOneCard, 7000);
 }
 
-/* ★ Shuffle แบบไม่ซ้ำ ★ */
-function createShuffleQueue() {
-  photoQueue = [...photos];
-
-  for (let i = photoQueue.length - 1; i > 0; i--) {
+/* -----------------------------------------
+   🟦 3. Shuffle ไม่ซ้ำ
+--------------------------------------------*/
+function shuffleQueue() {
+  queue = [...photos];
+  for (let i = queue.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [photoQueue[i], photoQueue[j]] = [photoQueue[j], photoQueue[i]];
+    [queue[i], queue[j]] = [queue[j], queue[i]];
   }
 }
 
-function getNextPhoto() {
-  if (photoQueue.length === 0) createShuffleQueue();
-  return photoQueue.pop();
+function nextPhoto() {
+  if (queue.length === 0) shuffleQueue();
+  return queue.pop();
 }
 
-/* ★ แสดงรูปใหม่ ★ */
-function spawnCard() {
-  const item = getNextPhoto();
-  if (!item || !item.picture_url) return;
+/* -----------------------------------------
+   🟦 4. ตรวจไม่ให้ภาพชนกัน (Non-overlap)
+--------------------------------------------*/
+function isOverlap(x, y) {
+  const cards = document.querySelectorAll(".floating-card");
+  for (let c of cards) {
+    const rect = c.getBoundingClientRect();
+    if (
+      x < rect.right + 20 &&
+      x + 150 > rect.left - 20 &&
+      y < rect.bottom + 20 &&
+      y + 200 > rect.top - 20
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
-  const name = item.display_name || `${item.first_name} ${item.last_name}`;
+function getSafePosition() {
+  let attempts = 0;
+  while (attempts < 50) {
+    const x = Math.random() * (window.innerWidth - 200);
+    const y = 120 + Math.random() * (window.innerHeight - 260);
+    if (!isOverlap(x, y)) return { x, y };
+    attempts++;
+  }
+  return { x: 50, y: 150 }; // fallback
+}
+
+/* -----------------------------------------
+   🟦 5. สร้างรูปใหม่
+--------------------------------------------*/
+function spawnCard() {
+  const item = nextPhoto();
+  if (!item || !item.picture_url) return;
 
   const card = document.createElement("div");
   card.classList.add("floating-card");
 
-  card.style.left = Math.random() * (window.innerWidth - 200) + "px";
-  card.style.top = Math.random() * (window.innerHeight - 260) + "px";
+  const { x, y } = getSafePosition();
+  card.style.left = x + "px";
+  card.style.top = y + "px";
+
+  const name = item.display_name || `${item.first_name} ${item.last_name}`;
 
   card.innerHTML = `
     <img src="${item.picture_url}">
@@ -159,24 +179,24 @@ function spawnCard() {
 
   document.body.appendChild(card);
 
-  // Fade-in
   setTimeout(() => card.classList.add("fade-in"), 50);
-
   return card;
 }
 
-/* ★ เปลี่ยนรูปใบหนึ่งออก แล้วเพิ่มรูปใหม่เข้ามาแทน ★ */
+/* -----------------------------------------
+   🟦 6. เปลี่ยนรูปทีละใบ
+--------------------------------------------*/
 function replaceOneCard() {
   const cards = document.querySelectorAll(".floating-card");
   if (cards.length === 0) return;
 
-  const removeCard = cards[Math.floor(Math.random() * cards.length)];
+  const target = cards[Math.floor(Math.random() * cards.length)];
 
-  removeCard.classList.remove("fade-in");
-  removeCard.classList.add("fade-out");
+  target.classList.remove("fade-in");
+  target.classList.add("fade-out");
 
   setTimeout(() => {
-    removeCard.remove();
+    target.remove();
     spawnCard();
   }, 1200);
 }
