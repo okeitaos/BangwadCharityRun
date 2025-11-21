@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>🏁 ระบบกรรมการสนาม (Auto Reason + Turbo Load)</title>
+<title>🏁 ระบบกรรมการสนาม (Auto Reason + Show Latest Reason)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
@@ -20,7 +20,7 @@
 <body class="bg-gray-100 p-6">
 
 <div class="max-w-5xl mx-auto bg-white rounded-lg shadow p-6">
-  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Auto Reason + Turbo Load)</h1>
+  <h1 class="text-2xl font-bold mb-4 text-center">🏁 ระบบกรรมการสนาม (Auto Reason + เหตุผลล่าสุด)</h1>
 
   <!-- 🔐 Login -->
   <div id="login-section">
@@ -66,7 +66,6 @@ let currentSearch = "";
 let showOnlyRunning = false;
 let searchTimeout = null;
 
-// เสียงเตือน
 const alertDnf = document.getElementById("alertDnf");
 const alertFinisher = document.getElementById("alertFinisher");
 const toastContainer = document.getElementById("toast-container");
@@ -130,7 +129,7 @@ async function loadRunners(query = "") {
   if (error) { console.error(error); return; }
 
   runnerList.innerHTML = "";
-  runners.forEach(r => {
+  for (const r of runners) {
     const div = document.createElement("div");
     div.id = `runner-${r.id}`;
     div.className = "border p-3 rounded bg-gray-50 mb-2";
@@ -139,48 +138,55 @@ async function loadRunners(query = "") {
         <b>${r.name}</b> (${r.type})<br>
         🏷️ BIB: ${r.bib || "-"}<br>🪪 Tag ID: ${r.tag_id || "-"}<br>
         สถานะ: ${r.status}<br>
-        <span class="text-xs text-gray-400">📡 กำลังโหลดข้อมูลรอบ...</span>
+        <span class="text-xs text-gray-400">📡 กำลังโหลดข้อมูล...</span>
         <div class="mt-2" id="btn-${r.id}"></div>
       </div>
     `;
     runnerList.appendChild(div);
 
-    supabase.from("record").select("lap").eq("runner_id", r.id).then(({data})=>{
-      const laps = data?.map(x=>x.lap)||[];
-      const maxLap = laps.length ? Math.max(...laps) : 0;
-      const distance = (maxLap * 6.3).toFixed(2);
-      const span = div.querySelector("span");
-      span.outerHTML = `🏁 รอบที่: ${maxLap}<br>ระยะทาง: ${distance} กม.`;
+    // โหลดรอบและเหตุผลล่าสุด
+    const [{ data: recordData }, { data: logData }] = await Promise.all([
+      supabase.from("record").select("lap").eq("runner_id", r.id),
+      supabase.from("dnf_log").select("reason").eq("runner_id", r.id).order("created_at", { ascending: false }).limit(1)
+    ]);
 
-      const type = (r.type || "").replace(/\s+/g, "").toUpperCase();
-      let finisherRequired = 0, dnfStart = 0;
-      if (type.includes("BCR50.4")) { finisherRequired = 8; dnfStart = 4; }
-      else if (type.includes("BCR69.3")) { finisherRequired = 11; dnfStart = 6; }
-      else if (type.includes("BCR100.8")) { finisherRequired = 16; dnfStart = 8; }
+    const laps = recordData?.map(x => x.lap) || [];
+    const maxLap = laps.length ? Math.max(...laps) : 0;
+    const distance = (maxLap * 6.3).toFixed(2);
+    const latestReason = logData?.[0]?.reason || "-";
 
-      const btnArea = document.getElementById(`btn-${r.id}`);
-      if (r.status === "RUNNING") {
-        if (maxLap >= finisherRequired) {
-          btnArea.innerHTML = `<button class="bg-red-600 text-white px-3 py-1 rounded text-sm" onclick="confirmChange('${r.id}','FINISHER','${r.name}',${maxLap},'${r.type}')">FINISHER</button>`;
-        } else {
-          btnArea.innerHTML = `<button class="bg-yellow-500 text-white px-3 py-1 rounded text-sm" onclick="confirmChange('${r.id}','DNF','${r.name}',${maxLap},'${r.type}')">DNF</button>`;
-        }
+    const span = div.querySelector("span");
+    span.outerHTML = `
+      🏁 รอบที่: ${maxLap}<br>ระยะทาง: ${distance} กม.<br>
+      🎽 เหตุผล: ${latestReason}
+    `;
+
+    const type = (r.type || "").replace(/\s+/g, "").toUpperCase();
+    let finisherRequired = 0, dnfStart = 0;
+    if (type.includes("BCR50.4")) { finisherRequired = 8; dnfStart = 4; }
+    else if (type.includes("BCR69.3")) { finisherRequired = 11; dnfStart = 6; }
+    else if (type.includes("BCR100.8")) { finisherRequired = 16; dnfStart = 8; }
+
+    const btnArea = document.getElementById(`btn-${r.id}`);
+    if (r.status === "RUNNING") {
+      if (maxLap >= finisherRequired) {
+        btnArea.innerHTML = `<button class="bg-red-600 text-white px-3 py-1 rounded text-sm" onclick="confirmChange('${r.id}','FINISHER','${r.name}',${maxLap},'${r.type}')">FINISHER</button>`;
       } else {
-        btnArea.innerHTML = `<span class="text-gray-400 text-sm">🚫 ออกจากการแข่งขันแล้ว</span>`;
+        btnArea.innerHTML = `<button class="bg-yellow-500 text-white px-3 py-1 rounded text-sm" onclick="confirmChange('${r.id}','DNF','${r.name}',${maxLap},'${r.type}')">DNF</button>`;
       }
-    });
-  });
+    } else {
+      btnArea.innerHTML = `<span class="text-gray-400 text-sm">🚫 ออกจากการแข่งขันแล้ว</span>`;
+    }
+  }
 
   document.getElementById("lastUpdate").textContent =
     "อัปเดตล่าสุด: " + new Date().toLocaleTimeString("th-TH");
 }
 
-// ============================ UPDATE STATUS + AUTO REASON ============================
+// ============================ UPDATE STATUS ============================
 async function confirmChange(runnerId, status, name, lap, type) {
   const confirm1 = confirm(`⚠️ ยืนยันเปลี่ยนสถานะของ "${name}" เป็น ${status}?`);
   if (!confirm1) return;
-  const confirm2 = confirm("❗ การเปลี่ยนสถานะนี้เป็นถาวร นักวิ่งจะออกจากการแข่งขันทันที!\n\nต้องการดำเนินการต่อหรือไม่?");
-  if (!confirm2) return;
 
   let finisherRequired = 0, dnfStart = 0, reason = "";
   if (type.includes("50.4")) { finisherRequired = 8; dnfStart = 4; }
