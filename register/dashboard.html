@@ -23,6 +23,12 @@
 <body class="bg-gray-100 min-h-screen p-6">
 
 <h1 class="text-3xl font-bold text-center mb-4">📊 DASHBOARD สรุปผลการแข่งขัน</h1>
+<div class="flex justify-center mb-4">
+  <select id="langSelect" class="border p-2 rounded">
+    <option value="TH">🇹🇭 ไทย</option>
+    <option value="EN">🇬🇧 English</option>
+  </select>
+</div>
 
 <!-- Tabs -->
 <div class="flex flex-wrap justify-center space-x-2 mb-4">
@@ -252,6 +258,90 @@ supabase.channel("record-changes")
   .on("postgres_changes",{event:"*",schema:"public",table:"record"},()=>loadDashboard())
   .subscribe();
 setInterval(loadDashboard,15000);
+
+  /* --------------------- ระบบแปลภาษา (เพิ่มใหม่ ไม่ยุ่งโค้ดเดิม) --------------------- */
+
+const translations = {
+  TH: {
+    title: "📊 DASHBOARD สรุปผลการแข่งขัน",
+    all: "ทั้งหมด",
+    t50: "BCR 50.4",
+    t69: "BCR 69.3",
+    t100: "BCR 100.8",
+    search: "🔍 พิมพ์ชื่อ, Tag ID หรือ BIB เพื่อค้นหา...",
+    col_rank: "🏅 อันดับ",
+    col_bib: "BIB",
+    col_name: "ชื่อ",
+    col_type: "ประเภท",
+    col_lap: "รอบ",
+    col_dist: "ระยะทาง (กม.)",
+    col_total: "เวลารวม",
+    popup_close: "ปิด",
+  },
+  EN: {
+    title: "📊 Race Dashboard Summary",
+    all: "All",
+    t50: "BCR 50.4",
+    t69: "BCR 69.3",
+    t100: "BCR 100.8",
+    search: "🔍 Search name, Tag ID or BIB...",
+    col_rank: "🏅 Rank",
+    col_bib: "BIB",
+    col_name: "Name",
+    col_type: "Category",
+    col_lap: "Laps",
+    col_dist: "Distance (km)",
+    col_total: "Total Time",
+    popup_close: "Close",
+  }
+};
+
+function applyTranslation(lang) {
+  const t = translations[lang];
+
+  // ส่วนหัว
+  document.querySelector("h1").textContent = t.title;
+
+  // Tabs
+  const tabs = document.querySelectorAll(".type-tab");
+  if (tabs.length >= 4) {
+    tabs[0].textContent = t.all;
+    tabs[1].textContent = t.t50;
+    tabs[2].textContent = t.t69;
+    tabs[3].textContent = t.t100;
+  }
+
+  // ช่องค้นหา
+  const searchInput = document.getElementById("searchInput");
+  if (searchInput) searchInput.placeholder = t.search;
+
+  // หัวตาราง
+  const th = document.querySelectorAll("thead tr th");
+  if (th.length >= 7) {
+    th[0].textContent = t.col_rank;
+    th[1].textContent = t.col_bib;
+    th[2].textContent = t.col_name;
+    th[3].textContent = t.col_type;
+    th[4].textContent = t.col_lap;
+    th[5].textContent = t.col_dist;
+    th[6].textContent = t.col_total;
+  }
+
+  // ปุ่มปิด popup
+  const closePopupBtn = document.getElementById("closePopup");
+  if (closePopupBtn) closePopupBtn.textContent = t.popup_close;
+}
+
+// เปลี่ยนภาษาเมื่อเลือกจาก dropdown
+document.getElementById("langSelect").addEventListener("change", function () {
+  applyTranslation(this.value);
+});
+
+// โหลดภาษาเริ่มต้นเป็นไทย
+applyTranslation("TH");
+
+/* --------------------- END ระบบแปลภาษา --------------------- */
+
 </script>
 </body>
 </html>
