@@ -259,7 +259,7 @@ supabase.channel("record-changes")
   .subscribe();
 setInterval(loadDashboard,15000);
 
-  /* --------------------- ระบบแปลภาษา (เพิ่มใหม่ ไม่ยุ่งโค้ดเดิม) --------------------- */
+/* --------------------- ระบบแปลภาษา (เพิ่มใหม่ ไม่ยุ่งโค้ดเดิม) --------------------- */
 
 const translations = {
   TH: {
@@ -269,6 +269,7 @@ const translations = {
     t69: "BCR 69.3",
     t100: "BCR 100.8",
     search: "🔍 พิมพ์ชื่อ, Tag ID หรือ BIB เพื่อค้นหา...",
+    
     col_rank: "🏅 อันดับ",
     col_bib: "BIB",
     col_name: "ชื่อ",
@@ -276,8 +277,21 @@ const translations = {
     col_lap: "รอบ",
     col_dist: "ระยะทาง (กม.)",
     col_total: "เวลารวม",
+
+    status_FINISHER: "FINISHER",
+    status_RUNNING: "กำลังวิ่ง",
+    status_DNF: "DNF",
+
     popup_close: "ปิด",
+    popup_summary: (status,laps,dist,time) =>
+      `สถานะ: <b>${status}</b> | รอบ: <b>${laps}</b> | ระยะทาง: <b>${dist} กม.</b> | เวลารวม: <b>${time}</b>`,
+
+    popup_lap: "🏁 รอบ",
+    popup_start: "⏱ เวลาเริ่ม",
+    popup_finish: "🏁 เวลาจบ",
+    popup_laptime: "⏳ เวลาต่อรอบ"
   },
+
   EN: {
     title: "📊 Race Dashboard Summary",
     all: "All",
@@ -285,6 +299,7 @@ const translations = {
     t69: "BCR 69.3",
     t100: "BCR 100.8",
     search: "🔍 Search name, Tag ID or BIB...",
+
     col_rank: "🏅 Rank",
     col_bib: "BIB",
     col_name: "Name",
@@ -292,11 +307,27 @@ const translations = {
     col_lap: "Laps",
     col_dist: "Distance (km)",
     col_total: "Total Time",
+
+    status_FINISHER: "Finisher",
+    status_RUNNING: "Running",
+    status_DNF: "DNF",
+
     popup_close: "Close",
+    popup_summary: (status,laps,dist,time) =>
+      `Status: <b>${status}</b> | Laps: <b>${laps}</b> | Distance: <b>${dist} km</b> | Total: <b>${time}</b>`,
+
+    popup_lap: "🏁 Lap",
+    popup_start: "⏱ Start",
+    popup_finish: "🏁 Finish",
+    popup_laptime: "⏳ Lap Time"
   }
 };
 
+
+let currentLang = "TH";
+
 function applyTranslation(lang) {
+  currentLang = lang;
   const t = translations[lang];
 
   // ส่วนหัว
@@ -332,13 +363,65 @@ function applyTranslation(lang) {
   if (closePopupBtn) closePopupBtn.textContent = t.popup_close;
 }
 
-// เปลี่ยนภาษาเมื่อเลือกจาก dropdown
+
+/* -------- ฟังก์ชันช่วยแปล status โดยไม่ยุ่งโค้ดเดิม -------- */
+
+function translateStatus(status) {
+  return translations[currentLang][`status_${status}`] || status;
+}
+
+
+/* -------- Hook การแสดง popup โดยไม่แก้ฟังก์ชันเดิม -------- */
+
+const _showDetails = showDetails;  // backup ของเดิม
+
+showDetails = function (runner) {
+  _showDetails(runner); // เรียกฟังก์ชันเดิมก่อน
+
+  const t = translations[currentLang];
+
+  // แปล summary
+  const totalTime = runner.totalTime ? formatDuration(runner.totalTime) : "-";
+  popupSummary.innerHTML = t.popup_summary(
+    translateStatus(runner.status),
+    runner.completedLaps,
+    runner.distance,
+    totalTime
+  );
+
+  // เปลี่ยนหัวตาราง popup
+  const popupTH = document.querySelectorAll("#popupContent").previousElementSibling;
+  const headers = document.querySelectorAll("#popup table thead tr th");
+  if (headers.length >= 4) {
+    headers[0].textContent = t.popup_lap;
+    headers[1].textContent = t.popup_start;
+    headers[2].textContent = t.popup_finish;
+    headers[3].textContent = t.popup_laptime;
+  }
+};
+
+
+/* -------- Hook renderRunners เพื่อแปลสถานะโดยไม่แก้ฟังก์ชันเดิม -------- */
+
+const _renderRunners = renderRunners; // backup
+
+renderRunners = function (list) {
+  // แปลสถานะก่อนส่งเข้า render เดิม
+  const mapped = list.map(r => ({
+    ...r,
+    status: translateStatus(r.status)
+  }));
+
+  _renderRunners(mapped);
+};
+
+
+/* -------- โหลดภาษาเริ่มต้นเป็น TH -------- */
+applyTranslation("TH");
+
 document.getElementById("langSelect").addEventListener("change", function () {
   applyTranslation(this.value);
 });
-
-// โหลดภาษาเริ่มต้นเป็นไทย
-applyTranslation("TH");
 
 /* --------------------- END ระบบแปลภาษา --------------------- */
 
