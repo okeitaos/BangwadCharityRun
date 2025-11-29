@@ -157,55 +157,64 @@ let allUsers = [];
 // }
 
 
-/* ✅ โหลดรายชื่อผู้ใช้ + นับรูปจาก Storage จริง */
 async function loadUsers() {
-  // 1) ค้นโฟลเดอร์ทั้งหมดใน bucket (ชื่อโฟลเดอร์ = user_id)
+  // ดึง user_id ที่มีจริงจาก DB
+  const { data: dbUsers } = await sb
+    .from("file_hashes")
+    .select("user_id");
+
+  const usersFromDB = [...new Set(dbUsers.map(u => u.user_id))];
+
+  // list root folders
   const { data: folders, error } = await sb.storage.from(BUCKET).list("", {
     limit: 10000
   });
 
   if (error) {
-    alert("❌ โหลดข้อมูลผู้ใช้ล้มเหลว");
+    alert("โหลดโฟลเดอร์ไม่สำเร็จ");
     console.error(error);
     return;
   }
 
-  // 2) สำหรับแต่ละ user → ดึงจำนวนรูป + ข้อมูลผู้ใช้
+  // กรองเฉพาะ user ที่มีอยู่จริงใน DB เท่านั้น
+  const realFolders = folders.filter(f => usersFromDB.includes(f.name));
+
+  // ทำข้อมูลผู้ใช้
   const userArray = await Promise.all(
-    folders
-      .filter(f => f.name) // ต้องมีชื่อโฟลเดอร์
-      .map(async folder => {
-        const uid = folder.name;
+    realFolders.map(async folder => {
+      const uid = folder.name;
 
-        // 2.1) ดึงจำนวนรูปจาก storage folder
-        const { data: files } = await sb.storage.from(BUCKET).list(`${uid}/`, {
-          limit: 10000
-        });
+      // นับรูปใน storage
+      const { data: files } = await sb.storage.from(BUCKET).list(`${uid}/`, {
+        limit: 10000
+      });
 
-        // จำนวนรูปจริง
-        const count = files?.length || 0;
+      const count = files?.length || 0;
 
-        // 2.2) ดึงข้อมูลผู้ใช้จากฐานข้อมูล file_hashes
-        const { data: userInfo } = await sb.from("file_hashes")
-          .select("profile_name, profile_pic")
-          .eq("user_id", uid)
-          .limit(1)
-          .maybeSingle();
+      // ดึงชื่อโปรไฟล์
+      const { data: info } = await sb
+        .from("file_hashes")
+        .select("profile_name, profile_pic")
+        .eq("user_id", uid)
+        .limit(1)
+        .maybeSingle();
 
-        return [
-          uid,
-          {
-            profile_name: userInfo?.profile_name || "ไม่ทราบชื่อ",
-            profile_pic: userInfo?.profile_pic || "",
-            files_count: count
-          }
-        ];
-      })
+      return [
+        uid,
+        {
+          profile_name: info?.profile_name || uid,
+          profile_pic: info?.profile_pic || "",
+          files_count: count
+        }
+      ];
+    })
   );
 
   allUsers = userArray;
+
   renderUserTable();
 }
+
 
 /* ✅ แสดงตารางผู้ใช้ */
 function renderUserTable() {
