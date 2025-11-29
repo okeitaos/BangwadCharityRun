@@ -317,7 +317,7 @@
             "Content-Type": "application/json",
             "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ embedding, threshold: SIM_THRESHOLD, limit: 1000 }),
+          body: JSON.stringify({ embedding, threshold: SIM_THRESHOLD, limit: 999 }),
         });
         const { matches, error } = await res.json();
         if (error) throw new Error(error);
