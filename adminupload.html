@@ -110,44 +110,106 @@ let currentUserName = "";
 let allUsers = [];
 
 /* ✅ โหลดรายชื่อผู้ใช้ทั้งหมด */
+// async function loadUsers() {
+//   const { data, error } = await sb.from("file_hashes")
+//     .select("user_id, profile_name, profile_pic, file_path")
+//     .order("user_id");
+
+//   if (error) {
+//     alert("❌ โหลดข้อมูลไม่สำเร็จ");
+//     console.error(error);
+//     return;
+//   }
+
+//   // รวมตาม user
+//   const users = {};
+//   data.forEach(row => {
+//     if (!users[row.user_id]) {
+//       users[row.user_id] = {
+//         profile_name: row.profile_name || "ไม่ทราบชื่อ",
+//         profile_pic: row.profile_pic || "",
+//         files: []
+//       };
+//     }
+//     users[row.user_id].files.push(row.file_path);
+//   });
+
+//   allUsers = Object.entries(users);
+//   renderUserTable();
+// }
+
+/* ✅ แสดงตารางผู้ใช้ */
+// function renderUserTable() {
+//   const tbody = document.getElementById("userList");
+//   tbody.innerHTML = "";
+//   allUsers.forEach(([uid, info]) => {
+//     const tr = document.createElement("tr");
+//     tr.innerHTML = `
+//       <td><img src="${info.profile_pic}" width="50" height="50" style="border-radius:50%;"></td>
+//       <td>${info.profile_name}</td>
+//       <td>${info.files.length}</td>
+//       <td>
+//         <button class="btn-view" onclick="viewUser('${uid}','${info.profile_name}')">ดูรูป</button>
+//       </td>
+//     `;
+//     tbody.appendChild(tr);
+//   });
+// }
+
+
 async function loadUsers() {
-  const { data, error } = await sb.from("file_hashes")
-    .select("user_id, profile_name, profile_pic, file_path")
-    .order("user_id");
+  const { data: folders, error } = await sb.storage.from(BUCKET).list("", {
+    limit: 10000,
+  });
 
   if (error) {
-    alert("❌ โหลดข้อมูลไม่สำเร็จ");
+    alert("❌ โหลดข้อมูลผู้ใช้ไม่สำเร็จ");
     console.error(error);
     return;
   }
 
-  // รวมตาม user
-  const users = {};
-  data.forEach(row => {
-    if (!users[row.user_id]) {
-      users[row.user_id] = {
-        profile_name: row.profile_name || "ไม่ทราบชื่อ",
-        profile_pic: row.profile_pic || "",
-        files: []
-      };
-    }
-    users[row.user_id].files.push(row.file_path);
-  });
+  allUsers = await Promise.all(
+    folders
+      .filter(f => f.name) // เฉพาะโฟลเดอร์ user
+      .map(async folder => {
+        const uid = folder.name;
 
-  allUsers = Object.entries(users);
+        // 1) นับรูปในโฟลเดอร์ user นั้น
+        const { data: files } = await sb.storage.from(BUCKET).list(`${uid}/`, {
+          limit: 10000,
+        });
+
+        // 2) ดึงชื่อและรูปโปรไฟล์จาก file_hashes (เก็บ profile)
+        const { data: userInfo } = await sb.from("file_hashes")
+          .select("profile_name, profile_pic")
+          .eq("user_id", uid)
+          .limit(1)
+          .maybeSingle();
+
+        return [
+          uid,
+          {
+            profile_name: userInfo?.profile_name || "ไม่ทราบชื่อ",
+            profile_pic: userInfo?.profile_pic || "",
+            files_count: files?.length || 0
+          }
+        ];
+      })
+  );
+
   renderUserTable();
 }
 
-/* ✅ แสดงตารางผู้ใช้ */
-function renderUserTable() {
+  function renderUserTable() {
   const tbody = document.getElementById("userList");
   tbody.innerHTML = "";
+
   allUsers.forEach(([uid, info]) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td><img src="${info.profile_pic}" width="50" height="50" style="border-radius:50%;"></td>
       <td>${info.profile_name}</td>
-      <td>${info.files.length}</td>
+      <td>${info.files_count}</td>
       <td>
         <button class="btn-view" onclick="viewUser('${uid}','${info.profile_name}')">ดูรูป</button>
       </td>
@@ -156,6 +218,8 @@ function renderUserTable() {
   });
 }
 
+
+  
 /* ✅ ดูรูปของ user */
 async function viewUser(uid, name) {
   currentUserId = uid;
