@@ -157,29 +157,35 @@ let allUsers = [];
 // }
 
 
+/* ✅ โหลดรายชื่อผู้ใช้ + นับรูปจาก Storage จริง */
 async function loadUsers() {
+  // 1) ค้นโฟลเดอร์ทั้งหมดใน bucket (ชื่อโฟลเดอร์ = user_id)
   const { data: folders, error } = await sb.storage.from(BUCKET).list("", {
-    limit: 10000,
+    limit: 10000
   });
 
   if (error) {
-    alert("❌ โหลดข้อมูลผู้ใช้ไม่สำเร็จ");
+    alert("❌ โหลดข้อมูลผู้ใช้ล้มเหลว");
     console.error(error);
     return;
   }
 
-  allUsers = await Promise.all(
+  // 2) สำหรับแต่ละ user → ดึงจำนวนรูป + ข้อมูลผู้ใช้
+  const userArray = await Promise.all(
     folders
-      .filter(f => f.name) // เฉพาะโฟลเดอร์ user
+      .filter(f => f.name) // ต้องมีชื่อโฟลเดอร์
       .map(async folder => {
         const uid = folder.name;
 
-        // 1) นับรูปในโฟลเดอร์ user นั้น
+        // 2.1) ดึงจำนวนรูปจาก storage folder
         const { data: files } = await sb.storage.from(BUCKET).list(`${uid}/`, {
-          limit: 10000,
+          limit: 10000
         });
 
-        // 2) ดึงชื่อและรูปโปรไฟล์จาก file_hashes (เก็บ profile)
+        // จำนวนรูปจริง
+        const count = files?.length || 0;
+
+        // 2.2) ดึงข้อมูลผู้ใช้จากฐานข้อมูล file_hashes
         const { data: userInfo } = await sb.from("file_hashes")
           .select("profile_name, profile_pic")
           .eq("user_id", uid)
@@ -191,23 +197,25 @@ async function loadUsers() {
           {
             profile_name: userInfo?.profile_name || "ไม่ทราบชื่อ",
             profile_pic: userInfo?.profile_pic || "",
-            files_count: files?.length || 0
+            files_count: count
           }
         ];
       })
   );
 
+  allUsers = userArray;
   renderUserTable();
 }
 
-  function renderUserTable() {
+/* ✅ แสดงตารางผู้ใช้ */
+function renderUserTable() {
   const tbody = document.getElementById("userList");
   tbody.innerHTML = "";
 
   allUsers.forEach(([uid, info]) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><img src="${info.profile_pic}" width="50" height="50" style="border-radius:50%;"></td>
+      <td><img src="${info.profile_pic}" width="50" height="50" style="border-radius:50%"></td>
       <td>${info.profile_name}</td>
       <td>${info.files_count}</td>
       <td>
@@ -217,7 +225,6 @@ async function loadUsers() {
     tbody.appendChild(tr);
   });
 }
-
 
   
 /* ✅ ดูรูปของ user */
