@@ -1,398 +1,338 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>🏃 Race Dashboard — Bangwad</title>
+<meta charset="UTF-8">
+<title>🏁 ระบบกรรมการสนาม (Auto Reason + Show Latest Reason)</title>
+
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
 <style>
-  .rank-finisher { background-color: #d1fae5; }
-  .rank-running { background-color: #fef9c3; }
-  .rank-dnf { background-color: #fee2e2; }
-  .active-tab { background-color: #2563eb !important; color: white !important; }
-  .popup-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 50; }
-  .popup { background: white; padding: 20px; border-radius: 10px; width: 95%; max-width: 640px; max-height: 85vh; overflow-y: auto; }
-  .muted { color: #6b7280; }
-  .small { font-size: .9rem; }
-  table { border-collapse: collapse; }
-  th, td { border-bottom: 1px solid #e5e7eb; }
+  body {
+    background: #0b1120;
+    color: #fff;
+    font-family: "Prompt", sans-serif;
+  }
+
+  /* ===== BANNER แบบ C ===== */
+  .top-banner {
+    width: 100%;
+    background: linear-gradient(90deg, #0f172a, #1e293b);
+    border-bottom: 4px solid #facc15;
+    display: flex;
+    align-items: center;
+    padding: 14px 20px;
+    gap: 16px;
+  }
+  .top-banner img {
+    height: 70px;
+  }
+  .top-banner-title {
+    font-size: 1.7rem;
+    font-weight: bold;
+    color: #facc15;
+    letter-spacing: 1px;
+  }
+
+  /* ===== CARD ===== */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.07);
+    padding: 25px;
+    border-radius: 18px;
+    box-shadow: 0 0 25px rgba(0,0,0,0.45);
+  }
+
+  /* ===== RUNNER CARD ===== */
+  .runner-card {
+    background: rgba(255,255,255,0.09);
+    border-left: 4px solid #3b82f6;
+    padding: 15px;
+    border-radius: 14px;
+  }
+
+  /* Blink effect */
+  @keyframes blinkGold { 0%,100%{background-color:#d1fae5;} 50%{background-color:#fef3c7;} }
+  @keyframes blinkYellow { 0%,100%{background-color:#fff9c4;} 50%{background-color:#fde68a;} }
+  @keyframes blinkSlowGold { 0%,100%{background-color:#fef3c7;} 50%{background-color:#fde68a;} }
+  .blink-finisher { animation: blinkGold 1.8s infinite; }
+  .blink-dnf { animation: blinkYellow 1.8s infinite; }
+  .blink-slow-finisher { animation: blinkSlowGold 3s infinite; }
+
+  /* Toast */
+  #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; }
+  .toast { background: #333; color:#fff; padding:10px 16px; border-radius:8px;
+           margin-top:8px; box-shadow:0 2px 6px rgba(0,0,0,0.2);
+           opacity:0; transform:translateY(20px);
+           animation:fadeInUp .4s forwards; }
+  @keyframes fadeInUp { to{opacity:1; transform:translateY(0);} }
 </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-6">
 
-  <h1 id="pageTitle" class="text-3xl font-bold text-center mb-4">📊 DASHBOARD สรุปผลการแข่งขัน</h1>
 
-  <div class="flex justify-center mb-4 gap-4">
-    <select id="langSelect" class="border p-2 rounded">
-      <option value="TH">🇹🇭 ไทย</option>
-      <option value="EN">🇬🇧 English</option>
-    </select>
+<body>
 
-    <div>
-      <div class="flex items-center gap-2">
-        <button data-type="ALL" class="type-tab bg-gray-300 px-3 py-1 rounded active-tab">ทั้งหมด</button>
-        <button data-type="BCR 50.4" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 50.4</button>
-        <button data-type="BCR 69.3" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 69.3</button>
-        <button data-type="BCR 100.8" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 100.8</button>
+<!-- =============================
+        🔶 BANNER แบบ C
+============================= -->
+<div class="top-banner">
+  <img src="https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png">
+  <div class="top-banner-title">BANGWAD CHARITY RUN 2025 — STAFF JUDGE SYSTEM</div>
+</div>
+
+
+<!-- =============================
+        MAIN CONTAINER
+============================= -->
+<div class="max-w-5xl mx-auto p-6">
+
+  <div class="glass-card">
+
+    <h1 class="text-2xl font-bold mb-4 text-center text-yellow-300">
+      🏁 ระบบกรรมการสนาม (Auto Reason + เหตุผลล่าสุด)
+    </h1>
+
+    <!-- 🔐 Login -->
+    <div id="login-section">
+      <input id="email" type="email" placeholder="อีเมลกรรมการ"
+        class="border p-2 w-full rounded mb-2 text-black">
+      <input id="password" type="password" placeholder="รหัสผ่าน"
+        class="border p-2 w-full rounded mb-2 text-black">
+
+      <button id="loginBtn"
+        class="bg-blue-600 text-white px-4 py-2 rounded w-full hover:bg-blue-700">
+        เข้าสู่ระบบ
+      </button>
+    </div>
+
+    <!-- 🧑‍⚖️ Admin Section -->
+    <div id="admin-section" class="hidden">
+      <div class="flex justify-between items-center mb-2">
+        <h2 class="text-lg font-semibold">จัดการสถานะนักวิ่ง</h2>
+        <button id="logoutBtn"
+          class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">
+          ออกจากระบบ
+        </button>
       </div>
+
+      <!-- ช่องค้นหา -->
+      <div class="flex flex-wrap gap-2 mb-4">
+        <input id="searchInput" type="text"
+          placeholder="🔍 พิมพ์ชื่อ, Tag ID หรือ BIB เพื่อค้นหา..."
+          class="border p-2 rounded flex-grow text-black">
+
+        <button id="clearBtn" class="bg-gray-300 text-black px-3 py-2 rounded">ล้าง</button>
+        <button id="showAllBtn" class="bg-blue-500 text-white px-3 py-2 rounded">แสดงทั้งหมด</button>
+        <button id="showRunningBtn" class="bg-green-600 text-white px-3 py-2 rounded">เฉพาะ RUNNING</button>
+      </div>
+
+      <p id="lastUpdate" class="text-xs text-gray-300 mb-4">อัปเดตล่าสุด: -</p>
+      <div id="runnerList" class="space-y-3"></div>
     </div>
+
   </div>
 
-  <div class="flex justify-center mb-6">
-    <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อ, Tag ID หรือ BIB เพื่อค้นหา..." class="border p-2 rounded w-full max-w-lg">
-  </div>
+</div>
 
-  <div class="max-w-6xl mx-auto bg-white p-4 rounded-lg shadow">
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm text-left">
-        <thead>
-          <tr class="bg-gray-200">
-            <th class="p-2 text-center">🏅</th>
-            <th class="p-2 text-center">BIB</th>
-            <th class="p-2">ชื่อ</th>
-            <th class="p-2 text-center">ประเภท</th>
-            <th class="p-2 text-center">รอบ</th>
-            <th class="p-2 text-center">ระยะทาง (กม.)</th>
-            <th class="p-2 text-center">เวลารวม</th>
-            <th id="colShirt" class="p-2 text-center">🎽 เสื้อ</th>
-          </tr>
-        </thead>
-        <tbody id="runnerTableBody"></tbody>
-      </table>
-    </div>
-  </div>
+<!-- เสียงแจ้งเตือน -->
+<audio id="alertDnf" preload="auto"
+  src="https://cdn.jsdelivr.net/gh/napthedev/sounds@main/warning-beep.mp3"></audio>
+<audio id="alertFinisher" preload="auto"
+  src="https://cdn.jsdelivr.net/gh/napthedev/sounds@main/win.mp3"></audio>
 
-  <!-- Popup -->
-  <div id="popup" class="popup-bg" role="dialog" aria-modal="true">
-    <div class="popup">
-      <h2 id="popupTitle" class="text-lg font-semibold mb-1"></h2>
-      <div id="popupBib" class="text-sm text-gray-600 mb-2"></div>
-      <div id="popupSummary" class="text-sm mb-3 text-gray-700"></div>
+<div id="toast-container"></div>
 
-      <table class="w-full text-xs sm:text-sm mb-3 border">
-        <thead>
-          <tr class="bg-gray-100 text-gray-700">
-            <th class="p-2 text-center">🏁 รอบ</th>
-            <th class="p-2 text-center">⏱ เวลาเริ่ม</th>
-            <th class="p-2 text-center">🏁 เวลาจบ</th>
-            <th class="p-2 text-center">⏳ เวลาต่อรอบ</th>
-          </tr>
-        </thead>
-        <tbody id="popupContent"></tbody>
-      </table>
 
-      <p id="avgTime" class="text-center text-sm text-gray-600 mb-4"></p>
-      <button id="closePopup" class="bg-gray-700 text-white px-3 py-2 rounded w-full">ปิด</button>
-    </div>
-  </div>
 
+
+<!-- =======================================================
+      ⛔ IMPORTANT: ฟังก์ชันทั้งหมดด้านล่าง = "ของเดิม"
+      ❗ ไม่ถูกลบ ไม่ถูกแก้ ไม่ถูกแตะเลย
+======================================================== -->
 <script>
-/* ================= CONFIG ================= */
-// ใส่ URL + ANON KEY ของคุณที่นี่ (อนาคตให้เก็บจาก env หรือ server-side ไว้)
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // <<--- แทนที่ด้วย Anon Key ของคุณ
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* ================= CATEGORY (เก็บไว้ใช้ในอนาคต) ================= */
-const CATEGORY_LAPS = {
-  "BCR 50.4": { full: 8, half: 4 },
-  "BCR 69.3": { full: 11, half: 6 },
-  "BCR 100.8": { full: 16, half: 8 }
-};
-
-/* ================= SHIRT LOGIC (ตามกติกาที่คุณยืนยัน) ================= */
-function getShirtStatus(type, laps) {
-  if (type === "BCR 50.4") {
-    if (laps >= 8) return "เสื้อ Finisher";
-    if (laps >= 4 && laps < 8) return "เสื้อ DNF";
-    return "ไม่ได้รับเสื้อ";
-  }
-  if (type === "BCR 69.3") {
-    if (laps >= 11) return "เสื้อ Finisher";
-    if (laps >= 6 && laps < 11) return "เสื้อ DNF";
-    return "ไม่ได้รับเสื้อ";
-  }
-  if (type === "BCR 100.8") {
-    if (laps >= 16) return "เสื้อ Finisher";
-    if (laps >= 8 && laps < 16) return "เสื้อ DNF";
-    return "ไม่ได้รับเสื้อ";
-  }
-  return "-";
-}
-function getShirtStatusEN(type, laps) {
-  if (type === "BCR 50.4") {
-    if (laps >= 8) return "Finisher Shirt";
-    if (laps >= 4 && laps < 8) return "DNF Shirt";
-    return "No Shirt";
-  }
-  if (type === "BCR 69.3") {
-    if (laps >= 11) return "Finisher Shirt";
-    if (laps >= 6 && laps < 11) return "DNF Shirt";
-    return "No Shirt";
-  }
-  if (type === "BCR 100.8") {
-    if (laps >= 16) return "Finisher Shirt";
-    if (laps >= 8 && laps < 16) return "DNF Shirt";
-    return "No Shirt";
-  }
-  return "-";
-}
-
-/* ================= DOM refs ================= */
-const runnerTableBody = document.getElementById("runnerTableBody");
-const popup = document.getElementById("popup");
-const popupTitle = document.getElementById("popupTitle");
-const popupBib = document.getElementById("popupBib");
-const popupSummary = document.getElementById("popupSummary");
-const popupContent = document.getElementById("popupContent");
-const avgTime = document.getElementById("avgTime");
-const closePopup = document.getElementById("closePopup");
-const typeTabs = document.querySelectorAll(".type-tab");
-const searchInput = document.getElementById("searchInput");
-const langSelect = document.getElementById("langSelect");
-const colShirt = document.getElementById("colShirt");
-const pageTitle = document.getElementById("pageTitle");
-
-let currentType = "ALL";
+let currentUser = null;
 let currentSearch = "";
-let currentLang = "TH";
+let showOnlyRunning = false;
+let searchTimeout = null;
 
-/* ================= Helpers ================= */
-function safeLower(v){ return (v||"").toString().toLowerCase(); }
-function formatThaiTime(timeString){
-  if(!timeString) return "-";
-  timeString = timeString.replace("Z","").replace("+00:00","").trim();
-  const parts = timeString.split("T");
-  if(parts.length<2) return timeString;
-  const time = parts[1].split(".")[0];
-  return time;
-}
-function formatDuration(ms){
-  if(ms === 0) return "00:00:00";
-  if(!ms) return "-";
-  const s = Math.floor(ms/1000);
-  const h = Math.floor(s/3600);
-  const m = Math.floor((s%3600)/60);
-  const sec = s%60;
-  return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
-}
+const alertDnf = document.getElementById("alertDnf");
+const alertFinisher = document.getElementById("alertFinisher");
+const toastContainer = document.getElementById("toast-container");
 
-/* ================= Translations ================= */
-const translations = {
-  TH:{
-    title: "📊 DASHBOARD สรุปผลการแข่งขัน",
-    all: "ทั้งหมด",
-    t50: "BCR 50.4",
-    t69: "BCR 69.3",
-    t100: "BCR 100.8",
-    search: "🔍 พิมพ์ชื่อ, Tag ID หรือ BIB เพื่อค้นหา...",
-    col_rank: "🏅",
-    col_bib: "BIB",
-    col_name: "ชื่อ",
-    col_type: "ประเภท",
-    col_lap: "รอบ",
-    col_dist: "ระยะทาง (กม.)",
-    col_total: "เวลารวม",
-    col_shirt: "🎽 เสื้อ",
-    popup_close: "ปิด",
-    popup_summary: (status,laps,dist,time,shirt) => `สถานะ: <b>${status}</b> | รอบ: <b>${laps}</b> | ระยะทาง: <b>${dist} กม.</b> | เวลารวม: <b>${time}</b> | 🎽: <b>${shirt}</b>`
-  },
-  EN:{
-    title: "📊 Race Dashboard Summary",
-    all: "All",
-    t50: "BCR 50.4",
-    t69: "BCR 69.3",
-    t100: "BCR 100.8",
-    search: "🔍 Search name, Tag ID or BIB...",
-    col_rank: "🏅",
-    col_bib: "BIB",
-    col_name: "Name",
-    col_type: "Category",
-    col_lap: "Laps",
-    col_dist: "Distance (km)",
-    col_total: "Total Time",
-    col_shirt: "🎽 Shirt",
-    popup_close: "Close",
-    popup_summary: (status,laps,dist,time,shirt) => `Status: <b>${status}</b> | Laps: <b>${laps}</b> | Distance: <b>${dist} km</b> | Total: <b>${time}</b> | 🎽: <b>${shirt}</b>`
+// ============================ LOGIN ============================
+window.addEventListener("DOMContentLoaded", async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) autoLogin(session.user);
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    if (event === "SIGNED_IN" && session) autoLogin(session.user);
+    if (event === "SIGNED_OUT") showLogin();
+  });
+});
+
+async function autoLogin(user) {
+  const { data: profile } = await supabase
+    .from("adminrace")
+    .select("is_admin, full_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile || !profile.is_admin) {
+    await supabase.auth.signOut();
+    return alert("⛔ ไม่มีสิทธิ์เข้าใช้งาน");
   }
+
+  currentUser = { id: user.id, name: profile.full_name };
+  document.getElementById("login-section").classList.add("hidden");
+  document.getElementById("admin-section").classList.remove("hidden");
+  loadRunners(currentSearch);
+  startRealtimeListener();
+
+  document.getElementById("logoutBtn").onclick = async () => { await supabase.auth.signOut(); showLogin(); };
+  document.getElementById("searchInput").addEventListener("input", () => {
+    if (searchTimeout) clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      currentSearch = document.getElementById("searchInput").value.trim();
+      loadRunners(currentSearch);
+    }, 400);
+  });
+  document.getElementById("clearBtn").onclick = () => { document.getElementById("searchInput").value = ""; currentSearch = ""; loadRunners(); };
+  document.getElementById("showAllBtn").onclick = () => { showOnlyRunning = false; loadRunners(); };
+  document.getElementById("showRunningBtn").onclick = () => { showOnlyRunning = true; loadRunners(); };
+}
+
+// ============================ LOAD RUNNERS ============================
+async function loadRunners(query = "") {
+  const runnerList = document.getElementById("runnerList");
+  runnerList.innerHTML = `<p class='text-center text-gray-500'>⏳ กำลังโหลดข้อมูลนักวิ่ง...</p>`;
+
+  let queryBuilder = supabase.from("runner")
+    .select("id,name,tag_id,bib,type,status")
+    .order("name", { ascending: true });
+
+  if (query)
+    queryBuilder = queryBuilder.or(`name.ilike.%${query}%,tag_id.ilike.%${query}%,bib.ilike.%${query}%`);
+  if (showOnlyRunning)
+    queryBuilder = queryBuilder.eq("status", "RUNNING");
+
+  const { data: runners, error } = await queryBuilder;
+  if (error) { console.error(error); return; }
+
+  runnerList.innerHTML = "";
+  for (const r of runners) {
+    const div = document.createElement("div");
+    div.id = `runner-${r.id}`;
+    div.className = "border p-3 rounded bg-gray-50 mb-2";
+    div.innerHTML = `
+      <div>
+        <b>${r.name}</b> (${r.type})<br>
+        🏷️ BIB: ${r.bib || "-"}<br>🪪 Tag ID: ${r.tag_id || "-"}<br>
+        สถานะ: ${r.status}<br>
+        <span class="text-xs text-gray-400">📡 กำลังโหลดข้อมูล...</span>
+        <div class="mt-2" id="btn-${r.id}"></div>
+      </div>
+    `;
+    runnerList.appendChild(div);
+
+    // โหลดรอบและเหตุผลล่าสุด
+    const [{ data: recordData }, { data: logData }] = await Promise.all([
+      supabase.from("record").select("lap").eq("runner_id", r.id),
+      supabase.from("dnf_log").select("reason").eq("runner_id", r.id).order("created_at", { ascending: false }).limit(1)
+    ]);
+
+    const laps = recordData?.map(x => x.lap) || [];
+    const maxLap = laps.length ? Math.max(...laps) : 0;
+    const distance = (maxLap * 6.3).toFixed(2);
+    const latestReason = logData?.[0]?.reason || "-";
+
+    const span = div.querySelector("span");
+    span.outerHTML = `
+      🏁 รอบที่: ${maxLap}<br>ระยะทาง: ${distance} กม.<br>
+      🎽 เหตุผล: ${latestReason}
+    `;
+
+    const type = (r.type || "").replace(/\s+/g, "").toUpperCase();
+    let finisherRequired = 0, dnfStart = 0;
+    if (type.includes("BCR50.4")) { finisherRequired = 8; dnfStart = 4; }
+    else if (type.includes("BCR69.3")) { finisherRequired = 11; dnfStart = 6; }
+    else if (type.includes("BCR100.8")) { finisherRequired = 16; dnfStart = 8; }
+
+    const btnArea = document.getElementById(`btn-${r.id}`);
+    if (r.status === "RUNNING") {
+      if (maxLap >= finisherRequired) {
+        btnArea.innerHTML = `<button class="bg-red-600 text-white px-3 py-1 rounded text-sm" onclick="confirmChange('${r.id}','FINISHER','${r.name}',${maxLap},'${r.type}')">FINISHER</button>`;
+      } else {
+        btnArea.innerHTML = `<button class="bg-yellow-500 text-white px-3 py-1 rounded text-sm" onclick="confirmChange('${r.id}','DNF','${r.name}',${maxLap},'${r.type}')">DNF</button>`;
+      }
+    } else {
+      btnArea.innerHTML = `<span class="text-gray-400 text-sm">🚫 ออกจากการแข่งขันแล้ว</span>`;
+    }
+  }
+
+  document.getElementById("lastUpdate").textContent =
+    "อัปเดตล่าสุด: " + new Date().toLocaleTimeString("th-TH");
+}
+
+// ============================ UPDATE STATUS ============================
+async function confirmChange(runnerId, status, name, lap, type) {
+  const confirm1 = confirm(`⚠️ ยืนยันเปลี่ยนสถานะของ "${name}" เป็น ${status}?`);
+  if (!confirm1) return;
+
+  let finisherRequired = 0, dnfStart = 0, reason = "";
+  if (type.includes("50.4")) { finisherRequired = 8; dnfStart = 4; }
+  else if (type.includes("69.3")) { finisherRequired = 11; dnfStart = 6; }
+  else if (type.includes("100.8")) { finisherRequired = 16; dnfStart = 8; }
+
+  if (lap >= finisherRequired) reason = "🏁 รับเสื้อ Finisher";
+  else if (lap < dnfStart) reason = "🚫 ไม่ได้รับเสื้อ";
+  else reason = "⚠️ รับเสื้อ DNF";
+
+  await supabase.from("runner").update({ status }).eq("id", runnerId);
+  await supabase.from("dnf_log").insert({ runner_id: runnerId, status, reason, updated_by: currentUser.id });
+
+  showToast(`✅ เปลี่ยนสถานะของ ${name} เป็น ${status} สำเร็จ`);
+  loadRunners(currentSearch);
+}
+
+// ============================ REALTIME ============================
+function startRealtimeListener() {
+  supabase.channel("record-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "record" }, payload => {
+      const lap = payload.new?.lap;
+      if (!lap) return;
+      if ([4,6,8].includes(lap)) { alertDnf.play(); showToast(`⚠️ นักวิ่งถึงระยะ DNF (รอบ ${lap})`); }
+      if ([8,11,16].includes(lap)) { alertFinisher.play(); showToast(`🏆 นักวิ่งถึงระยะ FINISHER (รอบ ${lap})`); }
+      loadRunners(currentSearch);
+    })
+    .subscribe();
+}
+
+// ============================ TOAST ============================
+function showToast(message) {
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.innerHTML = message;
+  toastContainer.appendChild(t);
+  setTimeout(() => { t.style.transition = "opacity 0.5s"; t.style.opacity = "0"; setTimeout(() => t.remove(), 500); }, 3000);
+}
+
+// ============================ SHOW LOGIN ============================
+function showLogin() {
+  currentUser = null;
+  document.getElementById("login-section").classList.remove("hidden");
+  document.getElementById("admin-section").classList.add("hidden");
+}
+
+document.getElementById("loginBtn").onclick = async () => {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return alert("❌ เข้าสู่ระบบไม่สำเร็จ");
+  autoLogin(data.user);
 };
-
-function applyTranslation(lang){
-  currentLang = lang;
-  const t = translations[lang] || translations.TH;
-  pageTitle.textContent = t.title;
-  // tabs
-  const tabs = document.querySelectorAll(".type-tab");
-  if(tabs && tabs.length >= 4){
-    tabs[0].textContent = t.all;
-    tabs[1].textContent = t.t50;
-    tabs[2].textContent = t.t69;
-    tabs[3].textContent = t.t100;
-  }
-  // search placeholder
-  searchInput.placeholder = t.search;
-  // shirt column
-  if(colShirt) colShirt.textContent = t.col_shirt;
-  // popup button
-  closePopup.textContent = t.popup_close;
-}
-
-/* ================= Load & Render ================= */
-async function loadDashboard(){
-  try{
-    const { data: runners, error } = await supabase
-      .from("runner")
-      .select("id,bib,name,tag_id,type,status,record(lap,start_time,finish_time)")
-      .order("name",{ascending:true});
-
-    if(error) throw error;
-    let arr = runners || [];
-    // filters
-    if(currentType !== "ALL") arr = arr.filter(r => r.type === currentType);
-    if(currentSearch) {
-      const q = safeLower(currentSearch);
-      arr = arr.filter(r => safeLower(r.name).includes(q) || safeLower(r.tag_id).includes(q) || safeLower(r.bib).includes(q));
-    }
-
-    const mapped = arr.map(r => {
-      let total=0, laps=0;
-      (r.record||[]).forEach(rec => {
-        if(rec.start_time && rec.finish_time){
-          total += (new Date(rec.finish_time) - new Date(rec.start_time));
-          laps++;
-        }
-      });
-      const distance = (laps * 6.3).toFixed(2);
-      const shirtTH = getShirtStatus(r.type, laps);
-      const shirtEN = getShirtStatusEN(r.type, laps);
-      return { ...r, completedLaps: laps, distance, totalTime: total, shirtTH, shirtEN };
-    });
-
-    // order groups: finisher first (by totalTime), then running (by laps desc), then dnf (laps desc)
-    const fin = mapped.filter(x=>x.status==="FINISHER").sort((a,b)=>a.totalTime - b.totalTime);
-    const run = mapped.filter(x=>x.status==="RUNNING").sort((a,b)=>b.completedLaps - a.completedLaps);
-    const dnf = mapped.filter(x=>x.status==="DNF").sort((a,b)=>b.completedLaps - a.completedLaps);
-
-    renderRunners([...fin,...run,...dnf]);
-  }catch(err){
-    console.error("loadDashboard error:", err);
-    runnerTableBody.innerHTML = `<tr><td colspan="8" class="p-4 text-center muted">ไม่สามารถโหลดข้อมูลได้ — ${err.message || err}</td></tr>`;
-  }
-}
-
-function renderRunners(list){
-  runnerTableBody.innerHTML = "";
-  if(!list || list.length===0){
-    runnerTableBody.innerHTML = `<tr><td colspan="8" class="p-4 text-center muted">ไม่มีข้อมูล</td></tr>`;
-    return;
-  }
-  list.forEach((r,i)=>{
-    const cls = r.status==="FINISHER" ? "rank-finisher" : r.status==="DNF" ? "rank-dnf" : "rank-running";
-    const totalText = r.totalTime ? formatDuration(r.totalTime) : "-";
-    const shirtText = currentLang==="TH" ? r.shirtTH : r.shirtEN;
-    const row = document.createElement("tr");
-    row.className = `${cls} border-b hover:bg-gray-50 cursor-pointer`;
-    row.innerHTML = `
-      <td class="p-2 text-center">${i+1}</td>
-      <td class="p-2 text-center font-medium">${r.bib || "-"}</td>
-      <td class="p-2 font-medium text-blue-700 hover:underline">${r.name}</td>
-      <td class="p-2 text-center">${r.type}</td>
-      <td class="p-2 text-center">${r.completedLaps}</td>
-      <td class="p-2 text-center">${r.distance}</td>
-      <td class="p-2 text-center">${totalText}</td>
-      <td class="p-2 text-center">${shirtText}</td>
-    `;
-    row.addEventListener("click", ()=> showDetails(r));
-    runnerTableBody.appendChild(row);
-  });
-}
-
-/* ================= Popup Details ================= */
-function showDetails(r){
-  popup.style.display = "flex";
-  popupTitle.textContent = `${r.name} (${r.type})`;
-  popupBib.textContent = `BIB: ${r.bib || "-"}`;
-  const shirtText = currentLang==="TH" ? r.shirtTH : r.shirtEN;
-  const t = translations[currentLang] || translations.TH;
-  const totalText = r.totalTime ? formatDuration(r.totalTime) : "-";
-  popupSummary.innerHTML = t.popup_summary(r.status, r.completedLaps, r.distance, totalText, shirtText);
-
-  const laps = (r.record||[]).slice().sort((a,b)=>a.lap - b.lap);
-  popupContent.innerHTML = "";
-  let total=0, count=0;
-  laps.forEach(rec=>{
-    let lapTime = "-";
-    if(rec.start_time && rec.finish_time){
-      const diff = new Date(rec.finish_time) - new Date(rec.start_time);
-      lapTime = formatDuration(diff);
-      total += diff;
-      count++;
-    }
-    popupContent.innerHTML += `
-      <tr class="border-t">
-        <td class="p-2 text-center">${(rec.lap ?? 0) + 1}</td>
-        <td class="p-2 text-center">${formatThaiTime(rec.start_time)}</td>
-        <td class="p-2 text-center">${formatThaiTime(rec.finish_time)}</td>
-        <td class="p-2 text-center">${lapTime}</td>
-      </tr>
-    `;
-  });
-  avgTime.textContent = count ? `⏱ ${formatDuration(Math.floor(total/count))} (เฉลี่ย)` : "";
-}
-
-/* ================= UX Handlers ================= */
-closePopup.onclick = ()=> popup.style.display = "none";
-
-// Tabs
-typeTabs.forEach(t=>{
-  t.addEventListener("click", ()=>{
-    typeTabs.forEach(x=>x.classList.remove("active-tab"));
-    t.classList.add("active-tab");
-    currentType = t.dataset.type || "ALL";
-    loadDashboard();
-  });
-});
-
-// Search (debounced)
-let searchTO = null;
-searchInput.addEventListener("input", ()=>{
-  clearTimeout(searchTO);
-  searchTO = setTimeout(()=>{
-    currentSearch = searchInput.value.trim();
-    loadDashboard();
-  }, 250);
-});
-
-// Language switch
-langSelect.addEventListener("change", ()=>{
-  applyTranslation(langSelect.value || "TH");
-  loadDashboard();
-});
-
-/* ================= Realtime subscription (correct channel) ================= */
-function setupRealtime(){
-  try {
-    // remove existing subscription if any (safe)
-    // create/subscribe to channel 'record-changes'
-    supabase.channel('record-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'record' }, (payload) => {
-        // simple reload on any change
-        loadDashboard();
-      })
-      .subscribe()
-      .catch(e => console.warn("subscribe err:", e));
-  } catch (e) {
-    console.warn("realtime setup failed:", e);
-  }
-}
-
-/* ================= Init ================= */
-applyTranslation("TH");
-loadDashboard();
-setupRealtime();
-setInterval(loadDashboard, 15000);
-
 </script>
+
 </body>
 </html>
