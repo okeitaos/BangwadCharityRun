@@ -7,7 +7,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
-  .fade-in { animation: fadeIn 0.28s ease-in; }
+  .fade-in { animation: fadeIn 0.22s ease-in; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
   .success-bg { background: #ecfdf5; border: 1px solid #bbf7d0; color: #065f46; }
   .warn-bg { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
@@ -17,44 +17,42 @@
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
 <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-6">
-  <h1 class="text-2xl font-bold text-center mb-4">🏁 ระบบสแกนรอบ (อัตโนมัติ)</h1>
+  <h1 class="text-2xl font-bold text-center mb-4">🏁 ระบบสแกนรอบ (เร็วพิเศษ)</h1>
 
   <div class="mb-4">
-    <label for="tagInput" class="block text-sm text-gray-600 mb-1">สแกนหรือวาง Tag ID (ระบบจะส่งอัตโนมัติ)</label>
+    <label class="block text-sm text-gray-600 mb-1">สแกนหรือวาง Tag ID (ระบบจะส่งอัตโนมัติเร็วมาก)</label>
     <div class="flex gap-2">
       <input id="tagInput" type="text" inputmode="numeric" autocomplete="off"
         placeholder="สแกนหรือวาง Tag ID ที่นี่..." 
         class="flex-grow border rounded-md px-3 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-blue-400" autofocus>
       <button id="manualBtn" class="bg-blue-600 text-white px-4 rounded-md font-medium">ส่ง</button>
     </div>
-    <p id="helper" class="mt-2 text-xs text-gray-500">ระบบจะรอสั้น ๆ หลังวางค่า แล้วส่งให้โดยอัตโนมัติ (สามารถกด "ส่ง" ได้ด้วย)</p>
   </div>
 
   <div id="statusBox" class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center min-h-[92px]">
-    <p id="status" class="text-gray-600 text-sm">พร้อมสำหรับสแกน — วาง / สแกน Tag แล้วระบบจะส่งให้เอง</p>
+    <p id="status" class="text-gray-600 text-sm">พร้อมสแกน — ยิงได้เลย</p>
   </div>
 
   <footer class="mt-4 text-xs text-gray-500 text-center">
-    1 รอบ = 6.30 กม. • ระบบส่งไปยังฟังก์ชัน Supabase
+    1 รอบ = 6.30 กม. • ใช้ระบบส่งเร็วแบบ Non-blocking
   </footer>
 </div>
 
 <script>
 /* ---------- CONFIG ---------- */
-const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/rfid-reader"; // ✅ เปลี่ยนเป็น URL ฟังก์ชันจริงของคุณ
-/* ไม่จำเป็นต้องใส่ Authorization อีก เพราะ Function เป็น Public แล้ว */
+const FUNCTION_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/rfid-reader";
 
-/* ---------- UI ---------- */
+/* ---------- UI Elements ---------- */
 const tagInput = document.getElementById("tagInput");
 const manualBtn = document.getElementById("manualBtn");
 const statusEl = document.getElementById("status");
 const statusBox = document.getElementById("statusBox");
 
+/* ---------- Speed Tuning ---------- */
+const SCAN_DEBOUNCE_MS = 60;   // ↓ ลดดีเลย์สแกนเร็วขึ้น
+const COOLDOWN_MS = 1200;      // ↓ ป้องกันซ้ำเร็วกว่าเดิม
 let scanTimeout = null;
-const SCAN_DEBOUNCE_MS = 180;
-const COOLDOWN_MS = 1500;
 const recentScans = new Map();
-let sending = false;
 
 /* ---------- Helpers ---------- */
 function showStatus(message, kind = "info") {
@@ -63,68 +61,58 @@ function showStatus(message, kind = "info") {
   else if (kind === "warn") statusBox.classList.add("warn-bg");
   else if (kind === "error") statusBox.classList.add("error-bg");
   else statusBox.classList.add("bg-gray-50","border","border-gray-200");
+
   statusEl.innerHTML = message;
 }
 
 function shouldSendTag(tag) {
-  if (!tag) return false;
-  const now = Date.now();
   const last = recentScans.get(tag);
+  const now = Date.now();
   if (!last) return true;
   return (now - last) > COOLDOWN_MS;
 }
+
 function markScanned(tag) {
   recentScans.set(tag, Date.now());
-  setTimeout(() => recentScans.delete(tag), 10000);
+  setTimeout(() => recentScans.delete(tag), 8000);
 }
 
-/* ---------- Send Tag ---------- */
-async function sendTag(tag) {
+/* ---------- FAST SEND (non-blocking) ---------- */
+function sendTag(tag) {
   if (!tag) return;
+
   if (!shouldSendTag(tag)) {
-    showStatus(`⚠️ ป้องกันการส่งซ้ำสำหรับ Tag: ${tag}`, "warn");
-    return;
-  }
-  if (sending) {
-    showStatus("⏳ กำลังส่งคำขอก่อนหน้า — กรุณารอสักครู่", "warn");
+    showStatus(`⚠️ ส่งซ้ำเร็วเกินไป: ${tag}`, "warn");
     return;
   }
 
-  sending = true;
-  manualBtn.disabled = true;
-  tagInput.disabled = true;
-  showStatus(`⏳ กำลังบันทึก Tag: ${tag} ...`, "info");
+  markScanned(tag);
 
-  try {
-    const resp = await fetch(FUNCTION_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tag_id: tag })
-    });
+  showStatus(`⏳ ส่ง Tag: ${tag} ...`, "info");
 
-    const result = await resp.json();
-
+  // Fire & Forget — ทำงานเร็วที่สุด
+  fetch(FUNCTION_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tag_id: tag })
+  })
+  .then(r => r.json())
+  .then(result => {
     if (result.error) {
       showStatus(`❌ ${result.error}`, "error");
-    } else if (result.message) {
+    } 
+    else if (result.message) {
       showStatus(`⚠️ ${result.message}`, "warn");
-      markScanned(tag);
-    } else {
-      const runnerName = result.runner || "ไม่ทราบชื่อ";
-      const bibText = result.bib ? ` (BIB: ${result.bib})` : "";
+    }
+    else {
+      const n = result.runner || "ไม่ทราบชื่อ";
+      const bib = result.bib ? ` (BIB: ${result.bib})` : "";
       const lap = result.lap !== undefined ? `รอบที่ ${result.lap}` : "";
       const time = result.time ? `<div class="text-xs text-gray-500 mt-1">${result.time}</div>` : "";
-      showStatus(`✅ ${runnerName}${bibText} บันทึกสำเร็จ ${lap} ${time}`, "success");
-      markScanned(tag);
+      showStatus(`✅ ${n}${bib} ${lap} ${time}`, "success");
     }
-  } catch (err) {
-    showStatus(`❌ Error: ${err.message}`, "error");
-  } finally {
-    sending = false;
-    manualBtn.disabled = false;
-    tagInput.disabled = false;
-    tagInput.focus();
-  }
+  })
+  .catch(err => showStatus(`❌ Error: ${err.message}`, "error"));
 }
 
 /* ---------- Events ---------- */
@@ -134,16 +122,15 @@ tagInput.addEventListener("input", () => {
     const val = tagInput.value.trim();
     if (!val) return;
     const lines = val.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    const candidate = lines.length ? lines[lines.length - 1] : val;
-    sendTag(candidate);
+    const tag = lines.length ? lines[lines.length - 1] : val;
+    sendTag(tag);
     tagInput.value = "";
   }, SCAN_DEBOUNCE_MS);
 });
 
 manualBtn.addEventListener("click", () => {
-  if (scanTimeout) clearTimeout(scanTimeout);
   const val = tagInput.value.trim();
-  if (!val) { showStatus("กรุณาใส่ Tag ID ก่อนกดส่ง", "warn"); return; }
+  if (!val) return showStatus("กรุณาใส่ Tag ID", "warn");
   sendTag(val);
   tagInput.value = "";
 });
@@ -151,9 +138,8 @@ manualBtn.addEventListener("click", () => {
 tagInput.addEventListener("keydown", e => {
   if (e.key === "Enter") {
     e.preventDefault();
-    if (scanTimeout) clearTimeout(scanTimeout);
     const val = tagInput.value.trim();
-    if (!val) { showStatus("กรุณาใส่ Tag ID ก่อนกด Enter", "warn"); return; }
+    if (!val) return showStatus("กรุณาใส่ Tag ID", "warn");
     sendTag(val);
     tagInput.value = "";
   }
