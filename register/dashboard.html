@@ -1,126 +1,145 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="th">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>🏃 Race Dashboard</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>🏃 Race Dashboard — Bangwad</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-
 <style>
   .rank-finisher { background-color: #d1fae5; }
   .rank-running { background-color: #fef9c3; }
   .rank-dnf { background-color: #fee2e2; }
   .active-tab { background-color: #2563eb !important; color: white !important; }
-  .popup-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-     display: none; justify-content: center; align-items: center; z-index: 50; }
-  .popup { background: white; padding: 20px; border-radius: 10px;
-     width: 95%; max-width: 550px; max-height: 85vh; overflow-y: auto; }
+  .popup-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 50; }
+  .popup { background: white; padding: 20px; border-radius: 10px; width: 95%; max-width: 640px; max-height: 85vh; overflow-y: auto; }
+  .muted { color: #6b7280; }
+  .small { font-size: .9rem; }
+  table { border-collapse: collapse; }
+  th, td { border-bottom: 1px solid #e5e7eb; }
 </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-6">
 
-<h1 class="text-3xl font-bold text-center mb-4">📊 DASHBOARD สรุปผลการแข่งขัน</h1>
+  <h1 id="pageTitle" class="text-3xl font-bold text-center mb-4">📊 DASHBOARD สรุปผลการแข่งขัน</h1>
 
-<!-- Language selector -->
-<div class="flex justify-center mb-4">
-  <select id="langSelect" class="border p-2 rounded">
-    <option value="TH">🇹🇭 ไทย</option>
-    <option value="EN">🇬🇧 English</option>
-  </select>
-</div>
+  <div class="flex justify-center mb-4 gap-4">
+    <select id="langSelect" class="border p-2 rounded">
+      <option value="TH">🇹🇭 ไทย</option>
+      <option value="EN">🇬🇧 English</option>
+    </select>
 
-<!-- Tabs -->
-<div class="flex flex-wrap justify-center space-x-2 mb-4">
-  <button data-type="ALL" class="type-tab bg-gray-300 px-3 py-1 rounded active-tab">ทั้งหมด</button>
-  <button data-type="BCR 50.4" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 50.4</button>
-  <button data-type="BCR 69.3" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 69.3</button>
-  <button data-type="BCR 100.8" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 100.8</button>
-</div>
-
-<!-- Search -->
-<div class="flex justify-center mb-6">
-  <input id="searchInput" type="text"
-    placeholder="🔍 พิมพ์ชื่อ, Tag ID หรือ BIB เพื่อค้นหา..."
-    class="border p-2 rounded w-full max-w-md">
-</div>
-
-<!-- Table -->
-<div class="max-w-5xl mx-auto bg-white p-4 rounded-lg shadow">
-  <table class="w-full text-sm text-left border-collapse">
-    <thead>
-      <tr class="bg-gray-200">
-        <th class="p-2 text-center">🏅 อันดับ</th>
-        <th class="p-2 text-center">BIB</th>
-        <th class="p-2">ชื่อ</th>
-        <th class="p-2 text-center">ประเภท</th>
-        <th class="p-2 text-center">รอบ</th>
-        <th class="p-2 text-center">ระยะทาง (กม.)</th>
-        <th class="p-2 text-center">เวลารวม</th>
-        <!-- ✅ เพิ่มหัวคอลัมน์เสื้อ -->
-        <th class="p-2 text-center">🎽 เสื้อ</th>
-      </tr>
-    </thead>
-    <tbody id="runnerTableBody"></tbody>
-  </table>
-</div>
-
-<!-- Popup -->
-<div id="popup" class="popup-bg" role="dialog">
-  <div class="popup">
-    <h2 id="popupTitle" class="text-lg font-semibold mb-1"></h2>
-    <div id="popupBib" class="text-sm text-gray-600 mb-2"></div>
-    <div id="popupSummary" class="text-sm mb-3 text-gray-700"></div>
-
-    <table class="w-full text-xs sm:text-sm mb-3 border">
-      <thead>
-        <tr class="bg-gray-100 text-gray-700">
-          <th class="p-2 text-center">🏁 รอบ</th>
-          <th class="p-2 text-center">⏱ เวลาเริ่ม</th>
-          <th class="p-2 text-center">🏁 เวลาจบ</th>
-          <th class="p-2 text-center">⏳ เวลาต่อรอบ</th>
-        </tr>
-      </thead>
-      <tbody id="popupContent"></tbody>
-    </table>
-
-    <p id="avgTime" class="text-center text-sm text-gray-600 mb-4"></p>
-
-    <button id="closePopup" class="bg-gray-700 text-white px-3 py-2 rounded w-full">ปิด</button>
+    <div>
+      <div class="flex items-center gap-2">
+        <button data-type="ALL" class="type-tab bg-gray-300 px-3 py-1 rounded active-tab">ทั้งหมด</button>
+        <button data-type="BCR 50.4" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 50.4</button>
+        <button data-type="BCR 69.3" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 69.3</button>
+        <button data-type="BCR 100.8" class="type-tab bg-gray-300 px-3 py-1 rounded">BCR 100.8</button>
+      </div>
+    </div>
   </div>
-</div>
+
+  <div class="flex justify-center mb-6">
+    <input id="searchInput" type="text" placeholder="🔍 พิมพ์ชื่อ, Tag ID หรือ BIB เพื่อค้นหา..." class="border p-2 rounded w-full max-w-lg">
+  </div>
+
+  <div class="max-w-6xl mx-auto bg-white p-4 rounded-lg shadow">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm text-left">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="p-2 text-center">🏅</th>
+            <th class="p-2 text-center">BIB</th>
+            <th class="p-2">ชื่อ</th>
+            <th class="p-2 text-center">ประเภท</th>
+            <th class="p-2 text-center">รอบ</th>
+            <th class="p-2 text-center">ระยะทาง (กม.)</th>
+            <th class="p-2 text-center">เวลารวม</th>
+            <th id="colShirt" class="p-2 text-center">🎽 เสื้อ</th>
+          </tr>
+        </thead>
+        <tbody id="runnerTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Popup -->
+  <div id="popup" class="popup-bg" role="dialog" aria-modal="true">
+    <div class="popup">
+      <h2 id="popupTitle" class="text-lg font-semibold mb-1"></h2>
+      <div id="popupBib" class="text-sm text-gray-600 mb-2"></div>
+      <div id="popupSummary" class="text-sm mb-3 text-gray-700"></div>
+
+      <table class="w-full text-xs sm:text-sm mb-3 border">
+        <thead>
+          <tr class="bg-gray-100 text-gray-700">
+            <th class="p-2 text-center">🏁 รอบ</th>
+            <th class="p-2 text-center">⏱ เวลาเริ่ม</th>
+            <th class="p-2 text-center">🏁 เวลาจบ</th>
+            <th class="p-2 text-center">⏳ เวลาต่อรอบ</th>
+          </tr>
+        </thead>
+        <tbody id="popupContent"></tbody>
+      </table>
+
+      <p id="avgTime" class="text-center text-sm text-gray-600 mb-4"></p>
+      <button id="closePopup" class="bg-gray-700 text-white px-3 py-2 rounded w-full">ปิด</button>
+    </div>
+  </div>
 
 <script>
-/* ---------------- Supabase Init ---------------- */
-const supabase = window.supabase.createClient(
-  "https://xjdjurdflowiwdxgkvfr.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-);
+/* ================= CONFIG ================= */
+// ใส่ URL + ANON KEY ของคุณที่นี่ (อนาคตให้เก็บจาก env หรือ server-side ไว้)
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // <<--- แทนที่ด้วย Anon Key ของคุณ
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* ---------------- Category Laps ---------------- */
+/* ================= CATEGORY (เก็บไว้ใช้ในอนาคต) ================= */
 const CATEGORY_LAPS = {
   "BCR 50.4": { full: 8, half: 4 },
   "BCR 69.3": { full: 11, half: 6 },
   "BCR 100.8": { full: 16, half: 8 }
 };
 
-/* ---------------- Shirt Status Functions ---------------- */
+/* ================= SHIRT LOGIC (ตามกติกาที่คุณยืนยัน) ================= */
 function getShirtStatus(type, laps) {
-  const c = CATEGORY_LAPS[type];
-  if (!c) return "-";
-  if (laps >= c.full) return "เสื้อ Finisher";
-  if (laps >= c.half) return "เสื้อ DNF";
-  return "ไม่ได้รับเสื้อ";
+  if (type === "BCR 50.4") {
+    if (laps >= 8) return "เสื้อ Finisher";
+    if (laps >= 4 && laps < 8) return "เสื้อ DNF";
+    return "ไม่ได้รับเสื้อ";
+  }
+  if (type === "BCR 69.3") {
+    if (laps >= 11) return "เสื้อ Finisher";
+    if (laps >= 6 && laps < 11) return "เสื้อ DNF";
+    return "ไม่ได้รับเสื้อ";
+  }
+  if (type === "BCR 100.8") {
+    if (laps >= 16) return "เสื้อ Finisher";
+    if (laps >= 8 && laps < 16) return "เสื้อ DNF";
+    return "ไม่ได้รับเสื้อ";
+  }
+  return "-";
 }
 function getShirtStatusEN(type, laps) {
-  const c = CATEGORY_LAPS[type];
-  if (!c) return "-";
-  if (laps >= c.full) return "Finisher Shirt";
-  if (laps >= c.half) return "DNF Shirt";
-  return "No Shirt";
+  if (type === "BCR 50.4") {
+    if (laps >= 8) return "Finisher Shirt";
+    if (laps >= 4 && laps < 8) return "DNF Shirt";
+    return "No Shirt";
+  }
+  if (type === "BCR 69.3") {
+    if (laps >= 11) return "Finisher Shirt";
+    if (laps >= 6 && laps < 11) return "DNF Shirt";
+    return "No Shirt";
+  }
+  if (type === "BCR 100.8") {
+    if (laps >= 16) return "Finisher Shirt";
+    if (laps >= 8 && laps < 16) return "DNF Shirt";
+    return "No Shirt";
+  }
+  return "-";
 }
 
-/* ---------------- Elements ---------------- */
+/* ================= DOM refs ================= */
 const runnerTableBody = document.getElementById("runnerTableBody");
 const popup = document.getElementById("popup");
 const popupTitle = document.getElementById("popupTitle");
@@ -132,178 +151,248 @@ const closePopup = document.getElementById("closePopup");
 const typeTabs = document.querySelectorAll(".type-tab");
 const searchInput = document.getElementById("searchInput");
 const langSelect = document.getElementById("langSelect");
+const colShirt = document.getElementById("colShirt");
+const pageTitle = document.getElementById("pageTitle");
 
 let currentType = "ALL";
 let currentSearch = "";
 let currentLang = "TH";
 
-/* ---------------- Utilities ---------------- */
-function formatThaiTime(timeString) {
-  if (!timeString) return "-";
+/* ================= Helpers ================= */
+function safeLower(v){ return (v||"").toString().toLowerCase(); }
+function formatThaiTime(timeString){
+  if(!timeString) return "-";
   timeString = timeString.replace("Z","").replace("+00:00","").trim();
-  const [date, time] = timeString.split("T");
-  if (!time) return timeString;
-  const [h,m,s] = time.split(":");
-  return `${h}:${m}:${(s||"00").split(".")[0]}`;
+  const parts = timeString.split("T");
+  if(parts.length<2) return timeString;
+  const time = parts[1].split(".")[0];
+  return time;
 }
-function formatDuration(ms) {
-  const sec = Math.floor(ms/1000);
-  const h = Math.floor(sec/3600);
-  const m = Math.floor((sec%3600)/60);
-  const s = sec%60;
-  return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+function formatDuration(ms){
+  if(ms === 0) return "00:00:00";
+  if(!ms) return "-";
+  const s = Math.floor(ms/1000);
+  const h = Math.floor(s/3600);
+  const m = Math.floor((s%3600)/60);
+  const sec = s%60;
+  return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
 }
 
-/* ---------------- Load Dashboard ---------------- */
-async function loadDashboard() {
-  const {data:runners} = await supabase
-    .from("runner")
-    .select("id,bib,name,tag_id,type,status,record(lap,start_time,finish_time)")
-    .order("name",{ascending:true});
-
-  let filtered = runners || [];
-  if (currentType !== "ALL") filtered = filtered.filter(r => r.type === currentType);
-  if (currentSearch.trim()) {
-    const q = currentSearch.toLowerCase();
-    filtered = filtered.filter(r =>
-      (r.name?.toLowerCase()||"").includes(q) ||
-      (r.tag_id||"").includes(q) ||
-      (r.bib||"").includes(q)
-    );
+/* ================= Translations ================= */
+const translations = {
+  TH:{
+    title: "📊 DASHBOARD สรุปผลการแข่งขัน",
+    all: "ทั้งหมด",
+    t50: "BCR 50.4",
+    t69: "BCR 69.3",
+    t100: "BCR 100.8",
+    search: "🔍 พิมพ์ชื่อ, Tag ID หรือ BIB เพื่อค้นหา...",
+    col_rank: "🏅",
+    col_bib: "BIB",
+    col_name: "ชื่อ",
+    col_type: "ประเภท",
+    col_lap: "รอบ",
+    col_dist: "ระยะทาง (กม.)",
+    col_total: "เวลารวม",
+    col_shirt: "🎽 เสื้อ",
+    popup_close: "ปิด",
+    popup_summary: (status,laps,dist,time,shirt) => `สถานะ: <b>${status}</b> | รอบ: <b>${laps}</b> | ระยะทาง: <b>${dist} กม.</b> | เวลารวม: <b>${time}</b> | 🎽: <b>${shirt}</b>`
+  },
+  EN:{
+    title: "📊 Race Dashboard Summary",
+    all: "All",
+    t50: "BCR 50.4",
+    t69: "BCR 69.3",
+    t100: "BCR 100.8",
+    search: "🔍 Search name, Tag ID or BIB...",
+    col_rank: "🏅",
+    col_bib: "BIB",
+    col_name: "Name",
+    col_type: "Category",
+    col_lap: "Laps",
+    col_dist: "Distance (km)",
+    col_total: "Total Time",
+    col_shirt: "🎽 Shirt",
+    popup_close: "Close",
+    popup_summary: (status,laps,dist,time,shirt) => `Status: <b>${status}</b> | Laps: <b>${laps}</b> | Distance: <b>${dist} km</b> | Total: <b>${time}</b> | 🎽: <b>${shirt}</b>`
   }
+};
 
-  const data = filtered.map(r=>{
-    let total=0, laps=0;
-    (r.record||[]).forEach(rec=>{
-      if(rec.start_time && rec.finish_time){
-        total += new Date(rec.finish_time)-new Date(rec.start_time);
-        laps++;
-      }
-    });
-    return {
-      ...r,
-      completedLaps:laps,
-      distance:(laps*6.3).toFixed(2),
-      shirtTH:getShirtStatus(r.type,laps),
-      shirtEN:getShirtStatusEN(r.type,laps),
-      totalTime:total
-    };
-  });
-
-  const fin = data.filter(r=>r.status==="FINISHER").sort((a,b)=>a.totalTime-b.totalTime);
-  const run = data.filter(r=>r.status==="RUNNING").sort((a,b)=>b.completedLaps-a.completedLaps);
-  const dnf = data.filter(r=>r.status==="DNF").sort((a,b)=>b.completedLaps-a.completedLaps);
-
-  renderRunners([...fin,...run,...dnf]);
+function applyTranslation(lang){
+  currentLang = lang;
+  const t = translations[lang] || translations.TH;
+  pageTitle.textContent = t.title;
+  // tabs
+  const tabs = document.querySelectorAll(".type-tab");
+  if(tabs && tabs.length >= 4){
+    tabs[0].textContent = t.all;
+    tabs[1].textContent = t.t50;
+    tabs[2].textContent = t.t69;
+    tabs[3].textContent = t.t100;
+  }
+  // search placeholder
+  searchInput.placeholder = t.search;
+  // shirt column
+  if(colShirt) colShirt.textContent = t.col_shirt;
+  // popup button
+  closePopup.textContent = t.popup_close;
 }
 
-/* ---------------- Render Table ---------------- */
-function renderRunners(list) {
-  runnerTableBody.innerHTML = "";
-  list.forEach((r,i)=>{
-    const row = document.createElement("tr");
-    row.className = (r.status==="FINISHER"?"rank-finisher":
-                    r.status==="DNF"?"rank-dnf":"rank-running")
-                    + " border-b hover:bg-gray-50 cursor-pointer";
+/* ================= Load & Render ================= */
+async function loadDashboard(){
+  try{
+    const { data: runners, error } = await supabase
+      .from("runner")
+      .select("id,bib,name,tag_id,type,status,record(lap,start_time,finish_time)")
+      .order("name",{ascending:true});
 
+    if(error) throw error;
+    let arr = runners || [];
+    // filters
+    if(currentType !== "ALL") arr = arr.filter(r => r.type === currentType);
+    if(currentSearch) {
+      const q = safeLower(currentSearch);
+      arr = arr.filter(r => safeLower(r.name).includes(q) || safeLower(r.tag_id).includes(q) || safeLower(r.bib).includes(q));
+    }
+
+    const mapped = arr.map(r => {
+      let total=0, laps=0;
+      (r.record||[]).forEach(rec => {
+        if(rec.start_time && rec.finish_time){
+          total += (new Date(rec.finish_time) - new Date(rec.start_time));
+          laps++;
+        }
+      });
+      const distance = (laps * 6.3).toFixed(2);
+      const shirtTH = getShirtStatus(r.type, laps);
+      const shirtEN = getShirtStatusEN(r.type, laps);
+      return { ...r, completedLaps: laps, distance, totalTime: total, shirtTH, shirtEN };
+    });
+
+    // order groups: finisher first (by totalTime), then running (by laps desc), then dnf (laps desc)
+    const fin = mapped.filter(x=>x.status==="FINISHER").sort((a,b)=>a.totalTime - b.totalTime);
+    const run = mapped.filter(x=>x.status==="RUNNING").sort((a,b)=>b.completedLaps - a.completedLaps);
+    const dnf = mapped.filter(x=>x.status==="DNF").sort((a,b)=>b.completedLaps - a.completedLaps);
+
+    renderRunners([...fin,...run,...dnf]);
+  }catch(err){
+    console.error("loadDashboard error:", err);
+    runnerTableBody.innerHTML = `<tr><td colspan="8" class="p-4 text-center muted">ไม่สามารถโหลดข้อมูลได้ — ${err.message || err}</td></tr>`;
+  }
+}
+
+function renderRunners(list){
+  runnerTableBody.innerHTML = "";
+  if(!list || list.length===0){
+    runnerTableBody.innerHTML = `<tr><td colspan="8" class="p-4 text-center muted">ไม่มีข้อมูล</td></tr>`;
+    return;
+  }
+  list.forEach((r,i)=>{
+    const cls = r.status==="FINISHER" ? "rank-finisher" : r.status==="DNF" ? "rank-dnf" : "rank-running";
+    const totalText = r.totalTime ? formatDuration(r.totalTime) : "-";
+    const shirtText = currentLang==="TH" ? r.shirtTH : r.shirtEN;
+    const row = document.createElement("tr");
+    row.className = `${cls} border-b hover:bg-gray-50 cursor-pointer`;
     row.innerHTML = `
       <td class="p-2 text-center">${i+1}</td>
-      <td class="p-2 text-center font-medium">${r.bib||"-"}</td>
-      <td class="p-2 text-blue-700 font-medium">${r.name}</td>
+      <td class="p-2 text-center font-medium">${r.bib || "-"}</td>
+      <td class="p-2 font-medium text-blue-700 hover:underline">${r.name}</td>
       <td class="p-2 text-center">${r.type}</td>
       <td class="p-2 text-center">${r.completedLaps}</td>
       <td class="p-2 text-center">${r.distance}</td>
-      <td class="p-2 text-center">${r.totalTime?formatDuration(r.totalTime):"-"}</td>
-      <td class="p-2 text-center">${currentLang==="TH"?r.shirtTH:r.shirtEN}</td>
+      <td class="p-2 text-center">${totalText}</td>
+      <td class="p-2 text-center">${shirtText}</td>
     `;
-
-    row.addEventListener("click",()=>showDetails(r));
+    row.addEventListener("click", ()=> showDetails(r));
     runnerTableBody.appendChild(row);
   });
 }
 
-/* ---------------- Popup ---------------- */
-function showDetails(r) {
-  popup.style.display="flex";
-  popupTitle.textContent=`${r.name} (${r.type})`;
-  popupBib.textContent=`BIB: ${r.bib||"-"}`;
-
+/* ================= Popup Details ================= */
+function showDetails(r){
+  popup.style.display = "flex";
+  popupTitle.textContent = `${r.name} (${r.type})`;
+  popupBib.textContent = `BIB: ${r.bib || "-"}`;
   const shirtText = currentLang==="TH" ? r.shirtTH : r.shirtEN;
+  const t = translations[currentLang] || translations.TH;
+  const totalText = r.totalTime ? formatDuration(r.totalTime) : "-";
+  popupSummary.innerHTML = t.popup_summary(r.status, r.completedLaps, r.distance, totalText, shirtText);
 
-  popupSummary.innerHTML = `
-    สถานะ: <b>${r.status}</b> |
-    รอบ: <b>${r.completedLaps}</b> |
-    ระยะทาง: <b>${r.distance} กม.</b> |
-    🎽 เสื้อ: <b>${shirtText}</b>
-  `;
-
-  const laps = (r.record||[]).sort((a,b)=>a.lap-b.lap);
-
-  popupContent.innerHTML="";
+  const laps = (r.record||[]).slice().sort((a,b)=>a.lap - b.lap);
+  popupContent.innerHTML = "";
   let total=0, count=0;
-
   laps.forEach(rec=>{
-    let lapTime="-";
+    let lapTime = "-";
     if(rec.start_time && rec.finish_time){
-      lapTime = new Date(rec.finish_time)-new Date(rec.start_time);
-      total += lapTime;
+      const diff = new Date(rec.finish_time) - new Date(rec.start_time);
+      lapTime = formatDuration(diff);
+      total += diff;
       count++;
-      lapTime = formatDuration(lapTime);
     }
-
     popupContent.innerHTML += `
       <tr class="border-t">
-        <td class="p-2 text-center">${rec.lap+1}</td>
+        <td class="p-2 text-center">${(rec.lap ?? 0) + 1}</td>
         <td class="p-2 text-center">${formatThaiTime(rec.start_time)}</td>
         <td class="p-2 text-center">${formatThaiTime(rec.finish_time)}</td>
         <td class="p-2 text-center">${lapTime}</td>
-      </tr>`;
+      </tr>
+    `;
   });
-
-  avgTime.textContent = count?`⏱ เฉลี่ย: ${formatDuration(total/count)}`:"";
+  avgTime.textContent = count ? `⏱ ${formatDuration(Math.floor(total/count))} (เฉลี่ย)` : "";
 }
 
-closePopup.onclick = ()=>popup.style.display="none";
+/* ================= UX Handlers ================= */
+closePopup.onclick = ()=> popup.style.display = "none";
 
-/* ---------------- Tabs ---------------- */
-typeTabs.forEach(tab=>{
-  tab.addEventListener("click",()=>{
-    typeTabs.forEach(t=>t.classList.remove("active-tab"));
-    tab.classList.add("active-tab");
-    currentType = tab.dataset.type;
+// Tabs
+typeTabs.forEach(t=>{
+  t.addEventListener("click", ()=>{
+    typeTabs.forEach(x=>x.classList.remove("active-tab"));
+    t.classList.add("active-tab");
+    currentType = t.dataset.type || "ALL";
     loadDashboard();
   });
 });
 
-/* ---------------- Search ---------------- */
-let TO=null;
-searchInput.addEventListener("input",()=>{
-  clearTimeout(TO);
-  TO=setTimeout(()=>{
-    currentSearch=searchInput.value.trim();
+// Search (debounced)
+let searchTO = null;
+searchInput.addEventListener("input", ()=>{
+  clearTimeout(searchTO);
+  searchTO = setTimeout(()=>{
+    currentSearch = searchInput.value.trim();
     loadDashboard();
-  },300);
+  }, 250);
 });
 
-/* ---------------- Live Update ---------------- */
-loadDashboard();
-supabase.channel("record-realtime")
-  .on("postgres_changes",{event:"*",schema:"public",table:"record"},()=>loadDashboard())
-  .subscribe();
-
-setInterval(loadDashboard,15000);
-
-/* ---------------- Translations ---------------- */
-const translations = {
-  TH:{ col_shirt:"🎽 เสื้อ" },
-  EN:{ col_shirt:"🎽 Shirt" }
-};
-
-langSelect.addEventListener("change",()=>{
-  currentLang=langSelect.value;
+// Language switch
+langSelect.addEventListener("change", ()=>{
+  applyTranslation(langSelect.value || "TH");
   loadDashboard();
 });
-</script>
 
+/* ================= Realtime subscription (correct channel) ================= */
+function setupRealtime(){
+  try {
+    // remove existing subscription if any (safe)
+    // create/subscribe to channel 'record-changes'
+    supabase.channel('record-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'record' }, (payload) => {
+        // simple reload on any change
+        loadDashboard();
+      })
+      .subscribe()
+      .catch(e => console.warn("subscribe err:", e));
+  } catch (e) {
+    console.warn("realtime setup failed:", e);
+  }
+}
+
+/* ================= Init ================= */
+applyTranslation("TH");
+loadDashboard();
+setupRealtime();
+setInterval(loadDashboard, 15000);
+
+</script>
 </body>
 </html>
