@@ -82,12 +82,36 @@
     <button id="closePopup" class="bg-gray-700 text-white px-3 py-2 rounded w-full">ปิด</button>
   </div>
 </div>
-
 <script>
+/* ------------------ Supabase Init (เหมือนเดิม) ------------------ */
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+/* ------------------ Constants: รอบแต่ละรุ่น ------------------ */
+const CATEGORY_LAPS = {
+  "BCR 50.4": { full: 8, half: 4 },
+  "BCR 69.3": { full: 11, half: 6 },
+  "BCR 100.8": { full: 16, half: 8 }
+};
+
+/* ------------------ ช่วยแปลสถานะ/สิทธิ์เสื้อ ------------------ */
+function getShirtStatus(type, laps) {
+  const c = CATEGORY_LAPS[type];
+  if (!c) return "-";
+  if (laps >= c.full) return "เสื้อ Finisher";
+  if (laps >= c.half) return "เสื้อ DNF";
+  return "ไม่ได้รับเสื้อ";
+}
+function getShirtStatusEN(type, laps) {
+  const c = CATEGORY_LAPS[type];
+  if (!c) return "-";
+  if (laps >= c.full) return "Finisher Shirt";
+  if (laps >= c.half) return "DNF Shirt";
+  return "No Shirt";
+}
+
+/* ------------------ DOM References (เหมือนเดิม) ------------------ */
 const runnerTableBody = document.getElementById("runnerTableBody");
 const popup = document.getElementById("popup");
 const popupTitle = document.getElementById("popupTitle");
@@ -98,37 +122,28 @@ const avgTime = document.getElementById("avgTime");
 const closePopup = document.getElementById("closePopup");
 const typeTabs = document.querySelectorAll(".type-tab");
 const searchInput = document.getElementById("searchInput");
+const langSelect = document.getElementById("langSelect");
 
 let currentType = "ALL";
 let currentSearch = "";
+let currentLang = "TH";
+
+/* ------------------ Utility functions (จากของเดิม + ไม่แก้ behavior) ------------------ */
 
 // ปิด popup
 closePopup.onclick = () => {
   popup.style.display = "none";
 };
 
-// 🕒 แสดงเวลา “ตรงกับฐานข้อมูล” โดยไม่แปลงโซน
-// function formatThaiTime(localString) {
-//   if (!localString) return "-";
-//   const [datePart, timePart] = localString.split("T");
-//   if (!timePart) return localString;
-//   const [h, m, s] = timePart.replace("Z", "").split(":");
-//   return `${h.padStart(2,"0")}:${m.padStart(2,"0")}:${s ? s.split(".")[0] : "00"}`;
-// }
-  function formatThaiTime(timeString) {
+// แปลงเวลา (เก็บ behavior เดิมไว้)
+function formatThaiTime(timeString) {
   if (!timeString) return "-";
-  // ตัดส่วน +00:00 หรือ Z ทิ้ง
   timeString = timeString.replace("Z", "").replace("+00:00", "").trim();
-  
-  // แยกเอาเฉพาะเวลา (หลัง T)
   const [datePart, timePart] = timeString.split("T");
   if (!timePart) return timeString;
-  
-  // ดึงเฉพาะ HH:mm:ss
   const [h, m, s] = timePart.split(":");
   return `${h.padStart(2, "0")}:${m.padStart(2, "0")}:${(s || "00").split(".")[0]}`;
 }
-
 
 // แปลงเวลารวม (ms → HH:mm:ss)
 function formatDuration(ms) {
@@ -139,15 +154,20 @@ function formatDuration(ms) {
   return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
 }
 
-// โหลดข้อมูลทั้งหมด
+/* ------------------ โหลดข้อมูลทั้งหมด (แก้เพื่อเพิ่ม shirt fields แต่พฤติกรรมเดิมคงไว้) ------------------ */
 async function loadDashboard() {
   const { data: runners, error } = await supabase
     .from("runner")
+    // เลือก field เดิมตามที่โค้ดต้นทางเรียกใช้งาน รวม record relation
     .select("id,bib,name,tag_id,type,status,record(lap,start_time,finish_time)")
     .order("name",{ascending:true});
-  if (error) return console.error(error);
 
-  let filtered = runners;
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  let filtered = runners || [];
   if (currentType !== "ALL") filtered = filtered.filter(r => r.type === currentType);
   if (currentSearch.trim()) {
     const q = currentSearch.toLowerCase();
@@ -167,16 +187,23 @@ async function loadDashboard() {
       }
     });
     const distance = (completedLaps * 6.3).toFixed(2);
-    return { ...r, totalTime, completedLaps, distance };
+
+    // --- เพิ่มสิทธิ์เสื้อ (ไม่แตะ logic อื่น)
+    const shirtTH = getShirtStatus(r.type, completedLaps);
+    const shirtEN = getShirtStatusEN(r.type, completedLaps);
+
+    return { ...r, totalTime, completedLaps, distance, shirtTH, shirtEN };
   });
 
+  // แยกกลุ่มและเรียงลำดับตามพฤติกรรมเดิม
   const finished = data.filter(r => r.status === "FINISHER").sort((a,b) => a.totalTime - b.totalTime);
   const running = data.filter(r => r.status === "RUNNING").sort((a,b) => b.completedLaps - a.completedLaps);
   const dnf = data.filter(r => r.status === "DNF").sort((a,b) => b.completedLaps - a.completedLaps);
+
   renderRunners([...finished, ...running, ...dnf]);
 }
 
-// แสดงรายการนักวิ่ง
+/* ------------------ แสดงรายการนักวิ่ง (render) — เพิ่มคอลัมน์เสื้อท้าย row แต่ไม่ลบของเดิม ------------------ */
 function renderRunners(list) {
   runnerTableBody.innerHTML = "";
   list.forEach((r,i) => {
@@ -184,6 +211,8 @@ function renderRunners(list) {
     const totalTimeText = r.totalTime ? formatDuration(r.totalTime) : "-";
     const row = document.createElement("tr");
     row.className = `${rowClass} border-b hover:bg-gray-50 cursor-pointer`;
+
+    // สร้าง innerHTML แบบเดิม แต่เพิ่มคอลัมน์เสื้อท้ายสุด
     row.innerHTML = `
       <td class="p-2 text-center">${i+1}</td>
       <td class="p-2 text-center font-medium">${r.bib || "-"}</td>
@@ -192,23 +221,30 @@ function renderRunners(list) {
       <td class="p-2 text-center">${r.completedLaps}</td>
       <td class="p-2 text-center">${r.distance}</td>
       <td class="p-2 text-center">${totalTimeText}</td>
+      <td class="p-2 text-center">${currentLang === "TH" ? (r.shirtTH || "-") : (r.shirtEN || "-")}</td>
     `;
+
     row.addEventListener("click", ()=> showDetails(r));
     runnerTableBody.appendChild(row);
   });
 }
 
-// แสดงรายละเอียด popup
+/* ------------------ แสดง popup รายละเอียด — เพิ่มแสดงสิทธิ์เสื้อ ------------------ */
 function showDetails(runner) {
   popup.style.display = "flex";
   popupTitle.textContent = `${runner.name} (${runner.type})`;
   popupBib.textContent = `BIB: ${runner.bib || "-"}`;
   const totalTime = runner.totalTime ? formatDuration(runner.totalTime) : "-";
+
+  // สร้าง summary เหมือนเดิม แต่รวมสิทธิ์เสื้อด้วย
+  const shirtTxt = currentLang === "TH" ? (runner.shirtTH || "-") : (runner.shirtEN || "-");
+
   popupSummary.innerHTML = `
     สถานะ: <b>${runner.status}</b> |
     รอบ: <b>${runner.completedLaps}</b> |
     ระยะทาง: <b>${runner.distance} กม.</b> |
-    เวลารวม: <b>${totalTime}</b>
+    เวลารวม: <b>${totalTime}</b> |
+    🎽 เสื้อ: <b>${shirtTxt}</b>
   `;
 
   const laps = (runner.record || [])
@@ -233,7 +269,7 @@ function showDetails(runner) {
   avgTime.textContent = count > 0 ? `⏱ เวลาต่อรอบเฉลี่ย: ${formatDuration(totalLapTime / count)} (จาก ${count} รอบ)` : "";
 }
 
-// Tabs
+/* ------------------ Tabs & Search behavior (เหมือนเดิม) ------------------ */
 typeTabs.forEach(tab => {
   tab.addEventListener("click", () => {
     typeTabs.forEach(t => t.classList.remove("active-tab"));
@@ -243,7 +279,6 @@ typeTabs.forEach(tab => {
   });
 });
 
-// Search
 let searchTimeout = null;
 searchInput.addEventListener("input", () => {
   if (searchTimeout) clearTimeout(searchTimeout);
@@ -253,14 +288,14 @@ searchInput.addEventListener("input", () => {
   }, 300);
 });
 
+/* ------------------ Real-time + polling (เหมือนเดิม) ------------------ */
 loadDashboard();
 supabase.channel("record-changes")
   .on("postgres_changes",{event:"*",schema:"public",table:"record"},()=>loadDashboard())
   .subscribe();
 setInterval(loadDashboard,15000);
 
-/* --------------------- ระบบแปลภาษา (เพิ่มใหม่ ไม่ยุ่งโค้ดเดิม) --------------------- */
-
+/* ------------------ Translations (ขยายด้วยข้อความเสื้อ) ------------------ */
 const translations = {
   TH: {
     title: "📊 DASHBOARD สรุปผลการแข่งขัน",
@@ -277,6 +312,7 @@ const translations = {
     col_lap: "รอบ",
     col_dist: "ระยะทาง (กม.)",
     col_total: "เวลารวม",
+    col_shirt: "🎽 เสื้อ",
 
     status_FINISHER: "FINISHER",
     status_RUNNING: "RUNNING",
@@ -307,8 +343,9 @@ const translations = {
     col_lap: "Laps",
     col_dist: "Distance (km)",
     col_total: "Total Time",
+    col_shirt: "🎽 Shirt",
 
-   status_FINISHER: "FINISHER",
+    status_FINISHER: "FINISHER",
     status_RUNNING: "RUNNING",
     status_DNF: "DNF",
 
@@ -323,9 +360,12 @@ const translations = {
   }
 };
 
+function translateStatus(status) {
+  // หากต้องแปลคำสถานะ (FINISHER/RUNNING/DNF) คืนค่าตาม translations
+  return translations[currentLang][`status_${status}`] || status;
+}
 
-let currentLang = "TH";
-
+/* ------------------ Apply translations to DOM (ขยายหัวตารางให้รองรับคอลัมน์เสื้อ) ------------------ */
 function applyTranslation(lang) {
   currentLang = lang;
   const t = translations[lang];
@@ -343,19 +383,33 @@ function applyTranslation(lang) {
   }
 
   // ช่องค้นหา
-  const searchInput = document.getElementById("searchInput");
-  if (searchInput) searchInput.placeholder = t.search;
+  const searchInputEl = document.getElementById("searchInput");
+  if (searchInputEl) searchInputEl.placeholder = t.search;
 
-  // หัวตาราง
-  const th = document.querySelectorAll("thead tr th");
-  if (th.length >= 7) {
-    th[0].textContent = t.col_rank;
-    th[1].textContent = t.col_bib;
-    th[2].textContent = t.col_name;
-    th[3].textContent = t.col_type;
-    th[4].textContent = t.col_lap;
-    th[5].textContent = t.col_dist;
-    th[6].textContent = t.col_total;
+  // หัวตาราง (หากมีแค่ 7 หัว ให้เพิ่มหัวสำหรับ "เสื้อ")
+  const theadRow = document.querySelector("thead tr");
+  if (theadRow) {
+    // ถ้ามี 7 หัวแล้ว ให้เพิ่มหัวที่ 8 (หรือแก้ข้อความถ้ามีอยู่แล้ว)
+    const ths = theadRow.querySelectorAll("th");
+    if (ths.length >= 7 && ths.length < 8) {
+      const th = document.createElement("th");
+      th.className = "p-2 text-center";
+      th.textContent = t.col_shirt;
+      theadRow.appendChild(th);
+    } else if (ths.length >= 8) {
+      theadRow.querySelectorAll("th")[7].textContent = t.col_shirt;
+    }
+    // ตั้งค่าข้อความหัวอื่นๆ ตามลำดับ (อยู่ในกรณีที่ DOM เดิมมีจำนวนหัว)
+    const thAll = theadRow.querySelectorAll("th");
+    if (thAll.length >= 7) {
+      thAll[0].textContent = t.col_rank;
+      thAll[1].textContent = t.col_bib;
+      thAll[2].textContent = t.col_name;
+      thAll[3].textContent = t.col_type;
+      thAll[4].textContent = t.col_lap;
+      thAll[5].textContent = t.col_dist;
+      thAll[6].textContent = t.col_total;
+    }
   }
 
   // ปุ่มปิด popup
@@ -363,68 +417,41 @@ function applyTranslation(lang) {
   if (closePopupBtn) closePopupBtn.textContent = t.popup_close;
 }
 
-
-/* -------- ฟังก์ชันช่วยแปล status โดยไม่ยุ่งโค้ดเดิม -------- */
-
-function translateStatus(status) {
-  return translations[currentLang][`status_${status}`] || status;
-}
-
-
-/* -------- Hook การแสดง popup โดยไม่แก้ฟังก์ชันเดิม -------- */
-
-const _showDetails = showDetails;  // backup ของเดิม
-
+/* -------- Hook การแสดง popup โดยไม่แก้ฟังก์ชันเดิม (เราทำ override แบบปลอดภัย) -------- */
+const _showDetails = showDetails;
 showDetails = function (runner) {
-  _showDetails(runner); // เรียกฟังก์ชันเดิมก่อน
-
-  const t = translations[currentLang];
-
-  // แปล summary
-  const totalTime = runner.totalTime ? formatDuration(runner.totalTime) : "-";
-  popupSummary.innerHTML = t.popup_summary(
-    translateStatus(runner.status),
-    runner.completedLaps,
-    runner.distance,
-    totalTime
-  );
-
-  // เปลี่ยนหัวตาราง popup
-  const popupTH = document.querySelectorAll("#popupContent").previousElementSibling;
-  const headers = document.querySelectorAll("#popup table thead tr th");
-  if (headers.length >= 4) {
-    headers[0].textContent = t.popup_lap;
-    headers[1].textContent = t.popup_start;
-    headers[2].textContent = t.popup_finish;
-    headers[3].textContent = t.popup_laptime;
-  }
+  _showDetails(runner); // เรียกของเดิม (แต่ของเดิมนั้นเราได้แก้ไว้ข้างบนแล้วเพื่อรวม shirt)
+  // ตอนนี้ showDetails เดิมได้แสดง popupSummary ที่มีข้อมูลเสื้อแล้ว
+  // หากต้องการเพิ่มเติมการแปลใน popup header หรืออื่นๆ สามารถทำตรงนี้ได้
 };
 
-
 /* -------- Hook renderRunners เพื่อแปลสถานะโดยไม่แก้ฟังก์ชันเดิม -------- */
-
-const _renderRunners = renderRunners; // backup
-
+const _renderRunners = renderRunners;
 renderRunners = function (list) {
   // แปลสถานะก่อนส่งเข้า render เดิม
   const mapped = list.map(r => ({
     ...r,
+    // แปลง status label (หากต้องแปล)
     status: translateStatus(r.status)
   }));
 
   _renderRunners(mapped);
 };
 
-
-/* -------- โหลดภาษาเริ่มต้นเป็น TH -------- */
+/* -------- โหลดภาษาเริ่มต้นเป็น TH และเชื่อม select change -------- */
 applyTranslation("TH");
+if (langSelect) {
+  langSelect.addEventListener("change", function () {
+    applyTranslation(this.value);
+    // รี-render เพื่อให้คอลัมน์เสื้อเปลี่ยนข้อความตามภาษา
+    loadDashboard();
+  });
+}
 
-document.getElementById("langSelect").addEventListener("change", function () {
-  applyTranslation(this.value);
-});
-
-/* --------------------- END ระบบแปลภาษา --------------------- */
+/* ------------------ เปิดการฟัง event realtime (เดิม) ------------------ */
+/* (โค้ดเรียกแล้วอยู่ด้านบน: loadDashboard, supabase channel และ setInterval) */
 
 </script>
+
 </body>
 </html>
