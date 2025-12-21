@@ -301,7 +301,7 @@
       resultDiv.innerHTML = langPack.analyzing;
       const img = await faceapi.bufferToImage(file);
       const det = await faceapi
-  .detectSingleFace(
+  .detectAllFaces()(
     img,
     new faceapi.TinyFaceDetectorOptions({
       inputSize: 416,       // ยิ่งสูง ยิ่งทนหน้าเล็ก
