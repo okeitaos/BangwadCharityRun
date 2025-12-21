@@ -112,8 +112,8 @@
         <label for="threshold" id="thresholdLabel" class="block text-sm text-gray-300 mb-1">
           ระดับความเหมือน (95%)
         </label>
-        <input id="threshold" type="range" min="80" max="99" value="95" class="w-full accent-green-500">
-        <p id="thresholdValue" class="text-xs text-gray-400 mt-1 text-center">≥ 95%</p>
+        <input id="threshold" type="range" min="55" max="85" value="65" class="w-full accent-green-500">
+        <p id="thresholdValue" class="text-xs text-gray-400 mt-1 text-center">≥ 65%</p>
       </div>
 
       <p id="status" class="text-gray-400 text-sm mb-3">⏳ กำลังโหลดโมเดล...</p>
@@ -146,7 +146,7 @@
     const BUCKET = "gallery";
     const WATERMARK_URL =
       "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
-    let SIM_THRESHOLD = 0.95;
+    let SIM_THRESHOLD = 0.65;
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const fileInput = document.getElementById("fileInput");
@@ -216,17 +216,13 @@
 
     statusDiv.textContent = LANG[currentLang].loading;
     const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
-    await Promise.all([
-      faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
-      faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
-      faceapi.nets.faceRecognitionNet.loadFromUri(modelURL),
-    ]);
-    statusDiv.textContent = LANG[currentLang].ready;
+   await Promise.all([
+  faceapi.nets.tinyFaceDetector.loadFromUri(modelURL),
+  faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
+  faceapi.nets.faceRecognitionNet.loadFromUri(modelURL),
+]);
 
-    const normalize = (desc) => {
-      const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
-      return desc.map((x) => x / norm);
-    };
+    statusDiv.textContent = LANG[currentLang].ready;
 
     thresholdInput.oninput = (e) => {
       const v = e.target.value;
@@ -304,10 +300,24 @@
 
       resultDiv.innerHTML = langPack.analyzing;
       const img = await faceapi.bufferToImage(file);
-      const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-      if (!det) return (resultDiv.innerHTML = langPack.notFound);
+      const det = await faceapi
+  .detectSingleFace(
+    img,
+    new faceapi.TinyFaceDetectorOptions({
+      inputSize: 416,       // ยิ่งสูง ยิ่งทนหน้าเล็ก
+      scoreThreshold: 0.5,  // ไม่เข้มเกิน
+    })
+  )
+  .withFaceLandmarks()
+  .withFaceDescriptor();
 
-      const embedding = normalize(Array.from(det.descriptor));
+if (!det) {
+  resultDiv.innerHTML = langPack.notFound;
+  return;
+}
+
+// ❗ ใช้ descriptor ตรง ๆ
+const embedding = Array.from(det.descriptor);
       statusDiv.textContent = langPack.searching(Math.round(SIM_THRESHOLD * 100));
 
       try {
