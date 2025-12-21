@@ -77,7 +77,7 @@
 
 <div id="userTableSection">
   <h2>รายชื่อผู้ใช้ทั้งหมด</h2>
-  <table id="userTable">
+  <table>
     <thead>
       <tr>
         <th>โปรไฟล์</th>
@@ -95,128 +95,67 @@
 <div id="gallery">
   <h2 id="userHeader">📸 รูปของผู้ใช้</h2>
   <div id="imageGrid"></div>
+  <br>
   <button class="btn-delete" onclick="deleteAllFromUser()">🗑️ ลบรูปทั้งหมดของคนนี้</button>
+  <br><br>
   <button class="btn-back" onclick="backToUserList()">⬅️ กลับไปหน้าเดิม</button>
 </div>
 
 <script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // ใช้ Service Role เท่านั้น!
+const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const BUCKET = "gallery";
+
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 let currentUserId = "";
 let currentUserName = "";
 let allUsers = [];
 
-/* ✅ โหลดรายชื่อผู้ใช้ทั้งหมด */
-// async function loadUsers() {
-//   const { data, error } = await sb.from("file_hashes")
-//     .select("user_id, profile_name, profile_pic, file_path")
-//     .order("user_id");
-
-//   if (error) {
-//     alert("❌ โหลดข้อมูลไม่สำเร็จ");
-//     console.error(error);
-//     return;
-//   }
-
-//   // รวมตาม user
-//   const users = {};
-//   data.forEach(row => {
-//     if (!users[row.user_id]) {
-//       users[row.user_id] = {
-//         profile_name: row.profile_name || "ไม่ทราบชื่อ",
-//         profile_pic: row.profile_pic || "",
-//         files: []
-//       };
-//     }
-//     users[row.user_id].files.push(row.file_path);
-//   });
-
-//   allUsers = Object.entries(users);
-//   renderUserTable();
-// }
-
-/* ✅ แสดงตารางผู้ใช้ */
-// function renderUserTable() {
-//   const tbody = document.getElementById("userList");
-//   tbody.innerHTML = "";
-//   allUsers.forEach(([uid, info]) => {
-//     const tr = document.createElement("tr");
-//     tr.innerHTML = `
-//       <td><img src="${info.profile_pic}" width="50" height="50" style="border-radius:50%;"></td>
-//       <td>${info.profile_name}</td>
-//       <td>${info.files.length}</td>
-//       <td>
-//         <button class="btn-view" onclick="viewUser('${uid}','${info.profile_name}')">ดูรูป</button>
-//       </td>
-//     `;
-//     tbody.appendChild(tr);
-//   });
-// }
-
-
+/* ===========================
+   ✅ โหลดช่างภาพครบทุกคน
+   =========================== */
 async function loadUsers() {
-  // ดึง user_id ที่มีจริงจาก DB
-  const { data: dbUsers } = await sb
+  const { data, error } = await sb
     .from("file_hashes")
-    .select("user_id");
-
-  const usersFromDB = [...new Set(dbUsers.map(u => u.user_id))];
-
-  // list root folders
-  const { data: folders, error } = await sb.storage.from(BUCKET).list("", {
-    limit: 10000
-  });
+    .select("user_id, profile_name, profile_pic");
 
   if (error) {
-    alert("โหลดโฟลเดอร์ไม่สำเร็จ");
+    alert("❌ โหลดรายชื่อผู้ใช้ไม่สำเร็จ");
     console.error(error);
     return;
   }
 
-  // กรองเฉพาะ user ที่มีอยู่จริงใน DB เท่านั้น
-  const realFolders = folders.filter(f => usersFromDB.includes(f.name));
+  // รวม user ซ้ำ
+  const userMap = {};
+  data.forEach(u => {
+    if (!userMap[u.user_id]) {
+      userMap[u.user_id] = {
+        profile_name: u.profile_name || u.user_id,
+        profile_pic: u.profile_pic || "",
+        files_count: 0
+      };
+    }
+  });
 
-  // ทำข้อมูลผู้ใช้
-  const userArray = await Promise.all(
-    realFolders.map(async folder => {
-      const uid = folder.name;
+  // นับรูปจาก Storage
+  await Promise.all(
+    Object.keys(userMap).map(async uid => {
+      const { data: files } = await sb.storage
+        .from(BUCKET)
+        .list(`${uid}/`, { limit: 10000 });
 
-      // นับรูปใน storage
-      const { data: files } = await sb.storage.from(BUCKET).list(`${uid}/`, {
-        limit: 10000
-      });
-
-      const count = files?.length || 0;
-
-      // ดึงชื่อโปรไฟล์
-      const { data: info } = await sb
-        .from("file_hashes")
-        .select("profile_name, profile_pic")
-        .eq("user_id", uid)
-        .limit(1)
-        .maybeSingle();
-
-      return [
-        uid,
-        {
-          profile_name: info?.profile_name || uid,
-          profile_pic: info?.profile_pic || "",
-          files_count: count
-        }
-      ];
+      userMap[uid].files_count = files?.length || 0;
     })
   );
 
-  allUsers = userArray;
-
+  allUsers = Object.entries(userMap);
   renderUserTable();
 }
 
-
-/* ✅ แสดงตารางผู้ใช้ */
+/* ===========================
+   📋 แสดงตารางผู้ใช้
+   =========================== */
 function renderUserTable() {
   const tbody = document.getElementById("userList");
   tbody.innerHTML = "";
@@ -224,40 +163,50 @@ function renderUserTable() {
   allUsers.forEach(([uid, info]) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><img src="${info.profile_pic}" width="50" height="50" style="border-radius:50%"></td>
+      <td>
+        <img src="${info.profile_pic}" width="50" height="50"
+             style="border-radius:50%" onerror="this.src='https://via.placeholder.com/50'">
+      </td>
       <td>${info.profile_name}</td>
       <td>${info.files_count}</td>
       <td>
-        <button class="btn-view" onclick="viewUser('${uid}','${info.profile_name}')">ดูรูป</button>
+        <button class="btn-view" onclick="viewUser('${uid}','${info.profile_name}')">
+          ดูรูป
+        </button>
       </td>
     `;
     tbody.appendChild(tr);
   });
 }
 
-  
-/* ✅ ดูรูปของ user */
+/* ===========================
+   🖼️ ดูรูปของ user
+   =========================== */
 async function viewUser(uid, name) {
   currentUserId = uid;
   currentUserName = name;
+
   document.getElementById("userTableSection").style.display = "none";
   document.getElementById("gallery").style.display = "block";
   document.getElementById("userHeader").innerText = `📸 รูปของ: ${name}`;
 
-  const { data, error } = await sb.storage.from(BUCKET).list(`${uid}/`, { limit: 10000 });
+  const { data, error } = await sb.storage
+    .from(BUCKET)
+    .list(`${uid}/`, { limit: 10000 });
+
   if (error) return alert("โหลดรูปไม่สำเร็จ");
-  
+
   const grid = document.getElementById("imageGrid");
   grid.innerHTML = "";
+
   if (!data.length) {
     grid.innerHTML = "<p>❌ ไม่มีรูป</p>";
     return;
   }
 
   data.forEach(f => {
-    const url = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${uid}/${f.name}`;
     const img = document.createElement("img");
-    img.src = url;
+    img.src = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${uid}/${f.name}`;
     img.className = "thumb";
     img.title = f.name;
     img.onclick = () => deleteSingle(uid, f.name);
@@ -265,20 +214,26 @@ async function viewUser(uid, name) {
   });
 }
 
-/* 🗑️ ลบรูปเดี่ยว */
+/* ===========================
+   🗑️ ลบรูปเดี่ยว
+   =========================== */
 async function deleteSingle(uid, name) {
-  if (!confirm(`⚠️ ต้องการลบไฟล์นี้หรือไม่?\n${name}`)) return;
+  if (!confirm(`ลบไฟล์ ${name} ?`)) return;
+
   const path = `${uid}/${name}`;
   await sb.storage.from(BUCKET).remove([path]);
   await sb.from("file_hashes").delete().eq("file_path", path);
-  alert(`✅ ลบรูป ${name} เรียบร้อย`);
-  await viewUser(uid, currentUserName);
+
+  alert("✅ ลบเรียบร้อย");
+  viewUser(uid, currentUserName);
 }
 
-/* 🗑️ ลบทั้งหมดของ user */
+/* ===========================
+   🗑️ ลบทั้งหมดของ user
+   =========================== */
 async function deleteAllFromUser() {
-  const confirmText = prompt(`⚠️ ต้องการลบรูปทั้งหมดของ "${currentUserName}"?\nพิมพ์ CONFIRM เพื่อยืนยัน:`);
-  if (confirmText !== "CONFIRM") return alert("❌ ยกเลิกการลบทั้งหมด");
+  const confirmText = prompt(`พิมพ์ CONFIRM เพื่อลบรูปทั้งหมดของ ${currentUserName}`);
+  if (confirmText !== "CONFIRM") return;
 
   const { data } = await sb.storage.from(BUCKET).list(`${currentUserId}/`, { limit: 10000 });
   const files = data.map(f => `${currentUserId}/${f.name}`);
@@ -288,11 +243,13 @@ async function deleteAllFromUser() {
     await sb.from("file_hashes").delete().eq("user_id", currentUserId);
   }
 
-  alert(`✅ ลบรูปทั้งหมดของ ${currentUserName} เรียบร้อย`);
+  alert("✅ ลบทั้งหมดเรียบร้อย");
   backToUserList();
 }
 
-/* 🔙 กลับหน้าหลัก */
+/* ===========================
+   🔙 กลับหน้าหลัก
+   =========================== */
 function backToUserList() {
   document.getElementById("gallery").style.display = "none";
   document.getElementById("userTableSection").style.display = "block";
