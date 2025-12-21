@@ -110,7 +110,7 @@
 
       <div class="mb-4 text-left">
         <label for="threshold" id="thresholdLabel" class="block text-sm text-gray-300 mb-1">
-          ระดับความเหมือน (95%)
+          ระดับความเหมือน (ุุ65%)
         </label>
         <input id="threshold" type="range" min="55" max="85" value="65" class="w-full accent-green-500">
         <p id="thresholdValue" class="text-xs text-gray-400 mt-1 text-center">≥ 65%</p>
@@ -327,7 +327,7 @@ const embedding = Array.from(det.descriptor);
             "Content-Type": "application/json",
             "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ embedding, threshold: SIM_THRESHOLD, limit: 999 }),
+          body: JSON.stringify({ embedding, threshold: SIM_THRESHOLD, limit: 100 }),
         });
         const { matches, error } = await res.json();
         if (error) throw new Error(error);
