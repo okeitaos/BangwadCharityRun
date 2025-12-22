@@ -311,7 +311,7 @@
 
       // const embedding = normalize(Array.from(det.descriptor));
       
-  const detections = await faceapi
+ const detections = await faceapi
   .detectAllFaces(img)
   .withFaceLandmarks()
   .withFaceDescriptors();
@@ -320,7 +320,17 @@ if (!detections.length) {
   resultDiv.innerHTML = langPack.notFound;
   return;
 }
- const embedding = normalize(Array.from(bestFace.descriptor));
+
+// ✅ เลือกหน้าที่ใหญ่ที่สุด (ลด false positive)
+const bestFace = detections.reduce((a, b) => {
+  const areaA = a.detection.box.width * a.detection.box.height;
+  const areaB = b.detection.box.width * b.detection.box.height;
+  return areaB > areaA ? b : a;
+});
+
+// ✅ สร้าง embedding จากหน้าที่ดีที่สุด
+const embedding = normalize(Array.from(bestFace.descriptor));
+
 
 
 // ✅ เลือกหน้าที่ใหญ่ที่สุด
