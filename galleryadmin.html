@@ -327,17 +327,37 @@ async function handleSync(path, map, cache, attempt = 0, singleRetry = false) {
     if (validFaces.length === 0) throw new Error("ใบหน้าเล็กเกินไปทั้งหมด");
 
     // ✅ บันทึกทุกใบหน้าที่ตรวจเจอ
-    for (let i = 0; i < validFaces.length; i++) {
-      const det = validFaces[i];
-      const emb = Array.from(det.descriptor);
-      const name = `${path.split("/").pop().split(".").shift()}#${i+1}`;
-      const { error } = await supabase.rpc("insert_face_vector", {
-        p_name: name,
-        p_image_url: path,
-        p_embedding: emb
-      });
-      if (error) console.warn("⚠️ insert_face_vector error:", error.message);
-    }
+    // for (let i = 0; i < validFaces.length; i++) {
+    //   const det = validFaces[i];
+    //   const emb = Array.from(det.descriptor);
+    //   const name = `${path.split("/").pop().split(".").shift()}#${i+1}`;
+    //   const { error } = await supabase.rpc("insert_face_vector", {
+    //     p_name: name,
+    //     p_image_url: path,
+    //     p_embedding: emb
+    //   });
+    //   if (error) console.warn("⚠️ insert_face_vector error:", error.message);
+    // }
+    // ===============================
+// ✅ เลือกใบหน้าหลัก (ใหญ่ที่สุด)
+// ===============================
+const area = d => d.detection.box.width * d.detection.box.height;
+
+const mainFace = validFaces.reduce((a, b) =>
+  area(b) > area(a) ? b : a
+);
+
+const det = mainFace;
+
+const emb = Array.from(det.descriptor);
+const name = path.split("/").pop().split(".").shift();
+
+await supabase.rpc("insert_face_vector", {
+  p_name: name,
+  p_image_url: path,
+  p_embedding: emb
+});
+
 
     stats.success++;
     cache[path] = updated;
