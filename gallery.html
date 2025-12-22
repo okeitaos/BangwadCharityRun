@@ -1,207 +1,136 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Face Search | ค้นหาภาพด้วยใบหน้า</title>
+<meta charset="UTF-8" />
+<title>Face Search Gallery</title>
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
+<script defer src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
-  <style>
-    #previewPopup {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.9);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 50;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity .3s;
-    }
-    #previewPopup.show {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    canvas {
-      max-width: 90vw;
-      max-height: 80vh;
-      border-radius: 1rem;
-    }
-  </style>
+<style>
+  body { font-family: sans-serif; }
+  #results img { width: 160px; margin: 6px; border-radius: 6px; }
+</style>
 </head>
 
-<body class="bg-slate-900 text-white min-h-screen p-6 flex justify-center">
+<body>
 
-<div class="w-full max-w-md">
-  <h1 class="text-2xl font-bold mb-4">📸 ค้นหาภาพด้วยใบหน้า</h1>
+<h2>🔍 ค้นหาภาพด้วยใบหน้า</h2>
 
-  <div class="bg-slate-800 p-6 rounded-xl text-center">
-    <input id="fileInput" type="file" accept="image/*" class="mb-4 w-full">
+<input type="file" id="imageInput" accept="image/*">
+<button id="searchBtn">ค้นหา</button>
 
-    <button id="searchBtn"
-      class="w-full bg-green-600 hover:bg-green-700 py-2 rounded-lg mb-3">
-      🔍 ค้นหา
-    </button>
+<div id="status"></div>
+<div id="results"></div>
 
-    <label class="block text-sm mb-1">
-      ความเหมือน: <span id="thresholdValue">75%</span>
-    </label>
-    <input id="threshold" type="range" min="70" max="90" value="75"
-      class="w-full accent-green-500 mb-3">
+<script>
+/* ===============================
+   CONFIG
+================================ */
+const FACE_SEARCH_API =
+  "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/face-search";
 
-    <p id="status" class="text-gray-400 text-sm">⏳ โหลดโมเดล...</p>
-    <div id="result" class="mt-4"></div>
-  </div>
-</div>
+const EVENT_ID = "BCR2025";
 
-<!-- PREVIEW -->
-<div id="previewPopup">
-  <canvas id="previewCanvas"></canvas>
-</div>
-
-<script type="module">
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-
-/* CONFIG */
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-const BUCKET = "gallery";
-const WATERMARK =
-  "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
-
-let SIM_THRESHOLD = 0.75;
-
-/* DOM */
-const fileInput = document.getElementById("fileInput");
-const searchBtn = document.getElementById("searchBtn");
-const statusDiv = document.getElementById("status");
-const resultDiv = document.getElementById("result");
-const thresholdInput = document.getElementById("threshold");
-const thresholdValue = document.getElementById("thresholdValue");
-const previewPopup = document.getElementById("previewPopup");
-const previewCanvas = document.getElementById("previewCanvas");
-
-/* HELPERS */
-const normalize = (d) => {
-  const n = Math.sqrt(d.reduce((a,b)=>a+b*b,0));
-  return d.map(x=>x/n);
-};
-
-thresholdInput.oninput = e => {
-  SIM_THRESHOLD = e.target.value / 100;
-  thresholdValue.textContent = `${e.target.value}%`;
-};
-
-/* LOAD MODEL */
-const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
-await Promise.all([
-  faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
-  faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
-  faceapi.nets.faceRecognitionNet.loadFromUri(modelURL),
-]);
-statusDiv.textContent = "✅ พร้อมใช้งาน";
-
-/* WATERMARK PREVIEW + DOWNLOAD */
-async function previewDownload(url, name) {
-  const [imgB, wmB] = await Promise.all([
-    fetch(url).then(r=>r.blob()),
-    fetch(WATERMARK).then(r=>r.blob())
+/* ===============================
+   LOAD MODELS
+================================ */
+async function loadModels() {
+  const url = "https://justadudewhohacks.github.io/face-api.js/models";
+  await Promise.all([
+    faceapi.nets.ssdMobilenetv1.loadFromUri(url),
+    faceapi.nets.faceLandmark68Net.loadFromUri(url),
+    faceapi.nets.faceRecognitionNet.loadFromUri(url),
   ]);
-  const img = await createImageBitmap(imgB);
-  const wm = await createImageBitmap(wmB);
-
-  const ctx = previewCanvas.getContext("2d");
-  previewCanvas.width = img.width;
-  previewCanvas.height = img.height;
-  ctx.drawImage(img,0,0);
-
-  const w = img.width * 0.2;
-  const h = wm.height * (w / wm.width);
-  ctx.drawImage(wm, img.width-w-20, img.height-h-20, w, h);
-
-  previewPopup.classList.add("show");
-
-  previewPopup.onclick = () => {
-    previewCanvas.toBlob(b=>{
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(b);
-      a.download = name;
-      a.click();
-    }, "image/jpeg", 0.95);
-    previewPopup.classList.remove("show");
-  };
+  console.log("✅ face-api models loaded");
 }
+loadModels();
 
-/* SEARCH */
-searchBtn.onclick = async () => {
-  const file = fileInput.files[0];
-  if (!file) return alert("เลือกรูปก่อน");
+/* ===============================
+   MAIN SEARCH
+================================ */
+document.getElementById("searchBtn").onclick = async () => {
+  const file = document.getElementById("imageInput").files[0];
+  const status = document.getElementById("status");
+  const results = document.getElementById("results");
 
-  resultDiv.innerHTML = "🧠 ตรวจจับใบหน้า...";
+  results.innerHTML = "";
+  status.innerText = "";
+
+  if (!file) {
+    alert("กรุณาเลือกรูป");
+    return;
+  }
+
+  status.innerText = "⏳ กำลังตรวจจับใบหน้า...";
+
   const img = await faceapi.bufferToImage(file);
 
-  const dets = await faceapi
+  const detections = await faceapi
     .detectAllFaces(img)
     .withFaceLandmarks()
     .withFaceDescriptors();
 
-  if (!dets.length) {
-    resultDiv.innerHTML = "❌ ไม่พบใบหน้า";
+  if (!detections || detections.length === 0) {
+    status.innerText = "❌ ไม่พบใบหน้าในภาพ";
     return;
   }
 
-  const best = dets.reduce((a,b)=>{
-    const A=a.detection.box.width*a.detection.box.height;
-    const B=b.detection.box.width*b.detection.box.height;
-    return B>A?b:a;
-  });
+  // ✅ เลือกหน้าที่ชัดที่สุด (box ใหญ่สุด)
+  const best = detections.sort((a, b) =>
+    (b.detection.box.width * b.detection.box.height) -
+    (a.detection.box.width * a.detection.box.height)
+  )[0];
 
-  const embedding = normalize(Array.from(best.descriptor));
+  const descriptor = best.descriptor;
 
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/face-search`,{
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json",
-      "Authorization":`Bearer ${SUPABASE_ANON_KEY}`
-    },
-    body:JSON.stringify({
-      embedding,
-      threshold:SIM_THRESHOLD,
-      limit:100
-    })
-  });
-
-  const { matches } = await res.json();
-  if (!matches?.length) {
-    resultDiv.innerHTML = "❌ ไม่พบภาพที่ตรงกัน";
+  if (!descriptor || descriptor.length !== 128) {
+    status.innerText = "❌ ใบหน้าไม่ชัด กรุณาใช้ภาพอื่น";
     return;
   }
 
-  matches.sort((a,b)=>b.similarity-a.similarity);
+  status.innerText = "🔎 กำลังค้นหารูปที่คล้าย...";
 
-  resultDiv.innerHTML = `
-    <div class="grid grid-cols-2 gap-3">
-      ${matches.map(m=>`
-        <div class="bg-slate-700 p-2 rounded">
-          <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}"
-            class="rounded mb-1 aspect-[3/4] object-cover cursor-pointer"
-            onclick="previewDownload('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}.jpg')">
-          <p class="text-xs text-center">${(m.similarity*100).toFixed(2)}%</p>
-        </div>
-      `).join("")}
-    </div>
-  `;
+  /* ===============================
+     CALL EDGE FUNCTION
+  ================================ */
+  try {
+    const res = await fetch(FACE_SEARCH_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        embedding: Array.from(descriptor),
+        threshold: 0.55,
+        limit: 30,
+        event_id: EVENT_ID
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err);
+    }
+
+    const data = await res.json();
+
+    if (!data || data.length === 0) {
+      status.innerText = "😢 ไม่พบภาพที่ตรงกัน";
+      return;
+    }
+
+    status.innerText = `✅ พบ ${data.length} ภาพ`;
+
+    data.forEach(row => {
+      const img = document.createElement("img");
+      img.src = row.image_url;
+      img.loading = "lazy";
+      results.appendChild(img);
+    });
+
+  } catch (err) {
+    console.error(err);
+    status.innerText = "❌ เกิดข้อผิดพลาดในการค้นหา";
+  }
 };
-
-// /* PROTECT */
-// document.addEventListener("contextmenu", e=>e.preventDefault());
-// document.addEventListener("dragstart", e=>e.preventDefault());
-
-window.previewDownload = previewDownload;
 </script>
 
 </body>
