@@ -323,11 +323,21 @@
         if (error) throw new Error(error);
         if (!matches?.length)
           return (resultDiv.innerHTML = langPack.noMatch(Math.round(SIM_THRESHOLD * 100)));
+      // 🔒 Score gap filter (กันภาพคนอื่นหลุด)
+const top = matches[0].similarity;
+const filteredMatches = matches.filter(
+  m => top - m.similarity <= 0.015
+);
+
+// fallback ถ้ากรองแล้วว่าง
+const finalMatches = filteredMatches.length
+  ? filteredMatches
+  : matches.slice(0, 3);
 
         resultDiv.innerHTML = `
-          <p class="text-green-400 font-semibold mb-2">${langPack.found(matches.length, Math.round(SIM_THRESHOLD * 100))}</p>
+          <p class="text-green-400 font-semibold mb-2">${langPack.found(finalMatches.length, Math.round(SIM_THRESHOLD * 100))}</p>
           <div class="grid grid-cols-2 gap-3">
-            ${matches
+            ${finalMatches
               .map(
                 (m) => `
              <div class="bg-slate-700 p-2 rounded-lg overflow-hidden relative">
