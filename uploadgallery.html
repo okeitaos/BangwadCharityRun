@@ -5,8 +5,13 @@
 <title>📸 Photographer Upload</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+<!-- Tailwind -->
 <script src="https://cdn.tailwindcss.com"></script>
+
+<!-- LINE LIFF -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -48,25 +53,35 @@
 </div>
 
 <script>
-/* ===== CONFIG ===== */
+/* ================= CONFIG ================= */
 const LIFF_ID = "2001781240-k2PJ3Ap2";
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const FACE_SYNC_URL = SUPABASE_URL + "/functions/v1/face-sync";
-/* ================== */
+/* ========================================= */
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+/* ❗ ใช้ชื่อ sb ป้องกันชน */
+const sb = supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
+
 let userId = null;
 
-/* ===== LOGIN ===== */
-document.getElementById("loginBtn").onclick = loginLine;
+/* ================= LOGIN ================= */
+document.getElementById("loginBtn").addEventListener("click", loginLine);
 
 async function loginLine() {
   await liff.init({ liffId: LIFF_ID });
-  if (!liff.isLoggedIn()) return liff.login();
+
+  if (!liff.isLoggedIn()) {
+    liff.login();
+    return;
+  }
 
   const profile = await liff.getProfile();
   userId = profile.userId;
+
   await checkPermission();
 }
 
@@ -101,7 +116,7 @@ async function checkPermission() {
   document.getElementById("avatar").src = data.picture_url;
 }
 
-/* ===== UPLOAD ===== */
+/* ================= UPLOAD ================= */
 const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileInput");
 const statusEl = document.getElementById("status");
@@ -115,44 +130,65 @@ dropzone.ondrop = e => {
 fileInput.onchange = e => handleFiles(e.target.files);
 
 async function handleFiles(files) {
-  for (const file of files) await uploadFile(file);
-  await triggerSync();
+  for (const file of files) {
+    await uploadFile(file);
+  }
+  await triggerSync(); // 🔥 auto sync
 }
 
 async function uploadFile(file) {
-  const path = `${userId}/${Date.now()}_${file.name}`;
-  statusEl.textContent = `⬆️ ${file.name}`;
+  const filePath = `${userId}/${Date.now()}_${file.name}`;
+  statusEl.textContent = `⬆️ อัปโหลด ${file.name}`;
 
-  const { error } = await sb.storage
+  const { error: uploadError } = await sb.storage
     .from("gallery")
-    .upload(path, file, { upsert: false });
+    .upload(filePath, file, { upsert: false });
 
-  if (error) {
-    statusEl.textContent = `❌ ${file.name}`;
+  if (uploadError) {
+    statusEl.textContent = `❌ อัปโหลดไม่สำเร็จ: ${file.name}`;
     return;
   }
 
-  const hashBuf = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  // 🔐 สร้าง SHA-256 hash
+  const hashBuf = await crypto.subtle.digest(
+    "SHA-256",
+    await file.arrayBuffer()
+  );
   const hashHex = Array.from(new Uint8Array(hashBuf))
-    .map(b => b.toString(16).padStart(2, "0")).join("");
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
 
-  await sb.from("file_hashes").insert({
-    user_id: userId,
-    file_path: path,
-    hash: hashHex,
-    synced: false
-  });
+  // ✅ ใช้ UPSERT กัน 409 Conflict
+  await sb
+    .from("file_hashes")
+    .upsert(
+      {
+        user_id: userId,
+        file_path: filePath,
+        hash: hashHex,
+        synced: false
+      },
+      {
+        onConflict: "hash"   // ❗ ต้องตรงกับ unique constraint
+      }
+    );
 
-  statusEl.textContent = `✅ ${file.name}`;
+  statusEl.textContent = `✅ อัปโหลดสำเร็จ: ${file.name}`;
 }
 
+/* ================= AUTO SYNC ================= */
 async function triggerSync() {
-  await fetch(FACE_SYNC_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId })
-  });
+  try {
+    await fetch(FACE_SYNC_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId })
+    });
+  } catch (e) {
+    console.error("SYNC ERROR", e);
+  }
 }
 </script>
+
 </body>
 </html>
