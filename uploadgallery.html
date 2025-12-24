@@ -1,17 +1,12 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>📸 Photographer Upload</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8">
+<title>Photographer Upload</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-<!-- Tailwind -->
 <script src="https://cdn.tailwindcss.com"></script>
-
-<!-- LINE LIFF -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-
-<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -20,117 +15,86 @@
 <div class="w-full max-w-xl space-y-6">
 
   <h1 class="text-2xl font-bold text-center text-yellow-400">
-    📸 Photographer Upload
+    Photographer Upload
   </h1>
 
-  <!-- LOGIN -->
-  <div id="loginBox" class="bg-slate-800 rounded-xl p-6 text-center space-y-3">
-    <p>กรุณาเข้าสู่ระบบด้วย LINE</p>
-    <button id="loginBtn"
-      class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl font-semibold">
+  <div id="loginBox" class="bg-slate-800 rounded-xl p-6 text-center">
+    <button id="loginBtn" class="bg-green-600 px-6 py-3 rounded-xl">
       Login with LINE
     </button>
   </div>
 
-  <!-- UPLOAD -->
   <div id="uploadBox" class="hidden space-y-4">
 
     <div class="bg-slate-800 rounded-xl p-4 text-center">
-      <img id="avatar" class="w-16 h-16 rounded-full mx-auto mb-2" />
-      <p id="welcome" class="font-semibold"></p>
-      <p class="text-sm text-gray-400">ลากและวางรูปเพื่ออัปโหลด</p>
+      <img id="avatar" class="w-16 h-16 rounded-full mx-auto mb-2">
+      <div id="welcome"></div>
     </div>
 
     <div id="dropzone"
-      class="border-2 border-dashed border-gray-500 rounded-xl p-10 text-center cursor-pointer hover:border-yellow-400 transition">
-      <p class="text-gray-300">Drag & Drop หรือคลิกเลือกไฟล์</p>
-      <input id="fileInput" type="file" multiple accept="image/*" class="hidden" />
+      class="border-2 border-dashed border-gray-500 rounded-xl p-10 text-center cursor-pointer">
+      Click or Drop Images
+      <input id="fileInput" type="file" multiple accept="image/*" class="hidden">
     </div>
 
-    <div id="status" class="text-sm text-gray-300"></div>
-  </div>
+    <div id="status" class="text-sm"></div>
 
+  </div>
 </div>
 
 <script>
-/* CONFIG */
 const LIFF_ID = "2001781240-k2PJ3Ap2";
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"";
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const FACE_SYNC_URL = SUPABASE_URL + "/functions/v1/face-sync";
 
-/* Supabase client */
-const sb = supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
-);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let userId = null;
 
-/* LOGIN */
-document.getElementById("loginBtn").addEventListener("click", loginLine);
+document.getElementById("loginBtn").onclick = loginLine;
 
 async function loginLine() {
   await liff.init({ liffId: LIFF_ID });
-
   if (!liff.isLoggedIn()) {
     liff.login();
     return;
   }
-
   const profile = await liff.getProfile();
   userId = profile.userId;
-
-  await checkPermission();
+  checkPermission();
 }
 
 async function checkPermission() {
-  const { data, error } = await sb
+  const res = await sb
     .from("photographer_registration")
     .select("*")
     .eq("user_id", userId)
     .single();
 
-  if (error || !data) {
-    alert("Not found photographer");
+  if (!res.data) {
+    alert("Not allowed");
     return;
   }
 
-  if (
-    data.status !== "approved" ||
-    data.is_blocked ||
-    data.is_deleted ||
-    data.is_upload_blocked
-  ) {
-    alert("Upload not allowed");
+  const d = res.data;
+  if (d.status !== "approved" || d.is_blocked || d.is_deleted || d.is_upload_blocked) {
+    alert("Upload blocked");
     return;
   }
 
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("uploadBox").classList.remove("hidden");
-
-  document.getElementById("welcome").textContent =
-    "Welcome " + data.display_name;
-
-  document.getElementById("avatar").src = data.picture_url;
+  document.getElementById("welcome").innerText = "Welcome " + d.display_name;
+  document.getElementById("avatar").src = d.picture_url;
 }
 
-/* UPLOAD */
 const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileInput");
 const statusEl = document.getElementById("status");
 
 dropzone.onclick = function () {
   fileInput.click();
-};
-
-dropzone.ondragover = function (e) {
-  e.preventDefault();
-};
-
-dropzone.ondrop = function (e) {
-  e.preventDefault();
-  handleFiles(e.dataTransfer.files);
 };
 
 fileInput.onchange = function (e) {
@@ -141,64 +105,34 @@ async function handleFiles(files) {
   for (const file of files) {
     await uploadFile(file);
   }
-  await triggerSync();
+  triggerSync();
 }
 
 async function uploadFile(file) {
-  const filePath = userId + "/" + Date.now() + "_" + file.name;
-  statusEl.textContent = "Uploading " + file.name;
+  const path = userId + "/" + Date.now() + "_" + file.name;
+  statusEl.innerText = "Uploading " + file.name;
 
-  const { error: uploadError } = await sb.storage
-    .from("gallery")
-    .upload(filePath, file, { upsert: false });
+  await sb.storage.from("gallery").upload(path, file);
 
-  if (uploadError) {
-    statusEl.textContent = "Upload failed: " + file.name;
-    return;
-  }
+  const buf = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  const hash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
 
-  const hashBuffer = await crypto.subtle.digest(
-    "SHA-256",
-    await file.arrayBuffer()
+  await sb.from("file_hashes").upsert(
+    { user_id: userId, file_path: path, hash: hash, synced: false },
+    { onConflict: "hash" }
   );
-  const hashHex = Array.from(new Uint8Array(hashBuffer))
-    .map(function (b) {
-      return b.toString(16).padStart(2, "0");
-    })
-    .join("");
 
-  await sb
-    .from("file_hashes")
-    .upsert(
-      {
-        user_id: userId,
-        file_path: filePath,
-        hash: hashHex,
-        synced: false
-      },
-      {
-        onConflict: "hash"
-      }
-    );
-
-  statusEl.textContent = "Uploaded " + file.name;
+  statusEl.innerText = "Uploaded " + file.name;
 }
 
-async function triggerSync() {
-  try {
-    await fetch(FACE_SYNC_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ user_id: userId })
-    });
-  } catch (err) {
-    console.error("Sync error", err);
-  }
+function triggerSync() {
+  fetch(FACE_SYNC_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId })
+  });
 }
 </script>
-
 
 </body>
 </html>
