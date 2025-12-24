@@ -50,8 +50,19 @@ search.onclick = async () => {
     })
   });
 
-  const { matches } = await res.json();
-  if (!matches.length) return alert("ไม่เจอ");
+ const json = await res.json();
+
+if (!json.matches || !Array.isArray(json.matches)) {
+  result.innerHTML = "❌ Search failed";
+  return;
+}
+
+const matches = json.matches;
+if (matches.length === 0) {
+  result.innerHTML = "❌ ไม่พบภาพ";
+  return;
+}
+
 
   // 🔒 GAP filter + cluster
   const GAP = 0.08;
