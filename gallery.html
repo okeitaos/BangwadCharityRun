@@ -1,25 +1,30 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8" />
+<meta charset="utf-8">
 <title>Face Search</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 </head>
 
 <body class="bg-slate-900 text-white p-6">
-<input type="file" id="file" class="mb-4" />
+<h1 class="text-xl mb-4">📸 ค้นหารูปด้วยใบหน้า</h1>
+
+<input type="file" id="file" accept="image/*" class="mb-3">
 <button id="search" class="bg-green-600 px-4 py-2 rounded">ค้นหา</button>
-<div id="result" class="mt-4 grid grid-cols-2 gap-3"></div>
+
+<div id="result" class="grid grid-cols-2 gap-3 mt-6"></div>
 
 <script type="module">
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const BUCKET = "gallery";
 
+const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
 await Promise.all([
-  faceapi.nets.ssdMobilenetv1.loadFromUri("https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/"),
-  faceapi.nets.faceLandmark68Net.loadFromUri("https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/"),
-  faceapi.nets.faceRecognitionNet.loadFromUri("https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/")
+  faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
+  faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
+  faceapi.nets.faceRecognitionNet.loadFromUri(modelURL),
 ]);
 
 search.onclick = async () => {
@@ -27,22 +32,27 @@ search.onclick = async () => {
   if (!file) return alert("เลือกรูป");
 
   const img = await faceapi.bufferToImage(file);
-  const detections = await faceapi
+  const dets = await faceapi
     .detectAllFaces(img)
     .withFaceLandmarks()
     .withFaceDescriptors();
 
-  if (!detections.length) return alert("ไม่พบใบหน้า");
+  if (!dets.length) return alert("ไม่เจอหน้า");
 
-  // เลือกหน้าที่ใหญ่ที่สุด
-  const area = d => d.detection.box.width * d.detection.box.height;
-  const main = detections.reduce((a,b)=>area(b)>area(a)?b:a);
+  // ใช้หน้าที่ใหญ่ที่สุด
+  const main = dets.reduce((a,b)=>
+    (b.detection.box.width*b.detection.box.height >
+     a.detection.box.width*a.detection.box.height ? b:a)
+  );
 
   const embedding = Array.from(main.descriptor);
 
   const res = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": ANON_KEY
+    },
     body: JSON.stringify({
       embedding,
       threshold: 0.8,
@@ -50,31 +60,11 @@ search.onclick = async () => {
     })
   });
 
- const json = await res.json();
+  const { matches } = await res.json();
 
-if (!json.matches || !Array.isArray(json.matches)) {
-  result.innerHTML = "❌ Search failed";
-  return;
-}
-
-const matches = json.matches;
-if (matches.length === 0) {
-  result.innerHTML = "❌ ไม่พบภาพ";
-  return;
-}
-
-
-  // 🔒 GAP filter + cluster
-  const GAP = 0.08;
-  const top = matches[0].similarity;
-  const near = matches.filter(m => top - m.similarity <= GAP);
-
-  const countByImage = {};
-  for (const m of near) {
-    countByImage[m.image_url] = (countByImage[m.image_url] || 0) + 1;
-  }
-
-  const final = near.filter(m => countByImage[m.image_url] >= 2);
+  // 🔒 กันหลุดแบบงานขาย
+  const top = matches[0]?.similarity ?? 0;
+  const final = matches.filter(m => top - m.similarity <= 0.08);
 
   result.innerHTML = final.map(m => `
     <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}"
