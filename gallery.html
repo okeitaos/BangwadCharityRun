@@ -2,8 +2,9 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Face Search | ค้นหาภาพด้วยใบหน้า</title>
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
@@ -13,416 +14,155 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      display: block;
-      width: 100%;
       text-align: center;
-    }
-
-    #previewPopup {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.9);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 50;
-      overflow-y: auto;
-      padding: 2rem 1rem;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.35s ease;
-    }
-
-    #previewPopup.show {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    #previewPopup > div {
-      background: #1e293b;
-      border-radius: 1rem;
-      box-shadow: 0 0 25px rgba(0, 0, 0, 0.7);
-      text-align: center;
-      max-width: 600px;
-      width: 100%;
-      margin: auto;
-      transform: translateY(20px);
-      transition: transform 0.35s ease;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-
-    #previewPopup.show > div {
-      transform: translateY(0);
-    }
-
-    #previewCanvas {
-      max-width: 100%;
-      max-height: 75vh;
-      object-fit: contain;
-      border: 2px solid white;
-      border-radius: 0.75rem;
-      margin-bottom: 1rem;
-      display: block;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    #confirmDownload, #cancelPreview {
-      transition: transform 0.15s ease, background 0.25s;
-    }
-
-    #confirmDownload:hover, #cancelPreview:hover {
-      transform: scale(1.05);
-    }
-
-    @media (max-width: 640px) {
-      #previewPopup > div {
-        width: 95%;
-        padding: 1rem;
-      }
-      #previewCanvas {
-        max-height: 60vh;
-      }
     }
   </style>
 </head>
 
-<body class="bg-slate-900 text-white flex flex-col items-center min-h-screen p-6">
-  <div class="w-full max-w-md">
-    <div class="flex justify-between items-center mb-4">
-      <h1 id="title" class="text-2xl font-bold">📸 ค้นหาภาพด้วยใบหน้า</h1>
-      <button id="langToggle" class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">EN</button>
-    </div>
+<body class="bg-slate-900 text-white min-h-screen flex justify-center p-6">
 
-    <div class="bg-slate-800 p-6 rounded-xl shadow-lg text-center">
-      <input id="fileInput" type="file" accept="image/*" class="mb-4 w-full text-gray-300" />
-      <div class="flex gap-2 mb-4">
-        <button id="searchBtn" class="flex-1 bg-green-500 hover:bg-green-600 py-2 rounded-lg">
-          🔎 <span id="btnSearchText">ค้นหาภาพ</span>
-        </button>
-        <button id="clearBtn" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg">
-          🧹 <span id="btnClearText">เคลียร์</span>
-        </button>
-      </div>
+<div class="w-full max-w-md">
+  <h1 class="text-2xl font-bold mb-4 text-center">📸 ค้นหาภาพด้วยใบหน้า</h1>
 
-      <div class="mb-4 text-left">
-        <label for="threshold" id="thresholdLabel" class="block text-sm text-gray-300 mb-1">
-          ระดับความเหมือน (95%)
-        </label>
-        <input id="threshold" type="range" min="80" max="99" value="95" class="w-full accent-green-500">
-        <p id="thresholdValue" class="text-xs text-gray-400 mt-1 text-center">≥ 95%</p>
-      </div>
+  <div class="bg-slate-800 p-5 rounded-xl shadow">
+    <input id="fileInput" type="file" accept="image/*"
+      class="w-full mb-4 text-sm text-gray-300"/>
 
-      <p id="status" class="text-gray-400 text-sm mb-3">⏳ กำลังโหลดโมเดล...</p>
-      <div id="result" class="text-sm text-gray-200"></div>
-    </div>
+    <button id="searchBtn"
+      class="w-full bg-green-600 hover:bg-green-700 py-2 rounded-lg font-semibold">
+      🔍 ค้นหารูป
+    </button>
+
+    <p id="status" class="text-sm text-gray-400 mt-3 text-center">
+      ⏳ โหลดโมเดล...
+    </p>
+
+    <div id="result" class="mt-4 text-sm"></div>
   </div>
-
-  <!-- 🆕 Popup Preview -->
-  <div id="previewPopup">
-    <div class="bg-slate-800 p-4 rounded-xl shadow-xl text-center max-w-lg w-[90%]">
-      <h2 class="text-lg font-semibold mb-3">🖼️ Preview ก่อนดาวน์โหลด</h2>
-      <canvas id="previewCanvas" class="max-w-full rounded-lg shadow-lg border-2 border-white mb-3"></canvas>
-      <div class="flex justify-center gap-3">
-        <button id="confirmDownload" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
-          ✅ ดาวน์โหลด
-        </button>
-        <button id="cancelPreview" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">
-          ❌ ยกเลิก
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <script type="module">
-    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-
-    const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-    const SUPABASE_ANON_KEY =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-    const BUCKET = "gallery";
-    const WATERMARK_URL =
-      "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
-    let SIM_THRESHOLD = 0.80;
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    const fileInput = document.getElementById("fileInput");
-    const searchBtn = document.getElementById("searchBtn");
-    const clearBtn = document.getElementById("clearBtn");
-    const statusDiv = document.getElementById("status");
-    const resultDiv = document.getElementById("result");
-    const langToggle = document.getElementById("langToggle");
-    const thresholdInput = document.getElementById("threshold");
-    const thresholdLabel = document.getElementById("thresholdLabel");
-    const thresholdValue = document.getElementById("thresholdValue");
-    const title = document.getElementById("title");
-    const btnSearchText = document.getElementById("btnSearchText");
-    const btnClearText = document.getElementById("btnClearText");
-    const previewPopup = document.getElementById("previewPopup");
-    const previewCanvas = document.getElementById("previewCanvas");
-    const confirmDownload = document.getElementById("confirmDownload");
-    const cancelPreview = document.getElementById("cancelPreview");
-
-    const LANG = {
-      th: {
-        title: "📸 ค้นหาภาพด้วยใบหน้า",
-        choose: "กรุณาเลือกรูปภาพก่อน",
-        analyzing: "🧠 กำลังตรวจสอบใบหน้า...",
-        notFound: "⚠️ ไม่พบใบหน้าในภาพนี้",
-        searching: (v) => `🔍 กำลังค้นหาภาพที่เหมือนกัน (≥${v}%)...`,
-        noMatch: (v) => `❌ ไม่พบภาพที่ตรงกัน (≥${v}%)`,
-        found: (n, v) => `🎯 พบภาพที่เหมือน ≥${v}% จำนวน ${n} ภาพ`,
-        btnSearch: "ค้นหาภาพ",
-        btnClear: "เคลียร์",
-        level: (v) => `ระดับความเหมือน (${v}%)`,
-        ready: "✅ พร้อมใช้งานแล้ว",
-        loading: "⏳ กำลังโหลดโมเดล...",
-        download: "ดาวน์โหลด",
-      },
-      en: {
-        title: "📸 Face Search",
-        choose: "Please select an image first.",
-        analyzing: "🧠 Detecting face...",
-        notFound: "⚠️ No face detected in this image.",
-        searching: (v) => `🔍 Searching for similar faces (≥${v}%)...`,
-        noMatch: (v) => `❌ No similar faces found (≥${v}%)`,
-        found: (n, v) => `🎯 Found ${n} similar faces (≥${v}%)`,
-        btnSearch: "Search",
-        btnClear: "Clear",
-        level: (v) => `Similarity Level (${v}%)`,
-        ready: "✅ Ready to use",
-        loading: "⏳ Loading model...",
-        download: "Download",
-      },
-    };
-
-    let currentLang = "th";
-    function setLang(lang) {
-      currentLang = lang;
-      const t = LANG[lang];
-      title.textContent = t.title;
-      btnSearchText.textContent = t.btnSearch;
-      btnClearText.textContent = t.btnClear;
-      thresholdLabel.textContent = t.level(Math.round(SIM_THRESHOLD * 100));
-      thresholdValue.textContent = `≥ ${Math.round(SIM_THRESHOLD * 100)}%`;
-      langToggle.textContent = lang === "th" ? "EN" : "TH";
-      statusDiv.textContent = t.ready;
-    }
-
-    langToggle.onclick = () => setLang(currentLang === "th" ? "en" : "th");
-
-    statusDiv.textContent = LANG[currentLang].loading;
-    const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
-    await Promise.all([
-      faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
-      faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
-      faceapi.nets.faceRecognitionNet.loadFromUri(modelURL),
-    ]);
-    statusDiv.textContent = LANG[currentLang].ready;
-
-    // const normalize = (desc) => {
-    //   const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
-    //   return desc.map((x) => x / norm);
-    // };
-
-    thresholdInput.oninput = (e) => {
-      const v = e.target.value;
-      SIM_THRESHOLD = v / 100;
-      thresholdLabel.textContent = LANG[currentLang].level(v);
-      thresholdValue.textContent = `≥ ${v}%`;
-    };
-
-    clearBtn.onclick = () => {
-      fileInput.value = "";
-      resultDiv.innerHTML = "";
-      statusDiv.textContent = LANG[currentLang].ready;
-    };
-
-    // ✅ ฟังก์ชัน Preview พร้อมลายน้ำ + ข้อความใหม่
-    async function previewWatermarkedImage(imageUrl, fileName) {
-      const [imgRes, watermarkRes] = await Promise.all([fetch(imageUrl), fetch(WATERMARK_URL)]);
-      const [imgBlob, watermarkBlob] = await Promise.all([imgRes.blob(), watermarkRes.blob()]);
-      const img = await createImageBitmap(imgBlob);
-      const watermark = await createImageBitmap(watermarkBlob);
-      const ctx = previewCanvas.getContext("2d");
-      previewCanvas.width = img.width;
-      previewCanvas.height = img.height;
-      ctx.drawImage(img, 0, 0, img.width, img.height);
-
-      // โลโก้ขวาล่าง
-      const aspectRatio = img.width / img.height;
-      let scaleFactor;
-      if (aspectRatio > 1.3) scaleFactor = 0.18;
-      else if (aspectRatio < 0.8) scaleFactor = 0.28;
-      else scaleFactor = 0.22;
-
-      const w = img.width * scaleFactor;
-      const s = w / watermark.width;
-      const h = watermark.height * s;
-      const x = img.width - w - 20;
-      const y = img.height - h - 20;
-      ctx.drawImage(watermark, x, y, w, h);
-
-      // ข้อความกลางล่าง (ขนาดเล็ก สีจาง เงาเบา)
-      const text = "BANGWAD CHARITY RUN 2025 | OFFICIAL";
-      const fontSize = Math.floor(img.width * 0.022);
-      ctx.font = `${fontSize}px 'Poppins', sans-serif`;
-      ctx.fillStyle = "rgba(255,255,255,0.65)";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "bottom";
-      ctx.shadowColor = "rgba(0,0,0,0.4)";
-      ctx.shadowBlur = 4;
-      ctx.fillText(text, img.width / 2, img.height - 12);
-
-      previewPopup.classList.add("show");
-
-      confirmDownload.onclick = () => {
-        previewCanvas.toBlob((b) => {
-          const l = document.createElement("a");
-          l.href = URL.createObjectURL(b);
-          l.download = fileName;
-          l.click();
-        }, "image/jpeg", 0.95);
-        previewPopup.classList.remove("show");
-      };
-
-      cancelPreview.onclick = () => previewPopup.classList.remove("show");
-    }
-
-    window.downloadImage = async (url, name) => {
-      await previewWatermarkedImage(url, name);
-    };
-
-    // ✅ ฟังก์ชันค้นหาใบหน้า
-    searchBtn.onclick = async () => {
-      const langPack = LANG[currentLang];
-      const file = fileInput.files[0];
-      if (!file) return alert(langPack.choose);
-
-      resultDiv.innerHTML = langPack.analyzing;
-      const img = await faceapi.bufferToImage(file);
-      // const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-      // if (!det) return (resultDiv.innerHTML = langPack.notFound);
-
-      // // const embedding = normalize(Array.from(det.descriptor));
-      // const embedding = Array.from(det.descriptor);
-      const detections = await faceapi
-  .detectAllFaces(img)
-  .withFaceLandmarks()
-  .withFaceDescriptors();
-
-if (!detections.length) {
-  resultDiv.innerHTML = langPack.notFound;
-  return;
-}
-
-const area = d => d.detection.box.width * d.detection.box.height;
-const det = detections.reduce((a, b) => area(b) > area(a) ? b : a);
-
-const embedding = Array.from(det.descriptor);
-
-
-      statusDiv.textContent = langPack.searching(Math.round(SIM_THRESHOLD * 100));
-
-      try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-          },
-          // body: JSON.stringify({ embedding, threshold: SIM_THRESHOLD, limit: 200 }),
-          body: JSON.stringify({ embedding, threshold: 0.80,   // ไม่ต้องผูกกับ slider
-          limit: 300         // ให้ edge คืนมาเยอะ ๆ
-}),
-
-        });
-        const { matches, error } = await res.json();
-        if (error) throw new Error(error);
-        if (!matches?.length)
-          return (resultDiv.innerHTML = langPack.noMatch(Math.round(SIM_THRESHOLD * 100)));
-      // 🔒 Score gap filter (กันภาพคนอื่นหลุด)
-// const top = matches[0].similarity;
-// const filteredMatches = matches.filter(
-//   m => top - m.similarity <= 0.015
-// );
-const GAP = 0.10;
-const top = matches[0].similarity;
-
-// 1) GAP filter
-const gapFiltered = matches.filter(
-  m => top - m.similarity <= GAP
-);
-
-// 2) group by image
-const byImage = new Map();
-for (const m of gapFiltered) {
-  const arr = byImage.get(m.image_url) || [];
-  arr.push(m);
-  byImage.set(m.image_url, arr);
-}
-
-// 3) ตัดสินระดับ "ภาพ"
-const finalMatches = [];
-
-for (const [imageUrl, arr] of byImage.entries()) {
-  // ถ้ามี vector ใด similarity สูงพอ → เอาทั้งภาพ
-  const best = arr.reduce((a,b)=> b.similarity > a.similarity ? b : a);
-
-  if (best.similarity >= top - GAP) {
-    finalMatches.push(best);
-  }
-}
-
-// 4) sort ตาม similarity จริง
-finalMatches.sort((a,b)=> b.similarity - a.similarity);
-
-// 5) จำกัดจำนวน (กัน noise)
-const results = finalMatches.slice(0, 50);
-
-
-
-
-
-        resultDiv.innerHTML = `
-          <p class="text-green-400 font-semibold mb-2">${langPack.found(finalMatches.length, Math.round(SIM_THRESHOLD * 100))}</p>
-          <div class="grid grid-cols-2 gap-3">
-            ${finalMatches
-              .map(
-                (m) => `
-             <div class="bg-slate-700 p-2 rounded-lg overflow-hidden relative">
-  <div class="relative">
-    <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}" 
-         class="rounded-lg mb-2 shadow w-full object-cover aspect-[3/4]" >
-    <img src="https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png"
-         class="absolute bottom-2 right-2 w-1/4 opacity-100 pointer-events-none select-none">
-  </div>
-  <p class="filename text-sm text-gray-200 mt-1" title="${m.name}">${m.name}</p>
-  <p class="text-xs text-gray-400 mb-2 text-center">Similarity: ${(m.similarity * 100).toFixed(2)}%</p>
-  <button onclick="downloadImage('${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}','${m.name}.jpg')" 
-          class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs rounded px-2 py-1">${langPack.download}</button>
 </div>
-            `
-              )
-              .join("")}
-          </div>
-        `;
-      } catch (e) {
-        resultDiv.innerHTML = `❌ ${e.message}`;
-      }
-    };
 
-    setLang("th");
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
-    document.addEventListener("dragstart", (e) => e.preventDefault());
+/* ================= CONFIG ================= */
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const BUCKET = "gallery";
 
-    previewPopup.addEventListener("click", (e) => {
-      if (e.target === previewPopup) previewPopup.classList.remove("show");
-    });
-  </script>
+/* ================= INIT ================= */
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const fileInput = document.getElementById("fileInput");
+const searchBtn = document.getElementById("searchBtn");
+const statusDiv = document.getElementById("status");
+const resultDiv = document.getElementById("result");
+
+/* ================= LOAD MODELS ================= */
+const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
+await Promise.all([
+  faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
+  faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
+  faceapi.nets.faceRecognitionNet.loadFromUri(modelURL),
+]);
+statusDiv.textContent = "✅ พร้อมค้นหาแล้ว";
+
+/* ================= SEARCH ================= */
+searchBtn.onclick = async () => {
+  const file = fileInput.files[0];
+  if (!file) return alert("กรุณาเลือกรูปก่อน");
+
+  resultDiv.innerHTML = "🧠 กำลังวิเคราะห์ใบหน้า...";
+  const img = await faceapi.bufferToImage(file);
+
+  // 🔍 ตรวจทุกหน้า → ใช้หน้าใหญ่สุด
+  const detections = await faceapi
+    .detectAllFaces(img)
+    .withFaceLandmarks()
+    .withFaceDescriptors();
+
+  if (!detections.length) {
+    resultDiv.innerHTML = "❌ ไม่พบใบหน้าในภาพ";
+    return;
+  }
+
+  const area = d => d.detection.box.width * d.detection.box.height;
+  const mainFace = detections.reduce((a,b)=> area(b)>area(a)?b:a);
+  const embedding = Array.from(mainFace.descriptor);
+
+  statusDiv.textContent = "🔍 ค้นหารูปในระบบ...";
+
+  /* ================= CALL EDGE ================= */
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+    },
+    body: JSON.stringify({ embedding })
+  });
+
+  const { matches, error } = await res.json();
+  if (error || !matches || !matches.length) {
+    resultDiv.innerHTML = "❌ ไม่พบภาพที่ตรงกัน";
+    return;
+  }
+
+  /* ================= SMART FILTER ================= */
+
+  // เรียงคะแนน
+  matches.sort((a,b)=>b.similarity - a.similarity);
+
+  const TOP = matches[0].similarity;
+  const GAP = 0.08;
+
+  // 1️⃣ score gap
+  const gapFiltered = matches.filter(
+    m => TOP - m.similarity <= GAP
+  );
+
+  // 2️⃣ vote ต่อ image
+  const vote = new Map();
+  for (const m of gapFiltered) {
+    vote.set(m.image_url, (vote.get(m.image_url) || 0) + 1);
+  }
+
+  // 3️⃣ ต้องโผล่มากกว่า 1 embedding
+  let final = gapFiltered.filter(
+    m => vote.get(m.image_url) >= 2
+  );
+
+  // fallback กันรูปหาย
+  if (final.length < 5) {
+    final = gapFiltered.slice(0, 30);
+  }
+
+  /* ================= UNIQUE IMAGE ================= */
+  const uniq = new Map();
+  for (const m of final) {
+    if (!uniq.has(m.image_url)) uniq.set(m.image_url, m);
+  }
+
+  const images = [...uniq.values()];
+
+  /* ================= RENDER ================= */
+  resultDiv.innerHTML = `
+    <p class="text-green-400 font-semibold mb-2">
+      🎯 พบ ${images.length} ภาพ
+    </p>
+    <div class="grid grid-cols-2 gap-3">
+      ${images.map(m => `
+        <div class="bg-slate-700 p-2 rounded">
+          <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}"
+               class="rounded mb-2 w-full object-cover aspect-[3/4]">
+          <p class="filename text-xs">${m.image_url.split("/").pop()}</p>
+          <p class="text-xs text-gray-400 text-center">
+            ${(m.similarity*100).toFixed(2)}%
+          </p>
+        </div>
+      `).join("")}
+    </div>
+  `;
+};
+</script>
+
 </body>
 </html>
