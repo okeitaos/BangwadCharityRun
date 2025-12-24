@@ -146,7 +146,7 @@
     const BUCKET = "gallery";
     const WATERMARK_URL =
       "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
-    let SIM_THRESHOLD = 0.95;
+    let SIM_THRESHOLD = 0.80;
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const fileInput = document.getElementById("fileInput");
@@ -223,10 +223,10 @@
     ]);
     statusDiv.textContent = LANG[currentLang].ready;
 
-    const normalize = (desc) => {
-      const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
-      return desc.map((x) => x / norm);
-    };
+    // const normalize = (desc) => {
+    //   const norm = Math.sqrt(desc.reduce((a, b) => a + b * b, 0));
+    //   return desc.map((x) => x / norm);
+    // };
 
     thresholdInput.oninput = (e) => {
       const v = e.target.value;
@@ -304,10 +304,27 @@
 
       resultDiv.innerHTML = langPack.analyzing;
       const img = await faceapi.bufferToImage(file);
-      const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-      if (!det) return (resultDiv.innerHTML = langPack.notFound);
+      // const det = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+      // if (!det) return (resultDiv.innerHTML = langPack.notFound);
 
-      const embedding = normalize(Array.from(det.descriptor));
+      // // const embedding = normalize(Array.from(det.descriptor));
+      // const embedding = Array.from(det.descriptor);
+      const detections = await faceapi
+  .detectAllFaces(img)
+  .withFaceLandmarks()
+  .withFaceDescriptors();
+
+if (!detections.length) {
+  resultDiv.innerHTML = langPack.notFound;
+  return;
+}
+
+const area = d => d.detection.box.width * d.detection.box.height;
+const det = detections.reduce((a, b) => area(b) > area(a) ? b : a);
+
+const embedding = Array.from(det.descriptor);
+
+
       statusDiv.textContent = langPack.searching(Math.round(SIM_THRESHOLD * 100));
 
       try {
@@ -317,17 +334,33 @@
             "Content-Type": "application/json",
             "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ embedding, threshold: SIM_THRESHOLD, limit: 200 }),
+          // body: JSON.stringify({ embedding, threshold: SIM_THRESHOLD, limit: 200 }),
+          body: JSON.stringify({ embedding, threshold: 0.80,   // ไม่ต้องผูกกับ slider
+          limit: 300         // ให้ edge คืนมาเยอะ ๆ
+}),
+
         });
         const { matches, error } = await res.json();
         if (error) throw new Error(error);
         if (!matches?.length)
           return (resultDiv.innerHTML = langPack.noMatch(Math.round(SIM_THRESHOLD * 100)));
       // 🔒 Score gap filter (กันภาพคนอื่นหลุด)
+// const top = matches[0].similarity;
+// const filteredMatches = matches.filter(
+//   m => top - m.similarity <= 0.015
+// );
+        const GAP = 0.12; // ค่าที่เหมาะกับงานวิ่ง
+
 const top = matches[0].similarity;
 const filteredMatches = matches.filter(
-  m => top - m.similarity <= 0.015
+  m => top - m.similarity <= GAP
 );
+
+// fallback กันว่าง
+const finalMatches = filteredMatches.length
+  ? filteredMatches
+  : matches.slice(0, 5);
+
 
 // fallback ถ้ากรองแล้วว่าง
 const finalMatches = filteredMatches.length
