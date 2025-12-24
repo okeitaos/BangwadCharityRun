@@ -75,56 +75,387 @@
 
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const ANON_KEY = "YOUR_ANON_KEY";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const BUCKET = "gallery";
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const supabase = createClient(SUPABASE_URL, ANON_KEY);
+const $ = id => document.getElementById(id);
+const delay = ms => new Promise(r => setTimeout(r, ms));
+const log = (type, text) => {
+  const time = new Date().toLocaleTimeString();
+  const color = type === "error" ? "text-red-300" : type === "warn" ? "text-yellow-300" : "text-green-300";
+  const div = document.createElement("div");
+  div.className = `${color} mb-1`;
+  div.innerHTML = `<span class="text-gray-400">[${time}]</span> ${text}`;
+  $("log").prepend(div);
+};
 
-const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
-await Promise.all([
-  faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
-  faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
-  faceapi.nets.faceRecognitionNet.loadFromUri(modelURL),
-]);
+let isSyncing = false, stopRequested = false, startTime = null;
+let stats = { success: 0, skipped: 0, failed: 0, processed: 0, total: 0 };
+const processedSet = new Set();
+const failedImages = new Map();
 
-async function syncOneImage(path) {
-  const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
-  const img = await faceapi.fetchImage(imgUrl);
-
-  const dets = await faceapi
-    .detectAllFaces(img)
-    .withFaceLandmarks()
-    .withFaceDescriptors();
-
-  if (!dets.length) throw new Error("no face");
-
-  // เลือกหน้าที่ใหญ่ที่สุด
-  const area = d => d.detection.box.width * d.detection.box.height;
-  const main = dets.reduce((a,b)=> area(b)>area(a)?b:a);
-
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/face-sync`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": ANON_KEY,
-      "Authorization": `Bearer ${ANON_KEY}`
-    },
-    body: JSON.stringify({
-      name: path.split("/").pop().split(".")[0],
-      image_url: path,
-      embedding: Array.from(main.descriptor)
-    })
-  });
-
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error);
+/* โหลดโมเดล */
+async function loadModels() {
+  $("status").textContent = "⏳ โหลดโมเดล...";
+  const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
+  await Promise.all([
+    faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
+    faceapi.nets.tinyFaceDetector.loadFromUri(modelURL),
+    faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
+    faceapi.nets.faceRecognitionNet.loadFromUri(modelURL)
+  ]);
+  $("status").textContent = "✅ พร้อมซิงค์";
+  log("info", "โหลดโมเดลครบแล้ว");
 }
 
-// ตัวอย่างเรียก
-await syncOneImage("runner/IMG_1234.jpg");
-</script>
+/* โหลดรูป robust */
+async function fetchImageRobust(url) {
+  try {
+    const resp = await fetch(url, { cache: "no-store" });
+    const blob = await resp.blob();
+    return await blobToImage(blob);
+  } catch {
+    return await faceapi.fetchImage(url);
+  }
+}
 
+function blobToImage(blob) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => { URL.revokeObjectURL(url); res(img); };
+    img.onerror = () => rej(new Error("load error"));
+    img.src = url;
+  });
+}
+
+/* แปลง / หมุนภาพ */
+async function transformImage(img, { angle = 0, scale = 1 } = {}) {
+  const rad = (angle * Math.PI) / 180;
+  const w = img.width, h = img.height;
+  const canvas = document.createElement("canvas");
+  if (angle % 180 === 0) { canvas.width = w; canvas.height = h; }
+  else { canvas.width = h; canvas.height = w; }
+  const ctx = canvas.getContext("2d");
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate(rad);
+  ctx.scale(scale, scale);
+  ctx.drawImage(img, -w / 2, -h / 2);
+  const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.95));
+  return await blobToImage(blob);
+}
+
+/* ตรวจจับใบหน้าพร้อมรองรับการหมุน + multi-scale hybrid */
+async function detectFaceWithRotationSupport(imgUrl, minFaceSize = 50) {
+  const img = await fetchImageRobust(imgUrl);
+
+  // 🔸 ลองตรวจทั้ง ssd และ tiny ในรอบแรก
+  let det = await detectFaceMulti(img, { minFaceSize });
+  if (det) return det;
+
+  // 🔸 ลองหมุนภาพ 90 / 270 องศา
+  for (const angle of [90, 270]) {
+    const rImg = await transformImage(img, { angle });
+    det = await detectFaceMulti(rImg, { minFaceSize });
+    if (det) return det;
+  }
+
+  // 🔸 ลอง upscale 1.5x (ช่วยจับหน้าเล็ก)
+  const upImg = await transformImage(img, { angle: 0, scale: 1.5 });
+  det = await detectFaceMulti(upImg, { minFaceSize: minFaceSize * 0.8 });
+  if (det) return det;
+
+  // 🔸 ลองสุดท้าย: detectAllFaces แล้วเลือกหน้าที่ใหญ่ที่สุด
+  const all = await faceapi.detectAllFaces(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.2 }))
+    .withFaceLandmarks().withFaceDescriptors();
+  if (all && all.length) {
+    const largest = all.reduce((a, b) =>
+      (b.detection.box.width * b.detection.box.height > a.detection.box.width * a.detection.box.height ? b : a)
+    );
+    return largest;
+  }
+
+  return null;
+}
+
+/* ตรวจหลาย scale และ hybrid ssd + tiny */
+async function detectFaceMulti(img, opts = {}) {
+  const minFaceSize = opts.minFaceSize || 50;
+
+  // 🧠 ลอง ssd ก่อน (ละเอียดสุด)
+  try {
+    const detSSD = await faceapi.detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.2 }))
+      .withFaceLandmarks().withFaceDescriptor();
+    if (detSSD && (detSSD.detection.box.width >= minFaceSize || detSSD.detection.box.height >= minFaceSize)) {
+      return detSSD;
+    }
+  } catch (e) {
+    console.warn("SSD failed:", e.message);
+  }
+
+  // 🔹 ถ้า ssd ไม่เจอ ใช้ tiny หลาย inputSize
+  const tinyConfigs = [
+    { inputSize: 512, scoreThreshold: 0.35 },
+    { inputSize: 416, scoreThreshold: 0.3 },
+    { inputSize: 320, scoreThreshold: 0.25 }
+  ];
+  for (const cfg of tinyConfigs) {
+    try {
+      const detTiny = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions(cfg))
+        .withFaceLandmarks().withFaceDescriptor();
+      if (detTiny && (detTiny.detection.box.width >= minFaceSize || detTiny.detection.box.height >= minFaceSize)) {
+        return detTiny;
+      }
+    } catch (e) {
+      console.warn("Tiny failed:", e.message);
+    }
+  }
+
+  return null;
+}
+
+
+/* อัปเดตสถิติ */
+function updateStats() {
+  $("countSuccess").textContent = stats.success;
+  $("countSkipped").textContent = stats.skipped;
+  $("countFailed").textContent = stats.failed;
+  $("processed").textContent = stats.processed;
+  $("total").textContent = stats.total;
+  $("progressBar").style.width = (stats.total ? Math.round((stats.processed / stats.total) * 100) : 0) + "%";
+}
+
+/* แคช */
+const loadCache = () => JSON.parse(localStorage.getItem("gallery-cache") || "{}");
+const saveCache = c => localStorage.setItem("gallery-cache", JSON.stringify(c));
+const clearCache = () => { localStorage.removeItem("gallery-cache"); log("info", "🧹 ล้าง cache แล้ว"); };
+
+/* Preview fail */
+function addFailedPreview(path, imgUrl, reason) {
+  if (failedImages.has(path)) return;
+  failedImages.set(path, true);
+  const div = document.createElement("div");
+  div.className = "bg-slate-700 p-2 rounded relative";
+  div.innerHTML = `
+    <img src="${imgUrl}" class="rounded w-full object-cover h-40"/>
+    <p class="text-xs text-center mt-1 text-red-300">${reason}</p>
+    <button class="absolute bottom-2 right-2 bg-blue-600 hover:bg-blue-700 text-xs px-2 py-1 rounded retry-btn">Retry</button>
+  `;
+  $("failedGrid").appendChild(div);
+  div.querySelector(".retry-btn").onclick = async () => {
+    div.style.opacity = "0.5";
+    await handleSync(path, { [path]: { updated_at: new Date().toISOString() } }, loadCache(), 0, true);
+    div.remove();
+    failedImages.delete(path);
+  };
+}
+
+/* handleSync (เรียกตรวจแบบละเอียด) */
+// async function handleSync(path, map, cache, attempt = 0, singleRetry = false) {
+//   const cacheT = cache[path], updated = map[path].updated_at;
+//   if (!singleRetry && cacheT && updated <= cacheT) {
+//     stats.skipped++; if (!processedSet.has(path)) { processedSet.add(path); stats.processed++; } updateStats(); return;
+//   }
+//   try {
+//     const { data: exists } = await supabase.from("faces").select("id").eq("image_url", path).maybeSingle();
+//     if (exists) { stats.skipped++; if (!processedSet.has(path)) { processedSet.add(path); stats.processed++; } cache[path] = updated; saveCache(cache); updateStats(); return; }
+
+//     const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`;
+//     const minFace = Number($("minFaceSize").value) || 50;
+//     const det = await detectFaceWithRotationSupport(imgUrl, minFace);
+//     if (!det) throw new Error("ไม่พบใบหน้า");
+
+//     const emb = Array.from(det.descriptor);
+//     const name = path.split("/").pop().split(".").shift();
+//     const { error } = await supabase.rpc("insert_face_vector", { p_name: name, p_image_url: path, p_embedding: emb });
+//     if (error) throw new Error(error.message);
+
+//     stats.success++; cache[path] = updated; saveCache(cache); log("info", `✅ ${path}`);
+//   } catch (err) {
+//     if (attempt < 2 && !singleRetry) { await delay(500); return await handleSync(path, map, cache, attempt + 1); }
+//     stats.failed++; log("error", `❌ ${path}: ${err.message}`);
+//     const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`;
+//     addFailedPreview(path, imgUrl, err.message);
+//   } finally {
+//     if (!processedSet.has(path)) { processedSet.add(path); stats.processed++; updateStats(); }
+//   }
+// }
+  /* 🧠 Hybrid Face Sync Mode — รองรับหลายใบหน้าในภาพเดียว */
+async function handleSync(path, map, cache, attempt = 0, singleRetry = false) {
+  const cacheT = cache[path], updated = map[path].updated_at;
+  if (!singleRetry && cacheT && updated <= cacheT) {
+    stats.skipped++;
+    if(!processedSet.has(path)){processedSet.add(path);stats.processed++;}
+    updateStats(); 
+    return;
+  }
+
+  try {
+    const { data: exists } = await supabase.from("faces").select("id").eq("image_url", path).maybeSingle();
+    if (exists) {
+      stats.skipped++;
+      if(!processedSet.has(path)){processedSet.add(path);stats.processed++;}
+      cache[path] = updated; saveCache(cache); updateStats();
+      return;
+    }
+
+    const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`;
+    const img = await faceapi.fetchImage(imgUrl);
+
+    // 🔍 ตรวจหลายใบหน้าก่อน
+    let detections = await faceapi
+      .detectAllFaces(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.2 }))
+      .withFaceLandmarks().withFaceDescriptors();
+
+    // ถ้าไม่เจอ → fallback โหมดละเอียด (smart)
+    if (!detections || detections.length === 0) {
+      detections = [];
+      const single = await detectFaceWithRotationSupport(imgUrl, Number($("minFaceSize").value));
+      if (single) detections.push(single);
+    }
+
+    if (!detections || detections.length === 0) throw new Error("ไม่พบใบหน้าในภาพ");
+
+    const minFace = Number($("minFaceSize").value) || 25;
+    const validFaces = detections.filter(d =>
+      d.detection.box.width >= minFace && d.detection.box.height >= minFace
+    );
+
+    if (validFaces.length === 0) throw new Error("ใบหน้าเล็กเกินไปทั้งหมด");
+
+    // ✅ บันทึกทุกใบหน้าที่ตรวจเจอ
+    // for (let i = 0; i < validFaces.length; i++) {
+    //   const det = validFaces[i];
+    //   const emb = Array.from(det.descriptor);
+    //   const name = `${path.split("/").pop().split(".").shift()}#${i+1}`;
+    //   const { error } = await supabase.rpc("insert_face_vector", {
+    //     p_name: name,
+    //     p_image_url: path,
+    //     p_embedding: emb
+    //   });
+    //   if (error) console.warn("⚠️ insert_face_vector error:", error.message);
+    // }
+    // ===============================
+// ✅ เลือกใบหน้าหลัก (ใหญ่ที่สุด)
+// ===============================
+// const area = d => d.detection.box.width * d.detection.box.height;
+
+// const mainFace = validFaces.reduce((a, b) =>
+//   area(b) > area(a) ? b : a
+// );
+
+// const det = mainFace;
+
+// const emb = Array.from(det.descriptor);
+// const name = path.split("/").pop().split(".").shift();
+
+// await supabase.rpc("insert_face_vector", {
+//   p_name: name,
+//   p_image_url: path,
+//   p_embedding: emb
+// });
+
+// ===============================
+// ✅ เก็บ 2 ใบหน้าหลัก (ลดภาพหาย)
+// ===============================
+const area = d => d.detection.box.width * d.detection.box.height;
+
+const sortedFaces = validFaces
+  .sort((a, b) => area(b) - area(a))
+  .slice(0, 3); // เก็บแค่ 2 หน้า
+
+const baseName = path.split("/").pop().split(".").shift();
+
+for (let i = 0; i < sortedFaces.length; i++) {
+  const det = sortedFaces[i];
+  const emb = Array.from(det.descriptor);
+
+  await supabase.rpc("insert_face_vector", {
+    p_name: `${baseName}#${i + 1}`,
+    p_image_url: path,
+    p_embedding: emb
+  });
+}
+
+    stats.success++;
+    cache[path] = updated;
+    saveCache(cache);
+    log("info", `✅ ${path} (ใบหน้าที่เจอ: ${validFaces.length})`);
+
+  } catch (err) {
+    if (attempt < 2 && !singleRetry) {
+      log("warn", `Retry ${attempt + 1}/3: ${path} (${err.message})`);
+      await delay(500);
+      return await handleSync(path, map, cache, attempt + 1);
+    } else {
+      log("error", `❌ ${path}: ${err.message}`);
+      stats.failed++;
+      const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`;
+      addFailedPreview(path, imgUrl, err.message);
+    }
+  } finally {
+    if (!processedSet.has(path)) {
+      processedSet.add(path);
+      stats.processed++;
+      updateStats();
+    }
+  }
+}
+
+
+/* listRecursive */
+async function listRecursive(path = "", map = {}) {
+  const limit = 1000; let offset = 0;
+  while (true) {
+    const { data } = await supabase.storage.from(BUCKET).list(path, { limit, offset });
+    if (!data || data.length === 0) break;
+    for (const item of data) {
+      if (!item.metadata) await listRecursive(path ? `${path}/${item.name}` : item.name, map);
+      else map[path ? `${path}/${item.name}` : item.name] = { updated_at: item.updated_at };
+    }
+    if (data.length < limit) break;
+    offset += limit; await delay(100);
+  }
+  return map;
+}
+
+/* syncGallery */
+async function syncGallery() {
+  if (isSyncing) return log("warn", "กำลังซิงค์อยู่แล้ว");
+  stopRequested = false; isSyncing = true;
+  stats = { success: 0, skipped: 0, failed: 0, processed: 0, total: 0 };
+  processedSet.clear(); updateStats(); startTime = Date.now(); $("status").textContent = "🔄 เริ่มซิงค์...";
+  $("failedGrid").innerHTML = "";
+  const map = await listRecursive("");
+  const files = Object.keys(map).filter(p => p.match(/\.(jpg|jpeg|png|webp|gif)$/i));
+  const cache = loadCache(); stats.total = files.length; updateStats();
+  const limit = Number($("rateLimit").value) || 5, delayMs = Number($("delayMs").value) || 200;
+  await Promise.all(Array.from({ length: limit }, async (_, w) => {
+    for (let i = w; i < files.length && !stopRequested; i += limit) {
+      await handleSync(files[i], map, cache);
+      if (delayMs) await delay(delayMs);
+    }
+  }));
+  $("status").textContent = `✅ เสร็จสิ้น (สำเร็จ ${stats.success}, ข้าม ${stats.skipped}, ล้มเหลว ${stats.failed})`;
+}
+
+/* ปุ่ม */
+$("syncNow").onclick = syncGallery;
+$("stopAuto").onclick = () => { stopRequested = true; log("warn", "หยุดการซิงค์แล้ว"); };
+$("clearLog").onclick = () => { $("log").innerHTML = ""; stats = { success: 0, skipped: 0, failed: 0, processed: 0, total: 0 }; updateStats(); };
+$("clearCache").onclick = clearCache;
+
+let autoSyncId = null;
+$("autoSyncToggle").onchange = e => {
+  if (e.target.checked) autoSyncId = setInterval(syncGallery, Number($("autoInterval").value) * 1000);
+  else clearInterval(autoSyncId);
+};
+
+setInterval(() => { if (startTime) $("elapsed").textContent = Math.floor((Date.now() - startTime) / 1000) + "s"; }, 1000);
+window.addEventListener("DOMContentLoaded", loadModels);
+</script>
 </body>
 </html>
