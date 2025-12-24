@@ -1,79 +1,153 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="utf-8">
-<title>Face Search | ค้นหารูปด้วยใบหน้า</title>
+<meta charset="UTF-8" />
+<title>ค้นหาภาพด้วยใบหน้า</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 
+<style>
+  .thumb { transition: transform .2s; }
+  .thumb:hover { transform: scale(1.05); }
+</style>
 </head>
 
-<body class="bg-slate-900 text-white p-6 min-h-screen">
-  <h1 class="text-2xl font-bold mb-4">📸 ค้นหารูปด้วยใบหน้า</h1>
+<body class="bg-slate-900 text-white min-h-screen">
 
-  <input id="file" type="file" accept="image/*" class="mb-3 block">
-  <button id="search" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">
-    🔍 ค้นหา
-  </button>
+<div class="max-w-5xl mx-auto p-4 space-y-6">
 
-  <p id="status" class="text-sm text-gray-400 mt-3"></p>
+  <h1 class="text-2xl font-bold text-center text-yellow-400">
+    🔍 ค้นหาภาพด้วยใบหน้า
+  </h1>
 
-  <div id="result" class="grid grid-cols-2 md:grid-cols-3 gap-3 mt-6"></div>
+  <!-- Upload -->
+  <div class="bg-slate-800 rounded-xl p-4 space-y-3">
+    <input id="fileInput" type="file" accept="image/*"
+      class="block w-full text-sm file:bg-yellow-500 file:text-black file:px-4 file:py-2 file:rounded-lg">
+    <div id="status" class="text-sm text-gray-300"></div>
+  </div>
 
-<script type="module">
+  <!-- Preview -->
+  <div id="previewBox" class="hidden bg-slate-800 rounded-xl p-4 text-center">
+    <img id="previewImg" class="mx-auto rounded-xl max-h-64">
+  </div>
+
+  <!-- Results -->
+  <div id="resultBox" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+
+</div>
+
+<script>
+/* ================= CONFIG ================= */
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-const BUCKET = "gallery";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";   // ใช้ anon ได้
+const DISTANCE_THRESHOLD = 0.45;
+/* ========================================= */
 
-search.onclick = async () => {
+const supabase = supabaseJs.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
+
+const fileInput = document.getElementById("fileInput");
+const statusEl = document.getElementById("status");
+const previewImg = document.getElementById("previewImg");
+const previewBox = document.getElementById("previewBox");
+const resultBox = document.getElementById("resultBox");
+
+/* ================= LOAD MODELS ================= */
+async function loadModels() {
+  const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
+  statusEl.innerText = "⏳ โหลดโมเดลใบหน้า...";
+  await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+  statusEl.innerText = "✅ พร้อมค้นหา";
+}
+loadModels();
+
+/* ================= HANDLE FILE ================= */
+fileInput.onchange = async () => {
   const file = fileInput.files[0];
-  if (!file) return alert("เลือกรูป");
+  if (!file) return;
+
+  resultBox.innerHTML = "";
+  statusEl.innerText = "📸 กำลังตรวจจับใบหน้า...";
 
   const img = await faceapi.bufferToImage(file);
-  const dets = await faceapi
-    .detectAllFaces(img)
+  previewImg.src = img.src;
+  previewBox.classList.remove("hidden");
+
+  const detection = await faceapi
+    .detectSingleFace(
+      img,
+      new faceapi.TinyFaceDetectorOptions({
+        inputSize: 416,
+        scoreThreshold: 0.4
+      })
+    )
     .withFaceLandmarks()
-    .withFaceDescriptors();
+    .withFaceDescriptor();
 
-  if (!dets.length) return alert("ไม่พบใบหน้า");
-
-  const main = dets.reduce((a,b)=>
-    b.detection.box.area > a.detection.box.area ? b : a
-  );
-
-  const embedding = Array.from(main.descriptor);
-
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": ANON_KEY
-    },
-    body: JSON.stringify({
-      embedding,
-      threshold: 0.8,
-      limit: 300
-    })
-  });
-
-  const json = await res.json();
-  if (!json.matches?.length) {
-    result.innerHTML = "<p>ไม่พบรูป</p>";
+  if (!detection) {
+    statusEl.innerText = "❌ ไม่พบใบหน้าในภาพ";
     return;
   }
 
-  // 🔒 กันหลุดระดับงานขาย
-  const top = json.matches[0].similarity;
-  const final = json.matches.filter(
-    m => top - m.similarity <= 0.08
-  );
+  // vector → pgvector literal
+  const vectorLiteral =
+    "[" + Array.from(detection.descriptor).join(",") + "]";
 
-  result.innerHTML = final.map(m => `
-    <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}"
-         class="rounded shadow">
-  `).join("");
+  statusEl.innerText = "🔍 กำลังค้นหารูป...";
+
+  const { data, error } = await supabase.rpc("search_face", {
+    query_vector: vectorLiteral,
+    threshold: DISTANCE_THRESHOLD,
+    result_limit: 100
+  });
+
+  if (error) {
+    console.error(error);
+    statusEl.innerText = "❌ ค้นหาไม่สำเร็จ";
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    statusEl.innerText = "😢 ไม่พบภาพที่ตรงกัน";
+    return;
+  }
+
+  statusEl.innerText = `🎉 พบ ${data.length} ภาพ`;
+
+  renderResults(data);
 };
+
+/* ================= RENDER ================= */
+function renderResults(rows) {
+  resultBox.innerHTML = "";
+
+  rows.forEach(r => {
+    const url = supabase
+      .storage
+      .from("gallery")
+      .getPublicUrl(r.file_path).data.publicUrl;
+
+    const div = document.createElement("div");
+    div.className = "thumb";
+
+    div.innerHTML = `
+      <img src="${url}" class="rounded-lg w-full">
+      <div class="text-xs text-center text-gray-400">
+        similarity ${(1 - r.distance).toFixed(2)}
+      </div>
+    `;
+
+    resultBox.appendChild(div);
+  });
+}
 </script>
 
 </body>
