@@ -2,26 +2,16 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
-<title>ค้นหาภาพของคุณ | ThaiRun</title>
+<title>ค้นหาภาพของคุณ | BANGWAD CHARITY RUN 2025</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-<!-- UI -->
 <script src="https://cdn.tailwindcss.com"></script>
-
-<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<!-- Face API -->
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 
 <style>
-  .card {
-    transition: transform .2s, box-shadow .2s;
-  }
-  .card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 25px rgba(0,0,0,.4);
-  }
+  .card { transition: transform .2s, box-shadow .2s; }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px rgba(0,0,0,.4); }
 </style>
 </head>
 
@@ -29,176 +19,166 @@
 
 <div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
-  <!-- Header -->
   <h1 class="text-2xl md:text-3xl font-bold text-center text-yellow-400">
-    🏃‍♂️ ค้นหาภาพของคุณ (ThaiRun Style)
+    🏃‍♂️ ค้นหาภาพของคุณ (ThaiRun)
   </h1>
 
   <!-- Upload -->
-  <div class="bg-slate-800 rounded-2xl p-5 space-y-3 shadow">
-    <input
-      id="fileInput"
-      type="file"
-      accept="image/*"
+  <div class="bg-slate-800 rounded-2xl p-5 space-y-3">
+    <input id="fileInput" type="file" accept="image/*"
       class="block w-full text-sm
-        file:bg-yellow-500
-        file:text-black
-        file:px-5
-        file:py-2
-        file:rounded-xl"
-    />
+      file:bg-yellow-500 file:text-black
+      file:px-5 file:py-2 file:rounded-xl" />
     <div id="status" class="text-sm text-gray-300"></div>
   </div>
 
-  <!-- Preview -->
-  <div id="previewBox" class="hidden bg-slate-800 rounded-2xl p-4 text-center shadow">
-    <p class="text-sm text-gray-400 mb-2">ภาพที่ใช้ค้นหา</p>
-    <img id="previewImg" class="mx-auto rounded-xl max-h-64">
-  </div>
-
-  <!-- Result Header -->
-  <div id="resultHeader" class="hidden flex justify-between items-center">
-    <div id="resultCount" class="text-sm text-gray-300"></div>
-  </div>
-
   <!-- Results -->
-  <div
-    id="resultBox"
-    class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"
-  ></div>
+  <div id="resultBox"
+    class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+  </div>
 
 </div>
 
 <script>
 /* ================= CONFIG ================= */
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 🔑 ใส่ของจริง
-const RESULT_LIMIT = 400; // ดึงมาเยอะพอ
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const LOGO_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
+const RESULT_LIMIT = 400;
 /* ========================================= */
 
-const sb = supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
-);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const fileInput = document.getElementById("fileInput");
 const statusEl = document.getElementById("status");
-const previewImg = document.getElementById("previewImg");
-const previewBox = document.getElementById("previewBox");
 const resultBox = document.getElementById("resultBox");
-const resultHeader = document.getElementById("resultHeader");
-const resultCount = document.getElementById("resultCount");
 
 /* ================= LOAD MODELS ================= */
 async function loadModels() {
   const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
-  statusEl.innerText = "⏳ กำลังโหลดโมเดลใบหน้า...";
-
+  statusEl.innerText = "⏳ โหลดโมเดลใบหน้า...";
   await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
   await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
   await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-
   statusEl.innerText = "✅ พร้อมค้นหา";
 }
 loadModels();
 
-/* ================= THAIRUN GROUPING (PRO) ================= */
+/* ================= GROUPING (เดิม) ================= */
 function groupAllMyFaces(rows) {
   if (!rows || rows.length === 0) return [];
-
   const sorted = [...rows].sort((a, b) => a.distance - b.distance);
-
-  const anchor = sorted[0].distance;
   const median = sorted[Math.floor(sorted.length / 2)].distance;
-
-  const DYNAMIC_THRESHOLD = Math.max(
-    0.75,          // กันรูปมุมยากมาก
-    median + 0.15
-  );
-
-  return sorted.filter(r => r.distance <= DYNAMIC_THRESHOLD);
+  const threshold = Math.max(0.75, median + 0.15);
+  return sorted.filter(r => r.distance <= threshold);
 }
 
-/* ================= HANDLE FILE ================= */
+/* ================= HANDLE SEARCH ================= */
 fileInput.onchange = async () => {
   const file = fileInput.files[0];
   if (!file) return;
 
   resultBox.innerHTML = "";
-  resultHeader.classList.add("hidden");
-  statusEl.innerText = "📸 กำลังตรวจจับใบหน้า...";
+  statusEl.innerText = "📸 ตรวจจับใบหน้า...";
 
   const img = await faceapi.bufferToImage(file);
-  previewImg.src = img.src;
-  previewBox.classList.remove("hidden");
-
   const detection = await faceapi
-    .detectSingleFace(
-      img,
-      new faceapi.TinyFaceDetectorOptions({
-        inputSize: 416,
-        scoreThreshold: 0.4
-      })
-    )
+    .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 }))
     .withFaceLandmarks()
     .withFaceDescriptor();
 
   if (!detection) {
-    statusEl.innerText = "❌ ไม่พบใบหน้าในภาพ";
+    statusEl.innerText = "❌ ไม่พบใบหน้า";
     return;
   }
 
   const vectorLiteral =
     "[" + Array.from(detection.descriptor).join(",") + "]";
 
-  statusEl.innerText = "🔍 กำลังค้นหาภาพของคุณ...";
+  statusEl.innerText = "🔍 ค้นหาภาพของคุณ...";
 
-  const { data, error } = await sb.rpc("search_face_ranked", {
+  const { data } = await sb.rpc("search_face_ranked", {
     query_vector: vectorLiteral,
     result_limit: RESULT_LIMIT
   });
 
-  if (error || !data) {
-    console.error(error);
-    statusEl.innerText = "❌ ค้นหาไม่สำเร็จ";
-    return;
-  }
-
-  const myPhotos = groupAllMyFaces(data);
-
-  statusEl.innerText = "🎉 ค้นหาสำเร็จ";
-  resultHeader.classList.remove("hidden");
-  resultCount.innerText = `พบภาพของคุณทั้งหมด ${myPhotos.length} ภาพ`;
+  const myPhotos = groupAllMyFaces(data || []);
+  statusEl.innerText = `🎉 พบ ${myPhotos.length} ภาพ`;
 
   renderResults(myPhotos);
 };
+
+/* ================= WATERMARK + DOWNLOAD ================= */
+async function downloadWithWatermark(imageUrl, filename) {
+  const img = new Image();
+  const logo = new Image();
+  img.crossOrigin = "anonymous";
+  logo.crossOrigin = "anonymous";
+
+  img.src = imageUrl;
+  logo.src = LOGO_URL;
+
+  await Promise.all([
+    new Promise(res => img.onload = res),
+    new Promise(res => logo.onload = res)
+  ]);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext("2d");
+
+  // draw main image
+  ctx.drawImage(img, 0, 0);
+
+  // watermark size ~15% width
+  const logoWidth = canvas.width * 0.15;
+  const ratio = logo.height / logo.width;
+  const logoHeight = logoWidth * ratio;
+
+  const padding = canvas.width * 0.02;
+  ctx.globalAlpha = 0.85;
+  ctx.drawImage(
+    logo,
+    canvas.width - logoWidth - padding,
+    canvas.height - logoHeight - padding,
+    logoWidth,
+    logoHeight
+  );
+  ctx.globalAlpha = 1;
+
+  const link = document.createElement("a");
+  link.href = canvas.toDataURL("image/jpeg", 0.95);
+  link.download = filename;
+  link.click();
+}
 
 /* ================= RENDER ================= */
 function renderResults(rows) {
   resultBox.innerHTML = "";
 
-  rows.forEach((r, index) => {
-    const url = sb
-      .storage
-      .from("gallery")
-      .getPublicUrl(r.file_path).data.publicUrl;
+  rows.forEach((r, idx) => {
+    const url = sb.storage.from("gallery").getPublicUrl(r.file_path).data.publicUrl;
 
     const card = document.createElement("div");
     card.className = "card bg-slate-800 rounded-2xl overflow-hidden";
 
     card.innerHTML = `
-      <img src="${url}" class="w-full h-56 object-cover">
+      <div class="relative">
+        <img src="${url}" class="w-full h-56 object-cover opacity-90">
+        <!-- watermark preview -->
+        <img src="${LOGO_URL}"
+          class="absolute bottom-2 right-2 w-12 opacity-80 pointer-events-none">
+      </div>
       <div class="p-3 space-y-2">
         <div class="text-xs text-gray-400">
           Similarity ${(1 - r.distance).toFixed(2)}
         </div>
-        <a
-          href="${url}"
-          download
-          class="block text-center bg-yellow-500 text-black text-sm py-1.5 rounded-lg hover:bg-yellow-400"
-        >
+        <button
+          class="w-full bg-yellow-500 text-black text-sm py-1.5 rounded-lg hover:bg-yellow-400"
+          onclick="downloadWithWatermark('${url}', 'myphoto_${idx + 1}.jpg')">
           ⬇️ ดาวน์โหลด
-        </a>
+        </button>
       </div>
     `;
 
