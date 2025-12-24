@@ -53,14 +53,13 @@
 </div>
 
 <script>
-/* ================= CONFIG ================= */
+/* CONFIG */
 const LIFF_ID = "2001781240-k2PJ3Ap2";
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const FACE_SYNC_URL = SUPABASE_URL + "/functions/v1/face-sync";
-/* ========================================= */
 
-/* ❗ ใช้ชื่อ sb ป้องกันชน */
+/* Supabase client */
 const sb = supabase.createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY
@@ -68,7 +67,7 @@ const sb = supabase.createClient(
 
 let userId = null;
 
-/* ================= LOGIN ================= */
+/* LOGIN */
 document.getElementById("loginBtn").addEventListener("click", loginLine);
 
 async function loginLine() {
@@ -93,7 +92,7 @@ async function checkPermission() {
     .single();
 
   if (error || !data) {
-    alert("❌ ไม่พบข้อมูลช่างภาพ");
+    alert("Not found photographer");
     return;
   }
 
@@ -103,7 +102,7 @@ async function checkPermission() {
     data.is_deleted ||
     data.is_upload_blocked
   ) {
-    alert("❌ บัญชีนี้ไม่สามารถอัปโหลดได้");
+    alert("Upload not allowed");
     return;
   }
 
@@ -111,54 +110,63 @@ async function checkPermission() {
   document.getElementById("uploadBox").classList.remove("hidden");
 
   document.getElementById("welcome").textContent =
-    `ยินดีต้อนรับ ${data.display_name}`;
+    "Welcome " + data.display_name;
 
   document.getElementById("avatar").src = data.picture_url;
 }
 
-/* ================= UPLOAD ================= */
+/* UPLOAD */
 const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileInput");
 const statusEl = document.getElementById("status");
 
-dropzone.onclick = () => fileInput.click();
-dropzone.ondragover = e => e.preventDefault();
-dropzone.ondrop = e => {
+dropzone.onclick = function () {
+  fileInput.click();
+};
+
+dropzone.ondragover = function (e) {
+  e.preventDefault();
+};
+
+dropzone.ondrop = function (e) {
   e.preventDefault();
   handleFiles(e.dataTransfer.files);
 };
-fileInput.onchange = e => handleFiles(e.target.files);
+
+fileInput.onchange = function (e) {
+  handleFiles(e.target.files);
+};
 
 async function handleFiles(files) {
   for (const file of files) {
     await uploadFile(file);
   }
-  await triggerSync(); // 🔥 auto sync
+  await triggerSync();
 }
 
 async function uploadFile(file) {
-  const filePath = `${userId}/${Date.now()}_${file.name}`;
-  statusEl.textContent = `⬆️ อัปโหลด ${file.name}`;
+  const filePath = userId + "/" + Date.now() + "_" + file.name;
+  statusEl.textContent = "Uploading " + file.name;
 
   const { error: uploadError } = await sb.storage
     .from("gallery")
     .upload(filePath, file, { upsert: false });
 
   if (uploadError) {
-    statusEl.textContent = `❌ อัปโหลดไม่สำเร็จ: ${file.name}`;
+    statusEl.textContent = "Upload failed: " + file.name;
     return;
   }
 
-  // 🔐 สร้าง SHA-256 hash
-  const hashBuf = await crypto.subtle.digest(
+  const hashBuffer = await crypto.subtle.digest(
     "SHA-256",
     await file.arrayBuffer()
   );
-  const hashHex = Array.from(new Uint8Array(hashBuf))
-    .map(b => b.toString(16).padStart(2, "0"))
+  const hashHex = Array.from(new Uint8Array(hashBuffer))
+    .map(function (b) {
+      return b.toString(16).padStart(2, "0");
+    })
     .join("");
 
-  // ✅ ใช้ UPSERT กัน 409 Conflict
   await sb
     .from("file_hashes")
     .upsert(
@@ -169,26 +177,28 @@ async function uploadFile(file) {
         synced: false
       },
       {
-        onConflict: "hash"   // ❗ ต้องตรงกับ unique constraint
+        onConflict: "hash"
       }
     );
 
-  statusEl.textContent = `✅ อัปโหลดสำเร็จ: ${file.name}`;
+  statusEl.textContent = "Uploaded " + file.name;
 }
 
-/* ================= AUTO SYNC ================= */
 async function triggerSync() {
   try {
     await fetch(FACE_SYNC_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({ user_id: userId })
     });
-  } catch (e) {
-    console.error("SYNC ERROR", e);
+  } catch (err) {
+    console.error("Sync error", err);
   }
 }
 </script>
+
 
 </body>
 </html>
