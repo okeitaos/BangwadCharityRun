@@ -20,9 +20,11 @@
 
   <!-- LOGIN -->
   <div id="loginBox" class="bg-slate-800 rounded-xl p-6 text-center">
-    <button id="loginBtn" class="bg-green-600 px-6 py-3 rounded-xl">
+    <button id="loginBtn"
+      class="bg-green-600 hover:bg-green-500 px-6 py-3 rounded-xl">
       Login with LINE
     </button>
+    <div id="loginError" class="text-red-400 text-sm mt-3 hidden"></div>
   </div>
 
   <!-- UPLOAD -->
@@ -31,7 +33,7 @@
     <!-- Profile -->
     <div class="bg-slate-800 rounded-xl p-4 text-center">
       <img id="avatar" class="w-16 h-16 rounded-full mx-auto mb-2">
-      <div id="welcome"></div>
+      <div id="welcome" class="text-sm"></div>
     </div>
 
     <!-- Overall progress -->
@@ -41,14 +43,20 @@
         <span id="overallPercent">0%</span>
       </div>
       <div class="w-full bg-gray-700 rounded-full h-3">
-        <div id="overallBar" class="bg-yellow-400 h-3 rounded-full" style="width:0%"></div>
+        <div id="overallBar"
+          class="bg-yellow-400 h-3 rounded-full transition-all"
+          style="width:0%"></div>
       </div>
     </div>
 
     <!-- Dropzone -->
     <div id="dropzone"
-      class="border-2 border-dashed border-gray-500 rounded-xl p-10 text-center cursor-pointer">
-      Click or Drop Images (Max 5000 files, Max 5MB / file)
+      class="border-2 border-dashed border-gray-500 rounded-xl p-10
+             text-center cursor-pointer hover:border-yellow-400">
+      Click or Drop Images<br>
+      <span class="text-xs text-gray-400">
+        Max 5000 files • Max 5MB / file
+      </span>
       <input id="fileInput" type="file" multiple accept="image/*" class="hidden">
     </div>
 
@@ -71,39 +79,68 @@ const MAX_SIZE_MB = 5;
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let userId = null;
+let photographer = null;
 let queue = [];
 let uploaded = 0;
+let uploading = false;
 
 /* ================= LOGIN ================= */
 document.getElementById("loginBtn").onclick = loginLine;
 
 async function loginLine() {
-  await liff.init({ liffId: LIFF_ID });
-  if (!liff.isLoggedIn()) return liff.login();
+  try {
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) return liff.login();
 
-  const profile = await liff.getProfile();
-  userId = profile.userId;
-  checkPermission();
+    const profile = await liff.getProfile();
+    userId = profile.userId;
+
+    await checkPermission();
+  } catch (e) {
+    showLoginError("LINE login failed");
+  }
 }
 
 async function checkPermission() {
-  const res = await sb
+  const { data, error } = await sb
     .from("photographer_registration")
-    .select("*")
+    .select(`
+      user_id,
+      display_name,
+      picture_url,
+      status,
+      is_blocked,
+      is_deleted,
+      is_upload_blocked
+    `)
     .eq("user_id", userId)
-    .single();
+    .maybeSingle();
 
-  if (!res.data) return alert("Not allowed");
-
-  const d = res.data;
-  if (d.status !== "approved" || d.is_blocked || d.is_deleted || d.is_upload_blocked) {
-    return alert("Upload blocked");
+  if (error || !data) {
+    return showLoginError("ไม่พบรายชื่อช่างภาพในระบบ");
   }
+
+  if (data.status !== "approved") {
+    return showLoginError("บัญชีนี้ยังไม่ได้รับการอนุมัติ");
+  }
+
+  if (data.is_blocked || data.is_deleted || data.is_upload_blocked) {
+    return showLoginError("บัญชีนี้ถูกระงับการอัปโหลด");
+  }
+
+  photographer = data;
 
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("uploadBox").classList.remove("hidden");
-  document.getElementById("welcome").innerText = "Welcome " + d.display_name;
-  document.getElementById("avatar").src = d.picture_url;
+  document.getElementById("welcome").innerText =
+    "Welcome " + data.display_name;
+  document.getElementById("avatar").src = data.picture_url;
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById("loginError");
+  el.innerText = "❌ " + msg;
+  el.classList.remove("hidden");
 }
 
 /* ================= FILE FILTER ================= */
@@ -143,11 +180,17 @@ fileInput.onchange = e => enqueue(filterFiles(e.target.files));
 
 /* ================= QUEUE ================= */
 function enqueue(files) {
+  if (uploading) return;
+
   for (const file of files) {
     queue.push(file);
     addQueueItem(file.name);
   }
-  if (uploaded === 0 && queue.length > 0) processQueue();
+
+  if (!uploading && queue.length > 0) {
+    uploading = true;
+    processQueue();
+  }
 }
 
 function addQueueItem(name) {
@@ -173,6 +216,7 @@ async function processQueue() {
   }
 
   document.getElementById("overallText").innerText = "Upload completed";
+  uploading = false;
 }
 
 function updateOverall(total) {
@@ -214,9 +258,15 @@ function uploadFile(file, index) {
           .join("");
 
         await sb.from("file_hashes").upsert(
-          { user_id: userId, file_path: path, hash: hash, synced: false },
+          {
+            user_id: userId,
+            file_path: path,
+            hash: hash,
+            synced: false
+          },
           { onConflict: "hash" }
         );
+
         resolve();
       } else {
         reject();
