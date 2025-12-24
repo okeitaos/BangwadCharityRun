@@ -18,12 +18,14 @@
     Photographer Upload
   </h1>
 
+  <!-- LOGIN -->
   <div id="loginBox" class="bg-slate-800 rounded-xl p-6 text-center">
     <button id="loginBtn" class="bg-green-600 px-6 py-3 rounded-xl">
       Login with LINE
     </button>
   </div>
 
+  <!-- UPLOAD -->
   <div id="uploadBox" class="hidden space-y-4">
 
     <div class="bg-slate-800 rounded-xl p-4 text-center">
@@ -43,25 +45,30 @@
 </div>
 
 <script>
+/* ===== CONFIG ===== */
 const LIFF_ID = "2001781240-k2PJ3Ap2";
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_URL = "hhttps://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-const FACE_SYNC_URL = SUPABASE_URL + "/functions/v1/face-sync";
+/* ================== */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let userId = null;
 
+/* ===== LOGIN ===== */
 document.getElementById("loginBtn").onclick = loginLine;
 
 async function loginLine() {
   await liff.init({ liffId: LIFF_ID });
+
   if (!liff.isLoggedIn()) {
     liff.login();
     return;
   }
+
   const profile = await liff.getProfile();
   userId = profile.userId;
+
   checkPermission();
 }
 
@@ -78,17 +85,27 @@ async function checkPermission() {
   }
 
   const d = res.data;
-  if (d.status !== "approved" || d.is_blocked || d.is_deleted || d.is_upload_blocked) {
+
+  if (
+    d.status !== "approved" ||
+    d.is_blocked ||
+    d.is_deleted ||
+    d.is_upload_blocked
+  ) {
     alert("Upload blocked");
     return;
   }
 
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("uploadBox").classList.remove("hidden");
-  document.getElementById("welcome").innerText = "Welcome " + d.display_name;
+
+  document.getElementById("welcome").innerText =
+    "Welcome " + d.display_name;
+
   document.getElementById("avatar").src = d.picture_url;
 }
 
+/* ===== UPLOAD ===== */
 const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileInput");
 const statusEl = document.getElementById("status");
@@ -105,32 +122,39 @@ async function handleFiles(files) {
   for (const file of files) {
     await uploadFile(file);
   }
-  triggerSync();
+  statusEl.innerText = "Upload completed";
 }
 
 async function uploadFile(file) {
   const path = userId + "/" + Date.now() + "_" + file.name;
   statusEl.innerText = "Uploading " + file.name;
 
+  // upload to storage
   await sb.storage.from("gallery").upload(path, file);
 
-  const buf = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
-  const hash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+  // create hash
+  const buf = await crypto.subtle.digest(
+    "SHA-256",
+    await file.arrayBuffer()
+  );
+  const hash = Array.from(new Uint8Array(buf))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
 
+  // save to file_hashes (UPLOAD ONLY)
   await sb.from("file_hashes").upsert(
-    { user_id: userId, file_path: path, hash: hash, synced: false },
-    { onConflict: "hash" }
+    {
+      user_id: userId,
+      file_path: path,
+      hash: hash,
+      synced: false
+    },
+    {
+      onConflict: "hash"
+    }
   );
 
   statusEl.innerText = "Uploaded " + file.name;
-}
-
-function triggerSync() {
-  fetch(FACE_SYNC_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId })
-  });
 }
 </script>
 
