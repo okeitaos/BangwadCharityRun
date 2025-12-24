@@ -349,35 +349,40 @@ const embedding = Array.from(det.descriptor);
 // const filteredMatches = matches.filter(
 //   m => top - m.similarity <= 0.015
 // );
-const GAP = 0.08;
-
+const GAP = 0.10;
 const top = matches[0].similarity;
 
 // 1) GAP filter
-const filteredMatches = matches.filter(
+const gapFiltered = matches.filter(
   m => top - m.similarity <= GAP
 );
 
-// 2) นับจำนวน face ต่อภาพ
+// 2) group by image
 const byImage = new Map();
-for (const m of filteredMatches) {
-  byImage.set(m.image_url, (byImage.get(m.image_url) || 0) + 1);
+for (const m of gapFiltered) {
+  const arr = byImage.get(m.image_url) || [];
+  arr.push(m);
+  byImage.set(m.image_url, arr);
 }
 
-// 3) แยกภาพกลุ่ม vs ภาพเดี่ยว
-const strongMatches = filteredMatches.filter(
-  m => byImage.get(m.image_url) >= 2   // ภาพกลุ่ม
-);
+// 3) ตัดสินระดับ "ภาพ"
+const finalMatches = [];
 
-const weakMatches = filteredMatches.filter(
-  m => byImage.get(m.image_url) === 1  // ภาพเดี่ยว
-);
+for (const [imageUrl, arr] of byImage.entries()) {
+  // ถ้ามี vector ใด similarity สูงพอ → เอาทั้งภาพ
+  const best = arr.reduce((a,b)=> b.similarity > a.similarity ? b : a);
 
-// 4) รวมผลลัพธ์ (กลุ่มมาก่อน เดี่ยวตาม)
-const finalMatches = [
-  ...strongMatches,
-  ...weakMatches.slice(0, 10) // จำกัดเดี่ยว
-];
+  if (best.similarity >= top - GAP) {
+    finalMatches.push(best);
+  }
+}
+
+// 4) sort ตาม similarity จริง
+finalMatches.sort((a,b)=> b.similarity - a.similarity);
+
+// 5) จำกัดจำนวน (กัน noise)
+const results = finalMatches.slice(0, 50);
+
 
 
 
