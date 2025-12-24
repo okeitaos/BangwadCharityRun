@@ -24,6 +24,7 @@
 
 <div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
+  <!-- Header -->
   <h1 class="text-2xl md:text-3xl font-bold text-center text-yellow-400">
     🏃‍♂️ ค้นหาภาพของคุณ
   </h1>
@@ -45,13 +46,29 @@
          class="mx-auto rounded-xl max-h-64 border border-yellow-500/40">
   </div>
 
+  <!-- Result Info -->
   <div id="resultInfo"
        class="hidden text-sm text-center text-gray-300">
   </div>
 
-  <!-- Results -->
-  <div id="resultBox"
-       class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+  <!-- Primary Results -->
+  <div>
+    <h2 class="text-sm text-green-400 mb-2 text-center">
+      ✅ รูปของคุณ (มั่นใจสูง)
+    </h2>
+    <div id="primaryBox"
+      class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+    </div>
+  </div>
+
+  <!-- Secondary Results -->
+  <div id="secondarySection" class="hidden mt-8">
+    <h2 class="text-sm text-yellow-400 mb-2 text-center">
+      ⚠️ อาจเป็นภาพของคุณ (กรุณาตรวจสอบ)
+    </h2>
+    <div id="secondaryBox"
+      class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+    </div>
   </div>
 
 </div>
@@ -72,8 +89,12 @@ const sb = supabase.createClient(
 
 const fileInput = document.getElementById("fileInput");
 const statusEl = document.getElementById("status");
-const resultBox = document.getElementById("resultBox");
 const resultInfo = document.getElementById("resultInfo");
+
+const primaryBox = document.getElementById("primaryBox");
+const secondaryBox = document.getElementById("secondaryBox");
+const secondarySection = document.getElementById("secondarySection");
+
 const queryPreviewBox = document.getElementById("queryPreviewBox");
 const queryPreviewImg = document.getElementById("queryPreviewImg");
 
@@ -88,35 +109,42 @@ async function loadModels() {
 }
 loadModels();
 
-/* ================= THAIRUN PRO GROUPING ================= */
-/* 🔥 แก้ปัญหารูปคนอื่นหลุดตรงนี้ */
-function groupAllMyFaces(rows) {
-  if (!rows || rows.length === 0) return [];
-
-  // เรียงจากใกล้ → ไกล
-  const sorted = [...rows].sort((a, b) => a.distance - b.distance);
-
-  const result = [sorted[0]]; // anchor
-
-  const MAX_JUMP = 0.12; // ระยะกระโดดที่ถือว่าเปลี่ยนคน
-  const ABS_MAX  = 0.70; // เพดานตาย ห้ามเกิน
-
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = sorted[i - 1];
-    const curr = sorted[i];
-
-    const jump = curr.distance - prev.distance;
-
-    // ❌ เกินเพดาน = คนอื่นแน่นอน
-    if (curr.distance > ABS_MAX) break;
-
-    // ❌ distance กระโดดแรง = เปลี่ยนคน
-    if (jump > MAX_JUMP) break;
-
-    result.push(curr);
+/* ================= SPLIT RESULTS (ทาง A) ================= */
+function splitResults(rows) {
+  if (!rows || rows.length === 0) {
+    return { primary: [], secondary: [] };
   }
 
-  return result;
+  const sorted = [...rows].sort((a, b) => a.distance - b.distance);
+
+  const primary = [sorted[0]]; // anchor
+  const secondary = [];
+
+  const MAX_JUMP = 0.12;
+  const ABS_MAX_PRIMARY = 0.70;
+  const ABS_MAX_SECONDARY = 0.80;
+
+  let cutIndex = 1;
+
+  // primary (มั่นใจสูง)
+  for (let i = 1; i < sorted.length; i++) {
+    const jump = sorted[i].distance - sorted[i - 1].distance;
+
+    if (sorted[i].distance > ABS_MAX_PRIMARY) break;
+    if (jump > MAX_JUMP) break;
+
+    primary.push(sorted[i]);
+    cutIndex = i + 1;
+  }
+
+  // secondary (อาจใช่)
+  for (let i = cutIndex; i < sorted.length; i++) {
+    if (sorted[i].distance <= ABS_MAX_SECONDARY) {
+      secondary.push(sorted[i]);
+    }
+  }
+
+  return { primary, secondary };
 }
 
 /* ================= SEARCH ================= */
@@ -124,13 +152,16 @@ fileInput.onchange = async () => {
   const file = fileInput.files[0];
   if (!file) return;
 
-  resultBox.innerHTML = "";
+  primaryBox.innerHTML = "";
+  secondaryBox.innerHTML = "";
+  secondarySection.classList.add("hidden");
   resultInfo.classList.add("hidden");
+
   statusEl.innerText = "📸 ตรวจจับใบหน้า...";
 
   const img = await faceapi.bufferToImage(file);
 
-  // แสดงภาพที่ใช้ค้นหา
+  // Show query preview
   queryPreviewImg.src = img.src;
   queryPreviewBox.classList.remove("hidden");
 
@@ -163,13 +194,16 @@ fileInput.onchange = async () => {
     return;
   }
 
-  const myPhotos = groupAllMyFaces(data);
+  const { primary, secondary } = splitResults(data);
 
   statusEl.innerText = "🎉 ค้นหาสำเร็จ";
   resultInfo.classList.remove("hidden");
-  resultInfo.innerText = `พบภาพของคุณทั้งหมด ${myPhotos.length} ภาพ`;
+  resultInfo.innerText =
+    `พบรูปของคุณ ${primary.length} ภาพ` +
+    (secondary.length ? ` • รูปที่อาจใช่ ${secondary.length} ภาพ` : "");
 
-  renderResults(myPhotos);
+  renderPrimary(primary);
+  renderSecondary(secondary);
 };
 
 /* ================= DOWNLOAD + WATERMARK ================= */
@@ -215,37 +249,46 @@ async function downloadWithWatermark(imageUrl, filename) {
 }
 
 /* ================= RENDER ================= */
-function renderResults(rows) {
-  resultBox.innerHTML = "";
+function renderPrimary(rows) {
+  primaryBox.innerHTML = "";
+  rows.forEach((r, i) => renderCard(r, i, primaryBox));
+}
 
-  rows.forEach((r, i) => {
-    const url =
-      sb.storage.from("gallery")
-        .getPublicUrl(r.file_path).data.publicUrl;
+function renderSecondary(rows) {
+  if (rows.length === 0) return;
 
-    const card = document.createElement("div");
-    card.className = "card bg-slate-800 rounded-2xl overflow-hidden";
+  secondarySection.classList.remove("hidden");
+  secondaryBox.innerHTML = "";
+  rows.forEach((r, i) => renderCard(r, i, secondaryBox, true));
+}
 
-    card.innerHTML = `
-      <div class="relative">
-        <img src="${url}" class="w-full h-56 object-cover">
-        <img src="${LOGO_URL}"
-             class="absolute bottom-2 right-2 w-12 opacity-80 pointer-events-none">
+function renderCard(r, i, box) {
+  const url =
+    sb.storage.from("gallery")
+      .getPublicUrl(r.file_path).data.publicUrl;
+
+  const card = document.createElement("div");
+  card.className = "card bg-slate-800 rounded-2xl overflow-hidden";
+
+  card.innerHTML = `
+    <div class="relative">
+      <img src="${url}" class="w-full h-56 object-cover">
+      <img src="${LOGO_URL}"
+           class="absolute bottom-2 right-2 w-12 opacity-80 pointer-events-none">
+    </div>
+    <div class="p-3 space-y-2">
+      <div class="text-xs text-gray-400">
+        Similarity ${(1 - r.distance).toFixed(2)}
       </div>
-      <div class="p-3 space-y-2">
-        <div class="text-xs text-gray-400">
-          Similarity ${(1 - r.distance).toFixed(2)}
-        </div>
-        <button
-          class="w-full bg-yellow-500 text-black text-sm py-1.5 rounded-lg hover:bg-yellow-400"
-          onclick="downloadWithWatermark('${url}', 'myphoto_${i+1}.jpg')">
-          ⬇️ ดาวน์โหลด
-        </button>
-      </div>
-    `;
+      <button
+        class="w-full bg-yellow-500 text-black text-sm py-1.5 rounded-lg hover:bg-yellow-400"
+        onclick="downloadWithWatermark('${url}', 'myphoto_${i+1}.jpg')">
+        ⬇️ ดาวน์โหลด
+      </button>
+    </div>
+  `;
 
-    resultBox.appendChild(card);
-  });
+  box.appendChild(card);
 }
 </script>
 
