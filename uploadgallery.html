@@ -5,8 +5,13 @@
 <title>📸 Photographer Upload</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+<!-- UI -->
 <script src="https://cdn.tailwindcss.com"></script>
+
+<!-- LINE LIFF -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -18,30 +23,30 @@
     📸 Photographer Upload
   </h1>
 
-  <!-- Login -->
+  <!-- LOGIN -->
   <div id="loginBox" class="bg-slate-800 rounded-xl p-6 text-center space-y-3">
     <p>กรุณาเข้าสู่ระบบด้วย LINE</p>
     <button
-      onclick="loginLine()"
+      id="loginBtn"
       class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl font-semibold"
     >
       Login with LINE
     </button>
   </div>
 
-  <!-- Upload -->
+  <!-- UPLOAD -->
   <div id="uploadBox" class="hidden space-y-4">
 
     <div class="bg-slate-800 rounded-xl p-4 text-center">
       <p id="welcome" class="font-semibold"></p>
-      <p class="text-sm text-gray-400">Drag & Drop รูปภาพด้านล่าง</p>
+      <p class="text-sm text-gray-400">ลากและวางรูปเพื่ออัปโหลด</p>
     </div>
 
     <div
       id="dropzone"
       class="border-2 border-dashed border-gray-500 rounded-xl p-10 text-center cursor-pointer hover:border-yellow-400 transition"
     >
-      <p class="text-gray-300">ลากไฟล์มาวาง หรือคลิกเลือกไฟล์</p>
+      <p class="text-gray-300">Drag & Drop หรือคลิกเพื่อเลือกไฟล์</p>
       <input id="fileInput" type="file" multiple accept="image/*" class="hidden" />
     </div>
 
@@ -59,24 +64,34 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const FACE_SYNC_URL = SUPABASE_URL + "/functions/v1/face-sync";
 /* ========================================== */
 
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+/* ---------- Supabase Client (ชื่อไม่ชน) ---------- */
+const sb = supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
 
+/* ---------- State ---------- */
 let userId = null;
 
 /* ---------- LINE LOGIN ---------- */
+document.getElementById("loginBtn").addEventListener("click", loginLine);
+
 async function loginLine() {
   await liff.init({ liffId: LIFF_ID });
+
   if (!liff.isLoggedIn()) {
     liff.login();
     return;
   }
+
   const profile = await liff.getProfile();
   userId = profile.userId;
-  checkPermission(profile);
+
+  await checkPermission(profile);
 }
 
 async function checkPermission(profile) {
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from("photographer_registration")
     .select("*")
     .eq("user_id", profile.userId)
@@ -84,7 +99,7 @@ async function checkPermission(profile) {
     .single();
 
   if (error || !data) {
-    alert("❌ ยังไม่ได้รับอนุญาตเป็นช่างภาพ");
+    alert("❌ คุณยังไม่ได้รับสิทธิ์อัปโหลดภาพ");
     return;
   }
 
@@ -94,52 +109,66 @@ async function checkPermission(profile) {
     `ยินดีต้อนรับ ${data.name}`;
 }
 
-/* ---------- UPLOAD ---------- */
+/* ---------- Drag & Drop ---------- */
 const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileInput");
 const statusEl = document.getElementById("status");
 
-dropzone.onclick = () => fileInput.click();
-dropzone.ondragover = e => e.preventDefault();
-dropzone.ondrop = e => {
-  e.preventDefault();
-  handleFiles(e.dataTransfer.files);
-};
-fileInput.onchange = e => handleFiles(e.target.files);
+dropzone.addEventListener("click", () => fileInput.click());
 
+dropzone.addEventListener("dragover", e => {
+  e.preventDefault();
+  dropzone.classList.add("border-yellow-400");
+});
+
+dropzone.addEventListener("dragleave", () => {
+  dropzone.classList.remove("border-yellow-400");
+});
+
+dropzone.addEventListener("drop", e => {
+  e.preventDefault();
+  dropzone.classList.remove("border-yellow-400");
+  handleFiles(e.dataTransfer.files);
+});
+
+fileInput.addEventListener("change", e => {
+  handleFiles(e.target.files);
+});
+
+/* ---------- Upload Logic ---------- */
 async function handleFiles(files) {
   for (const file of files) {
-    await uploadFile(file);
+    await uploadSingleFile(file);
   }
-  triggerSync(); // 🔥 auto sync
+  await triggerSync(); // 🔥 auto sync
 }
 
-async function uploadFile(file) {
-  const path = `${userId}/${Date.now()}_${file.name}`;
-
+async function uploadSingleFile(file) {
+  const filePath = `${userId}/${Date.now()}_${file.name}`;
   statusEl.textContent = `⬆️ อัปโหลด ${file.name}`;
 
-  const { error } = await supabase.storage
+  const { error: uploadError } = await sb
+    .storage
     .from("gallery")
-    .upload(path, file, { upsert: false });
+    .upload(filePath, file, { upsert: false });
 
-  if (error) {
-    statusEl.textContent = `❌ อัปโหลดล้มเหลว: ${file.name}`;
+  if (uploadError) {
+    statusEl.textContent = `❌ อัปโหลดไม่สำเร็จ: ${file.name}`;
     return;
   }
 
-  // hash (simple)
-  const hash = await crypto.subtle.digest(
+  // สร้าง hash
+  const hashBuffer = await crypto.subtle.digest(
     "SHA-256",
     await file.arrayBuffer()
   );
-  const hashHex = Array.from(new Uint8Array(hash))
+  const hashHex = Array.from(new Uint8Array(hashBuffer))
     .map(b => b.toString(16).padStart(2, "0"))
     .join("");
 
-  await supabase.from("file_hashes").insert({
+  await sb.from("file_hashes").insert({
     user_id: userId,
-    file_path: path,
+    file_path: filePath,
     hash: hashHex,
     synced: false
   });
@@ -147,7 +176,7 @@ async function uploadFile(file) {
   statusEl.textContent = `✅ อัปโหลดสำเร็จ: ${file.name}`;
 }
 
-/* ---------- AUTO SYNC ---------- */
+/* ---------- Auto Sync ---------- */
 async function triggerSync() {
   await fetch(FACE_SYNC_URL, {
     method: "POST",
