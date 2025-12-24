@@ -1,168 +1,75 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Face Search | ค้นหาภาพด้วยใบหน้า</title>
-
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
-
-  <style>
-    .filename {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      text-align: center;
-    }
-  </style>
+<meta charset="UTF-8" />
+<title>Face Search</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 </head>
 
-<body class="bg-slate-900 text-white min-h-screen flex justify-center p-6">
+<body class="bg-slate-900 text-white p-6">
+<input type="file" id="file" class="mb-4" />
+<button id="search" class="bg-green-600 px-4 py-2 rounded">ค้นหา</button>
+<div id="result" class="mt-4 grid grid-cols-2 gap-3"></div>
 
-<div class="w-full max-w-md">
-  <h1 class="text-2xl font-bold mb-4 text-center">📸 ค้นหาภาพด้วยใบหน้า</h1>
-
-  <div class="bg-slate-800 p-5 rounded-xl shadow">
-    <input id="fileInput" type="file" accept="image/*"
-      class="w-full mb-4 text-sm text-gray-300"/>
-
-    <button id="searchBtn"
-      class="w-full bg-green-600 hover:bg-green-700 py-2 rounded-lg font-semibold">
-      🔍 ค้นหารูป
-    </button>
-
-    <p id="status" class="text-sm text-gray-400 mt-3 text-center">
-      ⏳ โหลดโมเดล...
-    </p>
-
-    <div id="result" class="mt-4 text-sm"></div>
-  </div>
-</div>
-
-<script type="module">
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-
-/* ================= CONFIG ================= */
+<script>
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const BUCKET = "gallery";
 
-/* ================= INIT ================= */
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const fileInput = document.getElementById("fileInput");
-const searchBtn = document.getElementById("searchBtn");
-const statusDiv = document.getElementById("status");
-const resultDiv = document.getElementById("result");
-
-/* ================= LOAD MODELS ================= */
-const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
 await Promise.all([
-  faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
-  faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
-  faceapi.nets.faceRecognitionNet.loadFromUri(modelURL),
+  faceapi.nets.ssdMobilenetv1.loadFromUri("https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/"),
+  faceapi.nets.faceLandmark68Net.loadFromUri("https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/"),
+  faceapi.nets.faceRecognitionNet.loadFromUri("https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/")
 ]);
-statusDiv.textContent = "✅ พร้อมค้นหาแล้ว";
 
-/* ================= SEARCH ================= */
-searchBtn.onclick = async () => {
-  const file = fileInput.files[0];
-  if (!file) return alert("กรุณาเลือกรูปก่อน");
+search.onclick = async () => {
+  const file = document.getElementById("file").files[0];
+  if (!file) return alert("เลือกรูป");
 
-  resultDiv.innerHTML = "🧠 กำลังวิเคราะห์ใบหน้า...";
   const img = await faceapi.bufferToImage(file);
-
-  // 🔍 ตรวจทุกหน้า → ใช้หน้าใหญ่สุด
   const detections = await faceapi
     .detectAllFaces(img)
     .withFaceLandmarks()
     .withFaceDescriptors();
 
-  if (!detections.length) {
-    resultDiv.innerHTML = "❌ ไม่พบใบหน้าในภาพ";
-    return;
-  }
+  if (!detections.length) return alert("ไม่พบใบหน้า");
 
+  // เลือกหน้าที่ใหญ่ที่สุด
   const area = d => d.detection.box.width * d.detection.box.height;
-  const mainFace = detections.reduce((a,b)=> area(b)>area(a)?b:a);
-  const embedding = Array.from(mainFace.descriptor);
+  const main = detections.reduce((a,b)=>area(b)>area(a)?b:a);
 
-  statusDiv.textContent = "🔍 ค้นหารูปในระบบ...";
+  const embedding = Array.from(main.descriptor);
 
-  /* ================= CALL EDGE ================= */
   const res = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
-    },
-    body: JSON.stringify({ embedding })
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      embedding,
+      threshold: 0.8,
+      limit: 300
+    })
   });
 
-  const { matches, error } = await res.json();
-  if (error || !matches || !matches.length) {
-    resultDiv.innerHTML = "❌ ไม่พบภาพที่ตรงกัน";
-    return;
-  }
+  const { matches } = await res.json();
+  if (!matches.length) return alert("ไม่เจอ");
 
-  /* ================= SMART FILTER ================= */
-
-  // เรียงคะแนน
-  matches.sort((a,b)=>b.similarity - a.similarity);
-
-  const TOP = matches[0].similarity;
+  // 🔒 GAP filter + cluster
   const GAP = 0.08;
+  const top = matches[0].similarity;
+  const near = matches.filter(m => top - m.similarity <= GAP);
 
-  // 1️⃣ score gap
-  const gapFiltered = matches.filter(
-    m => TOP - m.similarity <= GAP
-  );
-
-  // 2️⃣ vote ต่อ image
-  const vote = new Map();
-  for (const m of gapFiltered) {
-    vote.set(m.image_url, (vote.get(m.image_url) || 0) + 1);
+  const countByImage = {};
+  for (const m of near) {
+    countByImage[m.image_url] = (countByImage[m.image_url] || 0) + 1;
   }
 
-  // 3️⃣ ต้องโผล่มากกว่า 1 embedding
-  let final = gapFiltered.filter(
-    m => vote.get(m.image_url) >= 2
-  );
+  const final = near.filter(m => countByImage[m.image_url] >= 2);
 
-  // fallback กันรูปหาย
-  if (final.length < 5) {
-    final = gapFiltered.slice(0, 30);
-  }
-
-  /* ================= UNIQUE IMAGE ================= */
-  const uniq = new Map();
-  for (const m of final) {
-    if (!uniq.has(m.image_url)) uniq.set(m.image_url, m);
-  }
-
-  const images = [...uniq.values()];
-
-  /* ================= RENDER ================= */
-  resultDiv.innerHTML = `
-    <p class="text-green-400 font-semibold mb-2">
-      🎯 พบ ${images.length} ภาพ
-    </p>
-    <div class="grid grid-cols-2 gap-3">
-      ${images.map(m => `
-        <div class="bg-slate-700 p-2 rounded">
-          <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}"
-               class="rounded mb-2 w-full object-cover aspect-[3/4]">
-          <p class="filename text-xs">${m.image_url.split("/").pop()}</p>
-          <p class="text-xs text-gray-400 text-center">
-            ${(m.similarity*100).toFixed(2)}%
-          </p>
-        </div>
-      `).join("")}
-    </div>
-  `;
+  result.innerHTML = final.map(m => `
+    <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}"
+         class="rounded shadow">
+  `).join("");
 };
 </script>
-
 </body>
 </html>
