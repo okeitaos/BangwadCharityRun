@@ -1,133 +1,154 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>🧠 Face Sync Admin Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8">
+<title>Admin Face Sync</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body class="bg-slate-900 text-white min-h-screen p-6">
-  <div class="max-w-4xl mx-auto space-y-6">
 
-    <h1 class="text-3xl font-bold text-center text-yellow-400">
-      🧠 Face Sync Admin Dashboard
-    </h1>
+<div class="max-w-3xl mx-auto space-y-6">
 
-    <!-- Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div class="bg-slate-800 rounded-xl p-4 text-center">
-        <p class="text-gray-400">📷 รูปทั้งหมด</p>
-        <p id="totalImages" class="text-2xl font-bold">-</p>
-      </div>
+  <h1 class="text-3xl font-bold text-yellow-400 text-center">
+    Admin Face Sync (ThaiRun Style)
+  </h1>
 
-      <div class="bg-slate-800 rounded-xl p-4 text-center">
-        <p class="text-gray-400">⏳ รอ Sync</p>
-        <p id="pendingImages" class="text-2xl font-bold text-yellow-300">-</p>
-      </div>
-
-      <div class="bg-slate-800 rounded-xl p-4 text-center">
-        <p class="text-gray-400">✅ Sync แล้ว</p>
-        <p id="syncedImages" class="text-2xl font-bold text-green-400">-</p>
-      </div>
+  <!-- Summary -->
+  <div class="bg-slate-800 rounded-xl p-4 space-y-2">
+    <div id="pendingText">Loading...</div>
+    <div class="w-full bg-gray-700 rounded-full h-4">
+      <div id="progressBar" class="bg-green-400 h-4 rounded-full" style="width:0%"></div>
     </div>
-
-    <!-- Actions -->
-    <div class="bg-slate-800 rounded-xl p-6 text-center space-y-4">
-      <button
-        id="syncBtn"
-        class="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-semibold transition disabled:opacity-50"
-      >
-        🔄 Sync Now
-      </button>
-
-      <div id="result" class="text-sm text-gray-300"></div>
-    </div>
-
-    <!-- Log -->
-    <div class="bg-black/40 rounded-xl p-4">
-      <h2 class="font-semibold mb-2">📜 Log</h2>
-      <pre id="log" class="text-xs text-gray-300 max-h-64 overflow-auto"></pre>
-    </div>
-
+    <div id="progressText" class="text-sm">0%</div>
   </div>
 
+  <!-- Controls -->
+  <div class="flex gap-4 justify-center">
+    <button id="startBtn"
+      class="bg-green-600 px-6 py-3 rounded-xl font-semibold">
+      Start Sync
+    </button>
+    <button id="stopBtn"
+      class="bg-red-600 px-6 py-3 rounded-xl font-semibold hidden">
+      Stop
+    </button>
+  </div>
+
+  <!-- Log -->
+  <div class="bg-slate-800 rounded-xl p-4 text-sm h-64 overflow-auto" id="logBox"></div>
+
+</div>
+
 <script>
-  // 🔧 แก้ค่าตรงนี้
-  const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-  const EDGE_FUNCTION_URL = SUPABASE_URL + "/functions/v1/face-sync";
+/* ========== CONFIG ========== */
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const FACE_SYNC_URL = SUPABASE_URL + "/functions/v1/face-sync";
 
-  const supabase = supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
+const BATCH_SIZE = 10;
+/* ============================ */
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let running = false;
+let total = 0;
+let done = 0;
+
+const pendingText = document.getElementById("pendingText");
+const progressBar = document.getElementById("progressBar");
+const progressText = document.getElementById("progressText");
+const logBox = document.getElementById("logBox");
+
+document.getElementById("startBtn").onclick = startSync;
+document.getElementById("stopBtn").onclick = stopSync;
+
+async function loadPending() {
+  const { count } = await sb
+    .from("file_hashes")
+    .select("*", { count: "exact", head: true })
+    .eq("synced", false);
+
+  total = count || 0;
+  pendingText.innerText = "Pending images: " + total;
+}
+
+async function startSync() {
+  if (total === 0) {
+    alert("No pending images");
+    return;
+  }
+
+  running = true;
+  done = 0;
+
+  document.getElementById("startBtn").classList.add("hidden");
+  document.getElementById("stopBtn").classList.remove("hidden");
+
+  log("Start syncing...");
+  await loopSync();
+}
+
+function stopSync() {
+  running = false;
+  log("Sync stopped by admin");
+}
+
+async function loopSync() {
+  while (running && done < total) {
+    await runBatch();
+    await sleep(800); // throttle like ThaiRun
+  }
+
+  if (done >= total) {
+    log("Sync completed");
+    document.getElementById("stopBtn").classList.add("hidden");
+    document.getElementById("startBtn").classList.remove("hidden");
+  }
+}
+
+async function runBatch() {
+  const res = await fetch(FACE_SYNC_URL, {
+    method: "POST"
+  });
+
+  const result = await res.json();
+
+  done += (result.synced || 0);
+  updateProgress();
+
+  log(
+    "Batch: synced=" +
+    result.synced +
+    " skipped=" +
+    result.skipped
   );
+}
 
-  const totalEl = document.getElementById("totalImages");
-  const pendingEl = document.getElementById("pendingImages");
-  const syncedEl = document.getElementById("syncedImages");
-  const logEl = document.getElementById("log");
-  const resultEl = document.getElementById("result");
-  const syncBtn = document.getElementById("syncBtn");
+function updateProgress() {
+  const percent = total
+    ? Math.min(100, Math.round((done / total) * 100))
+    : 0;
 
-  function log(msg) {
-    logEl.textContent += msg + "\n";
-    logEl.scrollTop = logEl.scrollHeight;
-  }
+  progressBar.style.width = percent + "%";
+  progressText.innerText = percent + "%";
+}
 
-  async function loadStats() {
-    log("🔍 โหลดสถิติรูป...");
+function log(text) {
+  const p = document.createElement("div");
+  p.innerText = new Date().toLocaleTimeString() + " - " + text;
+  logBox.appendChild(p);
+  logBox.scrollTop = logBox.scrollHeight;
+}
 
-    const { count: total } = await supabase
-      .from("images")
-      .select("*", { count: "exact", head: true });
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
 
-    const { count: pending } = await supabase
-      .from("images")
-      .select("*", { count: "exact", head: true })
-      .eq("synced", false);
-
-    const { count: synced } = await supabase
-      .from("images")
-      .select("*", { count: "exact", head: true })
-      .eq("synced", true);
-
-    totalEl.textContent = total ?? 0;
-    pendingEl.textContent = pending ?? 0;
-    syncedEl.textContent = synced ?? 0;
-
-    log("✅ โหลดสถิติเรียบร้อย");
-  }
-
-  async function runSync() {
-    syncBtn.disabled = true;
-    resultEl.textContent = "⏳ กำลัง Sync...";
-    log("🚀 เริ่ม Sync...");
-
-    try {
-      const res = await fetch(EDGE_FUNCTION_URL);
-      const json = await res.json();
-
-      log("📦 ผลลัพธ์: " + JSON.stringify(json));
-
-      resultEl.textContent =
-        `✅ Synced: ${json.synced || 0} | ❌ Skipped: ${json.skipped || 0}`;
-
-      await loadStats();
-    } catch (e) {
-      console.error(e);
-      resultEl.textContent = "❌ Sync ล้มเหลว";
-      log("❌ ERROR: " + e.message);
-    }
-
-    syncBtn.disabled = false;
-  }
-
-  syncBtn.addEventListener("click", runSync);
-
-  loadStats();
+loadPending();
 </script>
 
 </body>
