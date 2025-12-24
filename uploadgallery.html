@@ -1,492 +1,160 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📤 LINE Upload Gallery</title>
+<meta charset="UTF-8" />
+<title>📸 Photographer Upload</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 
-<!-- LINE LIFF & Supabase -->
+<script src="https://cdn.tailwindcss.com"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/js-sha256@0.9.0/build/sha256.min.js"></script>
-
-<style>
-  body {
-    font-family: "Prompt", sans-serif;
-    background: radial-gradient(circle at top, #1e293b, #0f172a);
-    color: #fff;
-    margin: 0;
-    text-align: center;
-    padding: 25px;
-  }
-  h1 { color: #facc15; text-shadow: 0 0 10px rgba(250,204,21,0.4); }
-  #userProfile img { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #facc15; }
-  button {
-    border: none; padding: 10px 20px; border-radius: 25px;
-    color: #fff; font-weight: bold; margin: 6px; cursor: pointer;
-    transition: 0.3s; box-shadow: 0 3px 10px rgba(0,0,0,0.4);
-  }
-  .btn-green { background: linear-gradient(90deg, #06C755, #00B900); }
-  .btn-gray { background: #475569; }
-  .btn-red { background: linear-gradient(90deg, #ef4444, #dc2626); }
-  .btn-blue { background: linear-gradient(90deg, #2563eb, #3b82f6); }
-  button:hover { transform: scale(1.05); opacity: 0.9; }
-
-  input[type="file"], input[type="text"] {
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 10px;
-    padding: 10px;
-    width: 90%;
-    max-width: 400px;
-    color: #fff;
-    text-align: center;
-    margin: 10px 0;
-  }
-
-  .progress-container { 
-    width: 90%; max-width: 500px; 
-    margin: 15px auto; 
-    background: rgba(255,255,255,0.1); 
-    border-radius: 10px; 
-    position: relative;
-  }
-  .progress-bar { 
-    height: 10px; 
-    background: linear-gradient(90deg, #22c55e, #84cc16); 
-    width: 0%; 
-    border-radius: 10px; 
-    transition: width 0.2s; 
-  }
-  #progressText {
-    position: absolute;
-    top: -25px;
-    right: 5px;
-    font-size: 0.9rem;
-    color: #facc15;
-  }
-
-  ul { list-style: none; padding: 0; margin: 0; }
-  li {
-    display: flex; align-items: center; justify-content: space-between;
-    background: rgba(255,255,255,0.05); margin: 5px auto;
-    padding: 8px; border-radius: 10px; max-width: 600px;
-  }
-  li img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; }
-  li span { flex: 1; margin-left: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
-
-  #pagination button { background: #3b82f6; }
-</style>
 </head>
 
-<body>
-<h1>📤 LINE Upload Gallery</h1>
+<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center p-4">
 
-<!-- 🔐 Section: Login -->
-<div id="loginSection">
-  <button class="btn-green" onclick="login()">เข้าสู่ระบบด้วย LINE</button>
-</div>
+<div class="w-full max-w-xl space-y-6">
 
-<!-- 📁 Section: Upload -->
-<div id="uploadSection" style="display:none;">
-  <div id="userProfile"></div>
+  <h1 class="text-2xl font-bold text-center text-yellow-400">
+    📸 Photographer Upload
+  </h1>
 
-  <input type="file" id="fileInput" multiple accept="image/*"><br>
-  <button class="btn-green" onclick="uploadFiles()">📤 อัปโหลด</button>
-  <button class="btn-gray" onclick="refreshProgress()">🔄 รีเฟรช</button>
-  <button class="btn-red" onclick="deleteAllFiles()">🗑️ ลบทั้งหมด</button>
-  <button class="btn-blue" onclick="logout()">🚪 ออกจากระบบ</button>
-
-  <div class="progress-container">
-    <div id="progressBar" class="progress-bar"></div>
-    <div id="progressText">0%</div>
+  <!-- Login -->
+  <div id="loginBox" class="bg-slate-800 rounded-xl p-6 text-center space-y-3">
+    <p>กรุณาเข้าสู่ระบบด้วย LINE</p>
+    <button
+      onclick="loginLine()"
+      class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl font-semibold"
+    >
+      Login with LINE
+    </button>
   </div>
-  
-<div id="uploadControls" style="margin-top:15px;">
-  <p id="eta" style="color:#facc15;font-size:0.9rem;">🕒 ประมาณเวลา: -</p>
-  <button id="pauseBtn" class="btn-gray" style="display:none;" onclick="pauseUpload()">⏸️ พัก</button>
-  <button id="resumeBtn" class="btn-green" style="display:none;" onclick="resumeUpload()">▶️ ดำเนินต่อ</button>
-  <button id="cancelBtn" class="btn-red" style="display:none;" onclick="cancelUpload()">⏹️ ยกเลิก</button>
-</div>
 
-  <div id="status">⏳ รออัปโหลด...</div>
-  <p id="totalCount">📸 อัปโหลดทั้งหมด: 0 รูป</p>
-  
-  <!-- 📋 Upload Queue -->
-  <div id="uploadQueue" style="max-width:600px;margin:20px auto;text-align:left;"></div>
+  <!-- Upload -->
+  <div id="uploadBox" class="hidden space-y-4">
 
-  <input type="text" id="searchInput" placeholder="🔍 ค้นหาชื่อไฟล์...">
-  <ul id="fileList"></ul>
+    <div class="bg-slate-800 rounded-xl p-4 text-center">
+      <p id="welcome" class="font-semibold"></p>
+      <p class="text-sm text-gray-400">Drag & Drop รูปภาพด้านล่าง</p>
+    </div>
 
-  <div id="pagination">
-    <button onclick="prevPage()" id="prevBtn" disabled>⬅️ ก่อนหน้า</button>
-    <button onclick="nextPage()" id="nextBtn" disabled>ถัดไป ➡️</button>
+    <div
+      id="dropzone"
+      class="border-2 border-dashed border-gray-500 rounded-xl p-10 text-center cursor-pointer hover:border-yellow-400 transition"
+    >
+      <p class="text-gray-300">ลากไฟล์มาวาง หรือคลิกเลือกไฟล์</p>
+      <input id="fileInput" type="file" multiple accept="image/*" class="hidden" />
+    </div>
+
+    <div id="status" class="text-sm text-gray-300"></div>
+
   </div>
+
 </div>
 
 <script>
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-const BUCKET = "gallery";
+/* ================= CONFIG ================= */
 const LIFF_ID = "2001781240-k2PJ3Ap2";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const FACE_SYNC_URL = SUPABASE_URL + "/functions/v1/face-sync";
+/* ========================================== */
 
-let cancelRequested = false;
-let paused = false;
-let resumePromise = null;
-let userId = "", profileName = "", profilePic = "";
-let existingHashes = new Set();
-let allFiles = [];
-let currentPage = 1;
-const PAGE_SIZE = 15;
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* 🟢 เริ่มต้น LIFF + ตรวจสอบสิทธิ์ */
-async function main() {
+let userId = null;
+
+/* ---------- LINE LOGIN ---------- */
+async function loginLine() {
   await liff.init({ liffId: LIFF_ID });
-
   if (!liff.isLoggedIn()) {
-    document.getElementById("loginSection").style.display = "block";
+    liff.login();
     return;
   }
-
   const profile = await liff.getProfile();
   userId = profile.userId;
-  profileName = profile.displayName;
-  profilePic = profile.pictureUrl;
+  checkPermission(profile);
+}
 
-  // ✅ ตรวจสอบสิทธิ์จากตาราง photographer_registration
-  const { data, error } = await sb
+async function checkPermission(profile) {
+  const { data, error } = await supabase
     .from("photographer_registration")
-    .select("status, prefix, first_name, last_name")
-    .eq("user_id", userId)
+    .select("*")
+    .eq("user_id", profile.userId)
+    .eq("status", "approved")
     .single();
 
   if (error || !data) {
-    document.body.innerHTML = `
-      <h1 style="color:#ef4444;">🚫 ไม่มีสิทธิ์ใช้งาน</h1>
-      <p>บัญชีนี้ยังไม่ผ่านการลงทะเบียนช่างภาพ</p>
-      <p><a href="https://okeitaos.github.io/BangwadCharityRun/photographer/register.html"
-        style="color:#3b82f6;">คลิกที่นี่เพื่อลงทะเบียน</a></p>
-    `;
+    alert("❌ ยังไม่ได้รับอนุญาตเป็นช่างภาพ");
     return;
   }
 
-  if (data.status !== "approved") {
-    document.body.innerHTML = `
-      <h1 style="color:#facc15;">⏳ รอการอนุมัติ</h1>
-      <p>บัญชีของคุณ (${data.prefix}${data.first_name} ${data.last_name})</p>
-      <p>ยังไม่ได้รับการอนุมัติจากผู้ดูแลระบบ</p>
-    `;
-    return;
-  }
-
-  // ✅ ผ่านการตรวจสอบแล้ว แสดงหน้า upload
-  showUploadSection();
-  await loadExistingHashes();
-  await listUserFiles();
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("uploadBox").classList.remove("hidden");
+  document.getElementById("welcome").textContent =
+    `ยินดีต้อนรับ ${data.name}`;
 }
 
-/* 👇 ฟังก์ชันทั้งหมดด้านล่างเหมือนเดิม ห้ามแก้ไข */
-function login() { liff.login(); }
-function logout() { liff.logout(); location.reload(); }
+/* ---------- UPLOAD ---------- */
+const dropzone = document.getElementById("dropzone");
+const fileInput = document.getElementById("fileInput");
+const statusEl = document.getElementById("status");
 
-function showUploadSection() {
-  document.getElementById("loginSection").style.display = "none";
-  document.getElementById("uploadSection").style.display = "block";
-  document.getElementById("userProfile").innerHTML = `<img src="${profilePic}" alt=""><p>${profileName}</p>`;
-}
-
-/* 🧩 โหลด hash ที่มีอยู่แล้ว */
-async function loadExistingHashes() {
-  const { data } = await sb.from("file_hashes").select("hash").eq("user_id", userId);
-  existingHashes = new Set(data?.map(x => x.hash));
-}
-
-/* 📤 อัปโหลดไฟล์ */
-// async function uploadFiles() {
-//   const files = document.getElementById("fileInput").files;
-//   const status = document.getElementById("status");
-//   const progressBar = document.getElementById("progressBar");
-//   const progressText = document.getElementById("progressText");
-//   if (!files.length) return alert("กรุณาเลือกไฟล์");
-//   if (files.length > 1000) return alert("อัปโหลดได้ไม่เกิน 1,000 รูปต่อครั้ง");
-
-//   status.innerText = "⏳ กำลังตรวจสอบ...";
-//   let success = 0, skipDup = 0, skipBig = 0;
-//   const total = files.length;
-
-//   for (let i = 0; i < total; i++) {
-//     const f = files[i];
-//     if (f.size > 5 * 1024 * 1024) { skipBig++; continue; }
-
-//     const buffer = await f.arrayBuffer();
-//     const hash = sha256(buffer);
-//     if (existingHashes.has(hash)) { skipDup++; continue; }
-
-//     const safeName = f.name.replace(/[^\w.-]+/g, "_").slice(0, 100);
-//     const path = `${userId}/${Date.now()}_${safeName}`;
-//     const { error } = await sb.storage.from(BUCKET).upload(path, f);
-//     if (!error) {
-//       await sb.from("file_hashes").insert({
-//         user_id: userId,
-//         profile_name: profileName,
-//         profile_pic: profilePic,
-//         file_path: path,
-//         hash
-//       });
-//       existingHashes.add(hash);
-//       success++;
-//     }
-//     const percent = Math.round(((i + 1) / total) * 100);
-//     progressBar.style.width = `${percent}%`;
-//     progressText.innerText = `${i + 1}/${total} (${percent}%)`;
-//   }
-
-//   status.innerText = `✅ สำเร็จ ${success}, ซ้ำ ${skipDup}, เกินขนาด ${skipBig}`;
-//   progressBar.style.width = "100%";
-//   progressText.innerText = "เสร็จสิ้น ✅";
-//   await listUserFiles();
-// }
-/* 📤 อัปโหลดไฟล์ผ่าน Edge Function (Parallel + Queue UI) */
-async function uploadFiles() {
-  cancelRequested = false;
-  paused = false;
-
-  const files = Array.from(document.getElementById("fileInput").files);
-  const status = document.getElementById("status");
-  const progressBar = document.getElementById("progressBar");
-  const progressText = document.getElementById("progressText");
-  const queueContainer = document.getElementById("uploadQueue");
-  const etaEl = document.getElementById("eta");
-  const cancelBtn = document.getElementById("cancelBtn");
-  const pauseBtn = document.getElementById("pauseBtn");
-  const resumeBtn = document.getElementById("resumeBtn");
-
-  if (!files.length) return alert("กรุณาเลือกไฟล์");
-
-  cancelBtn.style.display = "inline-block";
-  pauseBtn.style.display = "inline-block";
-  resumeBtn.style.display = "none";
-
-  const MAX_CONCURRENT = 5;
-  const total = files.length;
-  let success = 0, fail = 0, skipBig = 0, completed = 0;
-  let startTime = Date.now();
-
-  queueContainer.innerHTML = files.map(f => `
-    <div id="queue-${sha256(f.name)}" style="
-      background: rgba(255,255,255,0.08);
-      margin:5px 0;padding:8px;border-radius:10px;
-      display:flex;align-items:center;justify-content:space-between;
-    ">
-      <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.name}</span>
-      <div style="width:35%;height:8px;background:rgba(255,255,255,0.1);border-radius:5px;overflow:hidden;margin:0 5px;">
-        <div id="bar-${sha256(f.name)}" style="height:8px;width:0%;background:linear-gradient(90deg,#22c55e,#84cc16);"></div>
-      </div>
-      <small id="text-${sha256(f.name)}" style="color:#facc15;font-size:0.8rem;">รอคิว...</small>
-    </div>
-  `).join("");
-
-  async function uploadSingleFile(f) {
-    if (cancelRequested) return;
-    while (paused) await new Promise(r => resumePromise = r); // ⏸️ รอจน resume
-
-    const hash = sha256(f.name);
-    const textEl = document.getElementById(`text-${hash}`);
-    const barEl = document.getElementById(`bar-${hash}`);
-
-    if (f.size > 5 * 1024 * 1024) {
-      skipBig++;
-      textEl.innerText = "❌ ขนาดเกิน 5MB";
-      barEl.style.background = "#ef4444";
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("user_id", userId);
-    formData.append("profile_name", profileName);
-    formData.append("profile_pic", profilePic);
-    formData.append("file", f);
-
-    textEl.innerText = "📤 กำลังอัปโหลด...";
-    try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/upload_image`, { method: "POST", body: formData });
-      const result = await res.json();
-
-      if (result.success) {
-        textEl.innerText = "✅ สำเร็จ";
-        barEl.style.width = "100%";
-      } else {
-        textEl.innerText = "❌ ล้มเหลว";
-        barEl.style.background = "#ef4444";
-      }
-    } catch {
-      textEl.innerText = "⚠️ ข้อผิดพลาด";
-      barEl.style.background = "#ef4444";
-      fail++;
-    }
-
-    completed++;
-    const percent = Math.round((completed / total) * 100);
-    progressBar.style.width = `${percent}%`;
-    progressText.innerText = `${completed}/${total} (${percent}%)`;
-
-    // ⏱️ ETA
-    const elapsed = (Date.now() - startTime) / 1000;
-    const avg = elapsed / completed;
-    const remaining = (total - completed) * avg;
-    etaEl.innerText = `🕒 ประมาณเวลา: ${Math.floor(remaining / 60)} นาที ${Math.floor(remaining % 60)} วินาที`;
-  }
-
-  for (let i = 0; i < total; i += MAX_CONCURRENT) {
-    if (cancelRequested) break;
-    while (paused) await new Promise(r => resumePromise = r);
-    const batch = files.slice(i, i + MAX_CONCURRENT);
-    await Promise.all(batch.map(uploadSingleFile));
-  }
-
-  cancelBtn.style.display = "none";
-  pauseBtn.style.display = "none";
-  resumeBtn.style.display = "none";
-  progressText.innerText = cancelRequested ? "⏹️ ยกเลิกแล้ว" : "✅ เสร็จสิ้น";
-}
-
-/* 🛑 ยกเลิก */
-function cancelUpload() {
-  if (confirm("แน่ใจหรือไม่ที่จะยกเลิกการอัปโหลดทั้งหมด?")) {
-    cancelRequested = true;
-  }
-}
-
-/* ⏸️ พัก */
-function pauseUpload() {
-  paused = true;
-  document.getElementById("pauseBtn").style.display = "none";
-  document.getElementById("resumeBtn").style.display = "inline-block";
-  document.getElementById("eta").innerText = "⏸️ การอัปโหลดถูกพักชั่วคราว";
-}
-
-/* ▶️ ดำเนินต่อ */
-function resumeUpload() {
-  paused = false;
-  if (resumePromise) resumePromise();
-  document.getElementById("pauseBtn").style.display = "inline-block";
-  document.getElementById("resumeBtn").style.display = "none";
-}
-
-
-
-
-/* 📜 โหลดรายการ */
-async function listUserFiles() {
-  const { data } = await sb.storage.from(BUCKET).list(`${userId}/`, { limit: 10000 });
-  allFiles = data?.filter(f => f.name !== ".emptyFolderPlaceholder") || [];
-  document.getElementById("totalCount").innerText = `📸 อัปโหลดทั้งหมด: ${allFiles.length} รูป`;
-  renderPage(1);
-}
-
-/* 🧭 Pagination */
-function renderPage(page) {
-  const list = document.getElementById("fileList");
-  const start = (page - 1) * PAGE_SIZE;
-  const end = start + PAGE_SIZE;
-  const files = allFiles.slice(start, end);
-  list.innerHTML = "";
-
-  files.forEach(f => {
-    const url = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${f.name}`;
-    const li = document.createElement("li");
-    li.innerHTML = `
-      <img src="${url}" alt="thumb">
-      <span>${f.name}</span>
-      <button class="btn-red" onclick="deleteFile('${f.name}')">ลบ</button>
-    `;
-    list.appendChild(li);
-  });
-
-  document.getElementById("prevBtn").disabled = page <= 1;
-  document.getElementById("nextBtn").disabled = end >= allFiles.length;
-  currentPage = page;
-}
-function nextPage() { if ((currentPage * PAGE_SIZE) < allFiles.length) renderPage(++currentPage); }
-function prevPage() { if (currentPage > 1) renderPage(--currentPage); }
-
-/* 🔍 ค้นหา */
-document.getElementById("searchInput").addEventListener("input", e => {
-  const keyword = e.target.value.toLowerCase();
-  const filtered = allFiles.filter(f => f.name.toLowerCase().includes(keyword));
-  const list = document.getElementById("fileList");
-  list.innerHTML = "";
-  filtered.slice(0, 15).forEach(f => {
-    const url = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${userId}/${f.name}`;
-    list.innerHTML += `<li><img src="${url}"><span>${f.name}</span>
-      <button class="btn-red" onclick="deleteFile('${f.name}')">ลบ</button></li>`;
-  });
-});
-
-/* ❌ ลบรูปเดี่ยว */
-async function deleteFile(name) {
-  if (!confirm(`ลบไฟล์ ${name}?`)) return;
-  const filePath = `${userId}/${name}`;
-  await sb.storage.from(BUCKET).remove([filePath]);
-  await sb.from("file_hashes").delete().eq("file_path", filePath);
-  await listUserFiles();
-}
-
-/* ⚠️ ลบทั้งหมด */
-async function deleteAllFiles() {
-  const confirmText = prompt("⚠️ ต้องการลบรูปทั้งหมดของคุณหรือไม่?\nพิมพ์ CONFIRM เพื่อยืนยัน:");
-  if (confirmText !== "CONFIRM") return alert("❌ ยกเลิกการลบทั้งหมด");
-
-  const { data } = await sb.storage.from(BUCKET).list(`${userId}/`, { limit: 10000 });
-  const files = data?.map(f => `${userId}/${f.name}`) || [];
-  if (!files.length) return alert("ไม่มีรูปให้ลบ");
-
-  await sb.storage.from(BUCKET).remove(files);
-  await sb.from("file_hashes").delete().eq("user_id", userId);
-
-  alert("✅ ลบรูปทั้งหมดเรียบร้อยแล้ว");
-  await listUserFiles();
-}
-
-/* 🔄 รีเฟรช Progress */
-function refreshProgress() {
-  document.getElementById("progressBar").style.width = "0%";
-  document.getElementById("progressText").innerText = "0%";
-  document.getElementById("status").innerText = "🔄 พร้อมอัปโหลดใหม่";
-  document.getElementById("fileInput").value = "";
-}
-
-/* ==============================
-ADD: BLOCK UPLOAD FUNCTION
-============================== */
-async function checkUploadBlocked(userId){
-const { data } = await sb
-.from("photographer_registration")
-.select("is_upload_blocked")
-.eq("user_id", userId)
-.single();
-
-
-if(data?.is_upload_blocked){
-alert("🚫 ผู้ดูแลระบบได้ปิดการอัปโหลดรูปภาพสำหรับบัญชีนี้");
-document.getElementById("fileInput").disabled = true;
-const uploadBtn = document.querySelector("button.btn-green[onclick='uploadFiles()']");
-if(uploadBtn){ uploadBtn.disabled = true; uploadBtn.style.opacity = 0.4; }
-document.getElementById("status").innerText = "🚫 ถูกปิดการอัปโหลดโดยผู้ดูแลระบบ";
-}
-}
-
-
-/* Inject without modifying original function */
-const _originalShowUploadSection = showUploadSection;
-showUploadSection = function(){
-_originalShowUploadSection();
-checkUploadBlocked(userId);
+dropzone.onclick = () => fileInput.click();
+dropzone.ondragover = e => e.preventDefault();
+dropzone.ondrop = e => {
+  e.preventDefault();
+  handleFiles(e.dataTransfer.files);
 };
+fileInput.onchange = e => handleFiles(e.target.files);
 
+async function handleFiles(files) {
+  for (const file of files) {
+    await uploadFile(file);
+  }
+  triggerSync(); // 🔥 auto sync
+}
 
-main();
+async function uploadFile(file) {
+  const path = `${userId}/${Date.now()}_${file.name}`;
+
+  statusEl.textContent = `⬆️ อัปโหลด ${file.name}`;
+
+  const { error } = await supabase.storage
+    .from("gallery")
+    .upload(path, file, { upsert: false });
+
+  if (error) {
+    statusEl.textContent = `❌ อัปโหลดล้มเหลว: ${file.name}`;
+    return;
+  }
+
+  // hash (simple)
+  const hash = await crypto.subtle.digest(
+    "SHA-256",
+    await file.arrayBuffer()
+  );
+  const hashHex = Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  await supabase.from("file_hashes").insert({
+    user_id: userId,
+    file_path: path,
+    hash: hashHex,
+    synced: false
+  });
+
+  statusEl.textContent = `✅ อัปโหลดสำเร็จ: ${file.name}`;
+}
+
+/* ---------- AUTO SYNC ---------- */
+async function triggerSync() {
+  await fetch(FACE_SYNC_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId })
+  });
+}
 </script>
 
 </body>
