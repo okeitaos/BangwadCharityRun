@@ -1,12 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>Admin Face Sync</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body class="bg-slate-900 text-white min-h-screen p-6">
@@ -17,48 +16,52 @@
     Admin Face Sync (ThaiRun Style)
   </h1>
 
-  <!-- Summary -->
+  <!-- SUMMARY -->
   <div class="bg-slate-800 rounded-xl p-4 space-y-2">
-    <div id="pendingText">Loading...</div>
+    <div id="statusText">Idle</div>
+
     <div class="w-full bg-gray-700 rounded-full h-4">
-      <div id="progressBar" class="bg-green-400 h-4 rounded-full" style="width:0%"></div>
+      <div id="progressBar"
+        class="bg-green-400 h-4 rounded-full"
+        style="width:0%">
+      </div>
     </div>
+
     <div id="progressText" class="text-sm">0%</div>
   </div>
 
-  <!-- Controls -->
+  <!-- CONTROLS -->
   <div class="flex gap-4 justify-center">
     <button id="startBtn"
       class="bg-green-600 px-6 py-3 rounded-xl font-semibold">
       Start Sync
     </button>
+
     <button id="stopBtn"
       class="bg-red-600 px-6 py-3 rounded-xl font-semibold hidden">
       Stop
     </button>
   </div>
 
-  <!-- Log -->
-  <div class="bg-slate-800 rounded-xl p-4 text-sm h-64 overflow-auto" id="logBox"></div>
+  <!-- LOG -->
+  <div
+    id="logBox"
+    class="bg-slate-800 rounded-xl p-4 text-sm h-72 overflow-auto space-y-1">
+  </div>
 
 </div>
 
 <script>
-/* ========== CONFIG ========== */
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-const FACE_SYNC_URL = SUPABASE_URL + "/functions/v1/face-sync";
-
-const BATCH_SIZE = 10;
-/* ============================ */
-
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+/* ================= CONFIG ================= */
+const FACE_SYNC_URL = "http://localhost:3000/sync"; // 🔥 แก้ตรงนี้ถ้า deploy แล้ว
+const SYNC_KEY = ""; // ใส่ถ้ามี x-sync-key
+const LOOP_DELAY = 1200; // ms (เหมือนไทยรัน)
+/* ========================================= */
 
 let running = false;
-let total = 0;
-let done = 0;
+let totalDone = 0;
 
-const pendingText = document.getElementById("pendingText");
+const statusText = document.getElementById("statusText");
 const progressBar = document.getElementById("progressBar");
 const progressText = document.getElementById("progressText");
 const logBox = document.getElementById("logBox");
@@ -66,89 +69,118 @@ const logBox = document.getElementById("logBox");
 document.getElementById("startBtn").onclick = startSync;
 document.getElementById("stopBtn").onclick = stopSync;
 
-async function loadPending() {
-  const { count } = await sb
-    .from("file_hashes")
-    .select("*", { count: "exact", head: true })
-    .eq("synced", false);
-
-  total = count || 0;
-  pendingText.innerText = "Pending images: " + total;
+/* ================= LOG ================= */
+function log(msg) {
+  const el = document.createElement("div");
+  el.innerText = new Date().toLocaleTimeString() + " - " + msg;
+  logBox.appendChild(el);
+  logBox.scrollTop = logBox.scrollHeight;
 }
 
+/* ================= CONTROL ================= */
 async function startSync() {
-  if (total === 0) {
-    alert("No pending images");
-    return;
-  }
+  if (running) return;
 
   running = true;
-  done = 0;
+  totalDone = 0;
+
+  statusText.innerText = "Running...";
+  progressBar.style.width = "0%";
+  progressText.innerText = "0%";
 
   document.getElementById("startBtn").classList.add("hidden");
   document.getElementById("stopBtn").classList.remove("hidden");
 
-  log("Start syncing...");
+  log("🚀 Start face sync");
+
   await loopSync();
 }
 
 function stopSync() {
   running = false;
-  log("Sync stopped by admin");
+  statusText.innerText = "Stopped";
+  log("⛔ Sync stopped by admin");
+
+  document.getElementById("stopBtn").classList.add("hidden");
+  document.getElementById("startBtn").classList.remove("hidden");
 }
 
+/* ================= SYNC LOOP ================= */
 async function loopSync() {
-  while (running && done < total) {
-    await runBatch();
-    await sleep(800); // throttle like ThaiRun
-  }
+  while (running) {
+    const result = await runBatch();
 
-  if (done >= total) {
-    log("Sync completed");
-    document.getElementById("stopBtn").classList.add("hidden");
-    document.getElementById("startBtn").classList.remove("hidden");
+    if (!result) break;
+
+    if (result.status === "no_files") {
+      log("✅ No pending images");
+      finish();
+      break;
+    }
+
+    totalDone += result.synced;
+
+    log(
+      `Batch synced=${result.synced}, skipped=${result.skipped}`
+    );
+
+    // fake progress (thai-run style)
+    updateProgress(result.synced, result.skipped);
+
+    await sleep(LOOP_DELAY);
   }
 }
 
 async function runBatch() {
-  const res = await fetch(FACE_SYNC_URL, {
-    method: "POST"
-  });
+  try {
+    const res = await fetch(FACE_SYNC_URL, {
+      method: "POST",
+      headers: SYNC_KEY
+        ? { "x-sync-key": SYNC_KEY }
+        : {}
+    });
 
-  const result = await res.json();
+    if (!res.ok) {
+      log("❌ Server error: " + res.status);
+      stopSync();
+      return null;
+    }
 
-  done += (result.synced || 0);
-  updateProgress();
-
-  log(
-    "Batch: synced=" +
-    result.synced +
-    " skipped=" +
-    result.skipped
-  );
+    return await res.json();
+  } catch (err) {
+    log("❌ Network error");
+    stopSync();
+    return null;
+  }
 }
 
-function updateProgress() {
-  const percent = total
-    ? Math.min(100, Math.round((done / total) * 100))
-    : 0;
+/* ================= PROGRESS ================= */
+function updateProgress(synced, skipped) {
+  // progress แบบประมาณ (เพราะเราไม่รู้ total ล่วงหน้า)
+  const inc = synced > 0 ? 3 : 1;
+  const current = parseInt(progressBar.style.width) || 0;
+  const next = Math.min(100, current + inc);
 
-  progressBar.style.width = percent + "%";
-  progressText.innerText = percent + "%";
+  progressBar.style.width = next + "%";
+  progressText.innerText = next + "%";
 }
 
-function log(text) {
-  const p = document.createElement("div");
-  p.innerText = new Date().toLocaleTimeString() + " - " + text;
-  logBox.appendChild(p);
-  logBox.scrollTop = logBox.scrollHeight;
+function finish() {
+  running = false;
+  progressBar.style.width = "100%";
+  progressText.innerText = "100%";
+  statusText.innerText = "Completed";
+
+  document.getElementById("stopBtn").classList.add("hidden");
+  document.getElementById("startBtn").classList.remove("hidden");
+
+  log("🎉 Face sync completed");
 }
 
+/* ================= UTIL ================= */
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
-
-loadPending();
 </script>
 
 </body>
