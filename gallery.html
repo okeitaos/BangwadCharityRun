@@ -24,7 +24,6 @@
 
 <div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
-  <!-- Header -->
   <h1 class="text-2xl md:text-3xl font-bold text-center text-yellow-400">
     🏃‍♂️ ค้นหาภาพของคุณ
   </h1>
@@ -64,7 +63,7 @@
   <!-- Secondary Results -->
   <div id="secondarySection" class="hidden mt-8">
     <h2 class="text-sm text-yellow-400 mb-2 text-center">
-      ⚠️ อาจเป็นภาพของคุณ (กรุณาตรวจสอบ)
+      ⚠️ อาจเป็นภาพของคุณ
     </h2>
     <div id="secondaryBox"
       class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -80,6 +79,13 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const LOGO_URL =
   "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
 const RESULT_LIMIT = 500;
+
+/*
+  Similarity = 1 - distance
+  ดังนั้น:
+  similarity >= 0.50  → distance <= 0.50
+*/
+const MAX_DISTANCE_SHOW = 0.50;
 /* ========================================= */
 
 const sb = supabase.createClient(
@@ -109,20 +115,27 @@ async function loadModels() {
 }
 loadModels();
 
-/* ================= SPLIT RESULTS (ทาง A) ================= */
+/* ================= SPLIT RESULTS (UX + Confirmation) ================= */
 function splitResults(rows) {
   if (!rows || rows.length === 0) {
     return { primary: [], secondary: [] };
   }
 
-  const sorted = [...rows].sort((a, b) => a.distance - b.distance);
+  // เรียงจากใกล้ → ไกล
+  const sorted = [...rows]
+    .filter(r => r.distance <= MAX_DISTANCE_SHOW) // ❌ ตัด < similarity 0.50 ทิ้งตั้งแต่ต้น
+    .sort((a, b) => a.distance - b.distance);
+
+  if (sorted.length === 0) {
+    return { primary: [], secondary: [] };
+  }
 
   const primary = [sorted[0]]; // anchor
   const secondary = [];
 
   const MAX_JUMP = 0.12;
-  const ABS_MAX_PRIMARY = 0.70;
-  const ABS_MAX_SECONDARY = 0.80;
+  const ABS_MAX_PRIMARY = 0.30; // similarity >= 0.70
+  const ABS_MAX_SECONDARY = 0.50; // similarity >= 0.50
 
   let cutIndex = 1;
 
@@ -137,7 +150,7 @@ function splitResults(rows) {
     cutIndex = i + 1;
   }
 
-  // secondary (อาจใช่)
+  // secondary (อาจใช่ แต่ similarity ≥ 0.50)
   for (let i = cutIndex; i < sorted.length; i++) {
     if (sorted[i].distance <= ABS_MAX_SECONDARY) {
       secondary.push(sorted[i]);
@@ -161,7 +174,6 @@ fileInput.onchange = async () => {
 
   const img = await faceapi.bufferToImage(file);
 
-  // Show query preview
   queryPreviewImg.src = img.src;
   queryPreviewBox.classList.remove("hidden");
 
@@ -259,7 +271,7 @@ function renderSecondary(rows) {
 
   secondarySection.classList.remove("hidden");
   secondaryBox.innerHTML = "";
-  rows.forEach((r, i) => renderCard(r, i, secondaryBox, true));
+  rows.forEach((r, i) => renderCard(r, i, secondaryBox));
 }
 
 function renderCard(r, i, box) {
