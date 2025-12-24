@@ -349,12 +349,25 @@ const embedding = Array.from(det.descriptor);
 // const filteredMatches = matches.filter(
 //   m => top - m.similarity <= 0.015
 // );
-        const GAP = 0.12; // ค่าที่เหมาะกับงานวิ่ง
+const GAP = 0.08; // ค่าที่เหมาะกับงานวิ่ง
 
 const top = matches[0].similarity;
+
 const filteredMatches = matches.filter(
   m => top - m.similarity <= GAP
 );
+const byImage = new Map();
+
+for (const m of filteredMatches) {
+  const key = m.image_url;
+  byImage.set(key, (byImage.get(key) || 0) + 1);
+}
+
+// เก็บเฉพาะภาพที่ "หน้าเดียวกันโผล่หลายครั้ง"
+const finalMatches = filteredMatches.filter(
+  m => byImage.get(m.image_url) >= 2
+);
+
 
 // fallback กันว่าง
 const finalMatches = filteredMatches.length
