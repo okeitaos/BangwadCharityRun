@@ -362,11 +362,6 @@ const finalMatches = filteredMatches.length
   : matches.slice(0, 5);
 
 
-// fallback ถ้ากรองแล้วว่าง
-const finalMatches = filteredMatches.length
-  ? filteredMatches
-  : matches.slice(0, 3);
-
         resultDiv.innerHTML = `
           <p class="text-green-400 font-semibold mb-2">${langPack.found(finalMatches.length, Math.round(SIM_THRESHOLD * 100))}</p>
           <div class="grid grid-cols-2 gap-3">
