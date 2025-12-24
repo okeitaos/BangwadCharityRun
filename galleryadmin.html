@@ -288,114 +288,74 @@ async function handleSync(path, map, cache, attempt = 0, singleRetry = false) {
   const cacheT = cache[path], updated = map[path].updated_at;
   if (!singleRetry && cacheT && updated <= cacheT) {
     stats.skipped++;
-    if(!processedSet.has(path)){processedSet.add(path);stats.processed++;}
-    updateStats(); 
+    if (!processedSet.has(path)) {
+      processedSet.add(path);
+      stats.processed++;
+    }
+    updateStats();
     return;
   }
 
   try {
-    const { data: exists } = await supabase.from("faces").select("id").eq("image_url", path).maybeSingle();
+    // เช็คซ้ำใน DB
+    const { data: exists } = await supabase
+      .from("faces")
+      .select("id")
+      .eq("image_url", path)
+      .maybeSingle();
+
     if (exists) {
       stats.skipped++;
-      if(!processedSet.has(path)){processedSet.add(path);stats.processed++;}
-      cache[path] = updated; saveCache(cache); updateStats();
+      processedSet.add(path);
+      cache[path] = updated;
+      saveCache(cache);
+      updateStats();
       return;
     }
 
     const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`;
     const img = await faceapi.fetchImage(imgUrl);
 
-    // 🔍 ตรวจหลายใบหน้าก่อน
-    let detections = await faceapi
+    const detections = await faceapi
       .detectAllFaces(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.2 }))
-      .withFaceLandmarks().withFaceDescriptors();
+      .withFaceLandmarks()
+      .withFaceDescriptors();
 
-    // ถ้าไม่เจอ → fallback โหมดละเอียด (smart)
-    if (!detections || detections.length === 0) {
-      detections = [];
-      const single = await detectFaceWithRotationSupport(imgUrl, Number($("minFaceSize").value));
-      if (single) detections.push(single);
-    }
-
-    if (!detections || detections.length === 0) throw new Error("ไม่พบใบหน้าในภาพ");
+    if (!detections.length) throw new Error("ไม่พบใบหน้า");
 
     const minFace = Number($("minFaceSize").value) || 25;
+
     const validFaces = detections.filter(d =>
-      d.detection.box.width >= minFace && d.detection.box.height >= minFace
+      d.detection.box.width >= minFace &&
+      d.detection.box.height >= minFace
     );
 
-    if (validFaces.length === 0) throw new Error("ใบหน้าเล็กเกินไปทั้งหมด");
+    if (!validFaces.length) throw new Error("ใบหน้าเล็กเกินไป");
 
-    // ✅ บันทึกทุกใบหน้าที่ตรวจเจอ
-    // for (let i = 0; i < validFaces.length; i++) {
-    //   const det = validFaces[i];
-    //   const emb = Array.from(det.descriptor);
-    //   const name = `${path.split("/").pop().split(".").shift()}#${i+1}`;
-    //   const { error } = await supabase.rpc("insert_face_vector", {
-    //     p_name: name,
-    //     p_image_url: path,
-    //     p_embedding: emb
-    //   });
-    //   if (error) console.warn("⚠️ insert_face_vector error:", error.message);
-    // }
-    // ===============================
-// ✅ เลือกใบหน้าหลัก (ใหญ่ที่สุด)
-// ===============================
-// const area = d => d.detection.box.width * d.detection.box.height;
+    // ✅ เลือกใบหน้าหลัก (ใหญ่ที่สุด)
+    const area = d => d.detection.box.width * d.detection.box.height;
+    const mainFace = validFaces.reduce((a, b) => area(b) > area(a) ? b : a);
 
-// const mainFace = validFaces.reduce((a, b) =>
-//   area(b) > area(a) ? b : a
-// );
+    const baseName = path.split("/").pop().split(".").shift();
 
-// const det = mainFace;
-
-// const emb = Array.from(det.descriptor);
-// const name = path.split("/").pop().split(".").shift();
-
-// await supabase.rpc("insert_face_vector", {
-//   p_name: name,
-//   p_image_url: path,
-//   p_embedding: emb
-// });
-
-// ===============================
-// ✅ เก็บ 2 ใบหน้าหลัก (ลดภาพหาย)
-// ===============================
-const area = d => d.detection.box.width * d.detection.box.height;
-
-const sortedFaces = validFaces
-  .sort((a, b) => area(b) - area(a))
-  .slice(0, 3); // เก็บแค่ 2 หน้า
-
-const baseName = path.split("/").pop().split(".").shift();
-
-for (let i = 0; i < sortedFaces.length; i++) {
-  const det = sortedFaces[i];
-  const emb = Array.from(det.descriptor);
-
-  await supabase.rpc("insert_face_vector", {
-    p_name: `${baseName}#${i + 1}`,
-    p_image_url: path,
-    p_embedding: emb
-  });
-}
+    await supabase.rpc("insert_face_vector", {
+      p_name: baseName,
+      p_image_url: path,
+      p_embedding: Array.from(mainFace.descriptor)
+    });
 
     stats.success++;
     cache[path] = updated;
     saveCache(cache);
-    log("info", `✅ ${path} (ใบหน้าที่เจอ: ${validFaces.length})`);
+    log("info", `✅ ${path}`);
 
   } catch (err) {
     if (attempt < 2 && !singleRetry) {
-      log("warn", `Retry ${attempt + 1}/3: ${path} (${err.message})`);
       await delay(500);
-      return await handleSync(path, map, cache, attempt + 1);
-    } else {
-      log("error", `❌ ${path}: ${err.message}`);
-      stats.failed++;
-      const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(path)}`;
-      addFailedPreview(path, imgUrl, err.message);
+      return handleSync(path, map, cache, attempt + 1);
     }
+    stats.failed++;
+    log("error", `❌ ${path}: ${err.message}`);
   } finally {
     if (!processedSet.has(path)) {
       processedSet.add(path);
