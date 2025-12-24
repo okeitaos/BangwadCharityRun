@@ -49,10 +49,11 @@ search.onclick = async () => {
 
   const res = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": ANON_KEY
-    },
+  headers: {
+  "Content-Type": "application/json",
+  "apikey": ANON_KEY,
+  "Authorization": `Bearer ${ANON_KEY}`
+},
     body: JSON.stringify({
       embedding,
       threshold: 0.8,
