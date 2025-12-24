@@ -12,7 +12,7 @@
 
 <body class="bg-slate-900 text-white min-h-screen flex items-center justify-center p-4">
 
-<div class="w-full max-w-xl space-y-6">
+<div class="w-full max-w-2xl space-y-6">
 
   <h1 class="text-2xl font-bold text-center text-yellow-400">
     Photographer Upload
@@ -28,47 +28,61 @@
   <!-- UPLOAD -->
   <div id="uploadBox" class="hidden space-y-4">
 
+    <!-- Profile -->
     <div class="bg-slate-800 rounded-xl p-4 text-center">
       <img id="avatar" class="w-16 h-16 rounded-full mx-auto mb-2">
       <div id="welcome"></div>
     </div>
 
+    <!-- Overall progress -->
+    <div class="bg-slate-800 rounded-xl p-4">
+      <div class="flex justify-between text-sm mb-1">
+        <span id="overallText">Waiting</span>
+        <span id="overallPercent">0%</span>
+      </div>
+      <div class="w-full bg-gray-700 rounded-full h-3">
+        <div id="overallBar" class="bg-yellow-400 h-3 rounded-full" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Dropzone -->
     <div id="dropzone"
       class="border-2 border-dashed border-gray-500 rounded-xl p-10 text-center cursor-pointer">
-      Click or Drop Images
+      Click or Drop Images (Max 5000 files, Max 5MB / file)
       <input id="fileInput" type="file" multiple accept="image/*" class="hidden">
     </div>
 
-    <div id="status" class="text-sm"></div>
+    <!-- Queue -->
+    <div id="queue" class="space-y-2"></div>
 
   </div>
 </div>
 
 <script>
-/* ===== CONFIG ===== */
+/* ================= CONFIG ================= */
 const LIFF_ID = "2001781240-k2PJ3Ap2";
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
-/* ================== */
+
+const MAX_FILES = 5000;
+const MAX_SIZE_MB = 5;
+/* ========================================= */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let userId = null;
+let queue = [];
+let uploaded = 0;
 
-/* ===== LOGIN ===== */
+/* ================= LOGIN ================= */
 document.getElementById("loginBtn").onclick = loginLine;
 
 async function loginLine() {
   await liff.init({ liffId: LIFF_ID });
-
-  if (!liff.isLoggedIn()) {
-    liff.login();
-    return;
-  }
+  if (!liff.isLoggedIn()) return liff.login();
 
   const profile = await liff.getProfile();
   userId = profile.userId;
-
   checkPermission();
 }
 
@@ -79,82 +93,139 @@ async function checkPermission() {
     .eq("user_id", userId)
     .single();
 
-  if (!res.data) {
-    alert("Not allowed");
-    return;
-  }
+  if (!res.data) return alert("Not allowed");
 
   const d = res.data;
-
-  if (
-    d.status !== "approved" ||
-    d.is_blocked ||
-    d.is_deleted ||
-    d.is_upload_blocked
-  ) {
-    alert("Upload blocked");
-    return;
+  if (d.status !== "approved" || d.is_blocked || d.is_deleted || d.is_upload_blocked) {
+    return alert("Upload blocked");
   }
 
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("uploadBox").classList.remove("hidden");
-
-  document.getElementById("welcome").innerText =
-    "Welcome " + d.display_name;
-
+  document.getElementById("welcome").innerText = "Welcome " + d.display_name;
   document.getElementById("avatar").src = d.picture_url;
 }
 
-/* ===== UPLOAD ===== */
-const dropzone = document.getElementById("dropzone");
-const fileInput = document.getElementById("fileInput");
-const statusEl = document.getElementById("status");
+/* ================= FILE FILTER ================= */
+function filterFiles(files) {
+  const valid = [];
+  const skipped = [];
 
-dropzone.onclick = function () {
-  fileInput.click();
-};
-
-fileInput.onchange = function (e) {
-  handleFiles(e.target.files);
-};
-
-async function handleFiles(files) {
   for (const file of files) {
-    await uploadFile(file);
+    if (valid.length >= MAX_FILES) {
+      skipped.push(file.name + " (over 5000 files)");
+      continue;
+    }
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      skipped.push(file.name + " (over 5MB)");
+      continue;
+    }
+    valid.push(file);
   }
-  statusEl.innerText = "Upload completed";
+
+  if (skipped.length) {
+    alert(
+      "Skipped " + skipped.length + " files\n" +
+      skipped.slice(0, 10).join("\n")
+    );
+  }
+
+  return valid;
 }
 
-async function uploadFile(file) {
-  const path = userId + "/" + Date.now() + "_" + file.name;
-  statusEl.innerText = "Uploading " + file.name;
+/* ================= DROPZONE ================= */
+const dropzone = document.getElementById("dropzone");
+const fileInput = document.getElementById("fileInput");
+const queueEl = document.getElementById("queue");
 
-  // upload to storage
-  await sb.storage.from("gallery").upload(path, file);
+dropzone.onclick = () => fileInput.click();
+fileInput.onchange = e => enqueue(filterFiles(e.target.files));
 
-  // create hash
-  const buf = await crypto.subtle.digest(
-    "SHA-256",
-    await file.arrayBuffer()
-  );
-  const hash = Array.from(new Uint8Array(buf))
-    .map(b => b.toString(16).padStart(2, "0"))
-    .join("");
+/* ================= QUEUE ================= */
+function enqueue(files) {
+  for (const file of files) {
+    queue.push(file);
+    addQueueItem(file.name);
+  }
+  if (uploaded === 0 && queue.length > 0) processQueue();
+}
 
-  // save to file_hashes (UPLOAD ONLY)
-  await sb.from("file_hashes").upsert(
-    {
-      user_id: userId,
-      file_path: path,
-      hash: hash,
-      synced: false
-    },
-    {
-      onConflict: "hash"
-    }
-  );
+function addQueueItem(name) {
+  const div = document.createElement("div");
+  div.className = "bg-slate-800 rounded p-3";
+  div.innerHTML = `
+    <div class="text-sm mb-1">${name}</div>
+    <div class="w-full bg-gray-700 rounded-full h-2">
+      <div class="bg-green-400 h-2 rounded-full progress" style="width:0%"></div>
+    </div>
+  `;
+  queueEl.appendChild(div);
+}
 
-  statusEl.innerText = "Uploaded " + file.name;
+/* ================= UPLOAD ================= */
+async function processQueue() {
+  const total = queue.length;
+
+  for (let i = 0; i < total; i++) {
+    await uploadFile(queue[i], i);
+    uploaded++;
+    updateOverall(total);
+  }
+
+  document.getElementById("overallText").innerText = "Upload completed";
+}
+
+function updateOverall(total) {
+  const percent = Math.round((uploaded / total) * 100);
+  document.getElementById("overallBar").style.width = percent + "%";
+  document.getElementById("overallPercent").innerText = percent + "%";
+  document.getElementById("overallText").innerText =
+    "Uploaded " + uploaded + " / " + total;
+}
+
+function uploadFile(file, index) {
+  return new Promise(async (resolve, reject) => {
+    const path = userId + "/" + Date.now() + "_" + file.name;
+    const xhr = new XMLHttpRequest();
+
+    xhr.open(
+      "POST",
+      SUPABASE_URL + "/storage/v1/object/gallery/" + encodeURIComponent(path)
+    );
+    xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_ANON_KEY);
+    xhr.setRequestHeader("x-upsert", "false");
+
+    const bar = document.querySelectorAll(".progress")[index];
+
+    xhr.upload.onprogress = e => {
+      if (e.lengthComputable) {
+        bar.style.width = Math.round((e.loaded / e.total) * 100) + "%";
+      }
+    };
+
+    xhr.onload = async () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const buf = await crypto.subtle.digest(
+          "SHA-256",
+          await file.arrayBuffer()
+        );
+        const hash = Array.from(new Uint8Array(buf))
+          .map(b => b.toString(16).padStart(2, "0"))
+          .join("");
+
+        await sb.from("file_hashes").upsert(
+          { user_id: userId, file_path: path, hash: hash, synced: false },
+          { onConflict: "hash" }
+        );
+        resolve();
+      } else {
+        reject();
+      }
+    };
+
+    xhr.onerror = () => reject();
+    xhr.send(file);
+  });
 }
 </script>
 
