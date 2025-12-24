@@ -154,7 +154,7 @@ function filterFiles(files) {
       continue;
     }
     if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-      skipped.push(file.name + " (over 5MB)");
+      skipped.push(file.name + " (over 10MB)");
       continue;
     }
     valid.push(file);
