@@ -22,63 +22,33 @@
   <div id="result" class="grid grid-cols-2 md:grid-cols-3 gap-3 mt-6"></div>
 
 <script type="module">
-/* ================= CONFIG ================= */
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";   // 🔒 ใส่ของจริง
+const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const BUCKET = "gallery";
-const EDGE_URL = `${SUPABASE_URL}/functions/v1/face-search`;
-const GAP = 0.08;   // ค่าที่ใช้จริงในงานวิ่ง (แคบ = ไม่หลุด)
 
-/* ================= LOAD MODELS ================= */
-const status = document.getElementById("status");
-status.textContent = "⏳ โหลดโมเดล AI...";
+search.onclick = async () => {
+  const file = fileInput.files[0];
+  if (!file) return alert("เลือกรูป");
 
-const modelURL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/model/";
-await Promise.all([
-  faceapi.nets.ssdMobilenetv1.loadFromUri(modelURL),
-  faceapi.nets.faceLandmark68Net.loadFromUri(modelURL),
-  faceapi.nets.faceRecognitionNet.loadFromUri(modelURL),
-]);
-
-status.textContent = "✅ พร้อมค้นหาแล้ว";
-
-/* ================= SEARCH ================= */
-document.getElementById("search").onclick = async () => {
-  const file = document.getElementById("file").files[0];
-  if (!file) {
-    alert("กรุณาเลือกรูป");
-    return;
-  }
-
-  status.textContent = "🧠 กำลังวิเคราะห์ใบหน้า...";
-  document.getElementById("result").innerHTML = "";
-
-  /* ----- Detect face from selfie ----- */
   const img = await faceapi.bufferToImage(file);
-  const detections = await faceapi
+  const dets = await faceapi
     .detectAllFaces(img)
     .withFaceLandmarks()
     .withFaceDescriptors();
 
-  if (!detections.length) {
-    status.textContent = "❌ ไม่พบใบหน้าในภาพ";
-    return;
-  }
+  if (!dets.length) return alert("ไม่พบใบหน้า");
 
-  // ใช้หน้าที่ใหญ่ที่สุด (ถูกต้องที่สุดสำหรับ selfie)
-  const area = d => d.detection.box.width * d.detection.box.height;
-  const main = detections.reduce((a,b)=>area(b)>area(a)?b:a);
+  const main = dets.reduce((a,b)=>
+    b.detection.box.area > a.detection.box.area ? b : a
+  );
+
   const embedding = Array.from(main.descriptor);
 
-  status.textContent = "🔍 ค้นหารูปในระบบ...";
-
-  /* ----- Call Edge Function ----- */
-  const res = await fetch(EDGE_URL, {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/face-search`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "apikey": ANON_KEY,
-      "Authorization": `Bearer ${ANON_KEY}`
+      "apikey": ANON_KEY
     },
     body: JSON.stringify({
       embedding,
@@ -87,54 +57,24 @@ document.getElementById("search").onclick = async () => {
     })
   });
 
-  if (!res.ok) {
-    status.textContent = "❌ ระบบค้นหาขัดข้อง";
-    console.error(await res.text());
-    return;
-  }
-
   const json = await res.json();
-  const matches = json.matches;
-
-  if (!Array.isArray(matches) || matches.length === 0) {
-    status.textContent = "❌ ไม่พบภาพที่ตรงกัน";
+  if (!json.matches?.length) {
+    result.innerHTML = "<p>ไม่พบรูป</p>";
     return;
   }
 
-  /* ================= FILTER ระดับงานขาย ================= */
+  // 🔒 กันหลุดระดับงานขาย
+  const top = json.matches[0].similarity;
+  const final = json.matches.filter(
+    m => top - m.similarity <= 0.08
+  );
 
-  // 1) ใช้ score gap
-  const top = matches[0].similarity;
-  const filtered = matches.filter(m => top - m.similarity <= GAP);
-
-  // 2) เอาซ้ำออก (1 ภาพ = 1 ครั้ง)
-  const uniq = new Map();
-  for (const m of filtered) {
-    if (!uniq.has(m.image_url)) uniq.set(m.image_url, m);
-  }
-  const final = [...uniq.values()];
-
-  if (!final.length) {
-    status.textContent = "⚠️ พบภาพใกล้เคียง แต่ไม่ผ่านเกณฑ์ความแม่นยำ";
-    return;
-  }
-
-  /* ================= RENDER ================= */
-  status.textContent = `✅ พบภาพทั้งหมด ${final.length} ภาพ`;
-
-  document.getElementById("result").innerHTML = final.map(m => `
-    <div class="bg-slate-800 p-2 rounded">
-      <img 
-        src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}"
-        class="rounded shadow w-full object-cover aspect-[3/4]"
-        loading="lazy"
-      >
-      <p class="text-xs text-center text-gray-400 mt-1">
-        Similarity ${(m.similarity*100).toFixed(2)}%
-      </p>
-    </div>
+  result.innerHTML = final.map(m => `
+    <img src="${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${m.image_url}"
+         class="rounded shadow">
   `).join("");
 };
 </script>
+
 </body>
 </html>
