@@ -14,57 +14,56 @@
 
 <div class="w-full max-w-2xl space-y-6">
 
-<h1 class="text-2xl font-bold text-center text-yellow-400">
-Photographer Upload
-</h1>
+  <h1 class="text-2xl font-bold text-center text-yellow-400">
+    Photographer Upload
+  </h1>
 
-<!-- LOGIN -->
-<div id="loginBox" class="bg-slate-800 rounded-xl p-6 text-center">
-<button id="loginBtn" class="bg-green-600 px-6 py-3 rounded-xl">
-Login with LINE
-</button>
-<div id="loginError" class="text-red-400 text-sm mt-3 hidden"></div>
-</div>
+  <!-- LOGIN -->
+  <div id="loginBox" class="bg-slate-800 rounded-xl p-6 text-center">
+    <button id="loginBtn"
+      class="bg-green-600 hover:bg-green-500 px-6 py-3 rounded-xl">
+      Login with LINE
+    </button>
+    <div id="loginError" class="text-red-400 text-sm mt-3 hidden"></div>
+  </div>
 
-<!-- UPLOAD -->
-<div id="uploadBox" class="hidden space-y-4">
+  <!-- UPLOAD -->
+  <div id="uploadBox" class="hidden space-y-4">
 
-<!-- PROFILE -->
-<div class="bg-slate-800 rounded-xl p-4 text-center">
-<img id="avatar" class="w-16 h-16 rounded-full mx-auto mb-2">
-<div id="welcome" class="text-sm"></div>
-</div>
+    <!-- Profile -->
+    <div class="bg-slate-800 rounded-xl p-4 text-center">
+      <img id="avatar" class="w-16 h-16 rounded-full mx-auto mb-2">
+      <div id="welcome" class="text-sm"></div>
+    </div>
 
-<!-- OVERALL -->
-<div class="bg-slate-800 rounded-xl p-4">
-<div class="flex justify-between text-sm mb-1">
-<span id="overallText">Waiting</span>
-<span id="overallPercent">0%</span>
-</div>
-<div class="w-full bg-gray-700 rounded-full h-3">
-<div id="overallBar" class="bg-yellow-400 h-3 rounded-full" style="width:0%"></div>
-</div>
-</div>
+    <!-- Overall progress -->
+    <div class="bg-slate-800 rounded-xl p-4">
+      <div class="flex justify-between text-sm mb-1">
+        <span id="overallText">Waiting</span>
+        <span id="overallPercent">0%</span>
+      </div>
+      <div class="w-full bg-gray-700 rounded-full h-3">
+        <div id="overallBar"
+          class="bg-yellow-400 h-3 rounded-full transition-all"
+          style="width:0%"></div>
+      </div>
+    </div>
 
-<!-- CONTROLS -->
-<div class="flex gap-3 justify-center">
-<button id="pauseBtn" class="bg-yellow-500 px-4 py-2 rounded">Pause</button>
-<button id="resumeBtn" class="bg-green-600 px-4 py-2 rounded hidden">Resume</button>
-<button id="clearBtn" class="bg-red-600 px-4 py-2 rounded hidden">Clear</button>
-</div>
+    <!-- Dropzone -->
+    <div id="dropzone"
+      class="border-2 border-dashed border-gray-500 rounded-xl p-10
+             text-center cursor-pointer hover:border-yellow-400">
+      Click or Drop Images<br>
+      <span class="text-xs text-gray-400">
+        Max 5000 files • Max 5MB / file
+      </span>
+      <input id="fileInput" type="file" multiple accept="image/*" class="hidden">
+    </div>
 
-<!-- DROPZONE -->
-<div id="dropzone"
-class="border-2 border-dashed border-gray-500 rounded-xl p-10 text-center cursor-pointer">
-Click or Drop Images<br>
-<span class="text-xs text-gray-400">Max 5000 files • Max 5MB</span>
-<input id="fileInput" type="file" multiple accept="image/*" class="hidden">
-</div>
+    <!-- Queue -->
+    <div id="queue" class="space-y-2"></div>
 
-<!-- QUEUE -->
-<div id="queue" class="space-y-2"></div>
-
-</div>
+  </div>
 </div>
 
 <script>
@@ -75,61 +74,100 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const MAX_FILES = 5000;
 const MAX_SIZE_MB = 5;
-const BLOCK_CHECK_INTERVAL = 5000;
 /* ========================================= */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let userId;
+let userId = null;
+let photographer = null;
 let queue = [];
 let uploaded = 0;
 let uploading = false;
-let paused = false;
-let uploadBlocked = false;
-let uploadSession = null;
 
 /* ================= LOGIN ================= */
-document.getElementById("loginBtn").onclick = async () => {
-try {
-  await liff.init({ liffId: LIFF_ID });
-  if (!liff.isLoggedIn()) return liff.login();
+document.getElementById("loginBtn").onclick = loginLine;
 
-  const p = await liff.getProfile();
-  userId = p.userId;
+async function loginLine() {
+  try {
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) return liff.login();
+
+    const profile = await liff.getProfile();
+    userId = profile.userId;
+
+    await checkPermission();
+  } catch (e) {
+    showLoginError("LINE login failed");
+  }
+}
+
+async function checkPermission() {
+  const { data, error } = await sb
+    .from("photographer_registration")
+    .select(`
+      user_id,
+      display_name,
+      picture_url,
+      status,
+      is_blocked,
+      is_deleted,
+      is_upload_blocked
+    `)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return showLoginError("ไม่พบรายชื่อช่างภาพในระบบ");
+  }
+
+  if (data.status !== "approved") {
+    return showLoginError("บัญชีนี้ยังไม่ได้รับการอนุมัติ");
+  }
+
+  if (data.is_blocked || data.is_deleted || data.is_upload_blocked) {
+    return showLoginError("บัญชีนี้ถูกระงับการอัปโหลด");
+  }
+
+  photographer = data;
 
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("uploadBox").classList.remove("hidden");
-  document.getElementById("avatar").src = p.pictureUrl;
-  document.getElementById("welcome").innerText = "Welcome " + p.displayName;
-
-  setInterval(checkUploadBlock, BLOCK_CHECK_INTERVAL);
-} catch {
-  showError("LINE login failed");
-}
-};
-
-function showError(msg) {
-const el = document.getElementById("loginError");
-el.innerText = "❌ " + msg;
-el.classList.remove("hidden");
+  document.getElementById("welcome").innerText =
+    "Welcome " + data.display_name;
+  document.getElementById("avatar").src = data.picture_url;
 }
 
-/* ================= BLOCK WATCH ================= */
-async function checkUploadBlock() {
-const { data } = await sb
-  .from("photographer_registration")
-  .select("is_upload_blocked")
-  .eq("user_id", userId)
-  .single();
-
-if (data?.is_upload_blocked) {
-  uploadBlocked = true;
-  paused = true;
-  document.getElementById("overallText").innerText =
-    "⛔ Upload blocked by admin";
-} else {
-  uploadBlocked = false;
+function showLoginError(msg) {
+  const el = document.getElementById("loginError");
+  el.innerText = "❌ " + msg;
+  el.classList.remove("hidden");
 }
+
+/* ================= FILE FILTER ================= */
+function filterFiles(files) {
+  const valid = [];
+  const skipped = [];
+
+  for (const file of files) {
+    if (valid.length >= MAX_FILES) {
+      skipped.push(file.name + " (over 5000 files)");
+      continue;
+    }
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      skipped.push(file.name + " (over 5MB)");
+      continue;
+    }
+    valid.push(file);
+  }
+
+  if (skipped.length) {
+    alert(
+      "Skipped " + skipped.length + " files\n" +
+      skipped.slice(0, 10).join("\n")
+    );
+  }
+
+  return valid;
 }
 
 /* ================= DROPZONE ================= */
@@ -137,153 +175,107 @@ const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileInput");
 const queueEl = document.getElementById("queue");
 
-dropzone.onclick = () => {
-if (uploading) return alert("⏳ Uploading...");
-if (uploadBlocked) return alert("⛔ Upload blocked by admin");
-fileInput.click();
-};
+dropzone.onclick = () => fileInput.click();
+fileInput.onchange = e => enqueue(filterFiles(e.target.files));
 
-fileInput.onchange = e => enqueueFiles(e.target.files);
+/* ================= QUEUE ================= */
+function enqueue(files) {
+  if (uploading) return;
 
-/* ================= ENQUEUE ================= */
-function enqueueFiles(files) {
-if (uploadBlocked) return alert("⛔ Upload blocked");
+  for (const file of files) {
+    queue.push(file);
+    addQueueItem(file.name);
+  }
 
-queue = [];
-uploaded = 0;
-queueEl.innerHTML = "";
-updateOverall(1);
-
-uploadSession = crypto.randomUUID(); // session ต่อรอบ
-
-for (const file of files) {
-  if (queue.length >= MAX_FILES) break;
-  if (file.size > MAX_SIZE_MB * 1024 * 1024) continue;
-
-  queue.push(file);
-  addQueueItem(file.name);
+  if (!uploading && queue.length > 0) {
+    uploading = true;
+    processQueue();
+  }
 }
 
-if (!queue.length) return;
-
-uploading = true;
-paused = false;
-processQueue();
-}
-
-/* ================= QUEUE UI ================= */
 function addQueueItem(name) {
-const div = document.createElement("div");
-div.className = "bg-slate-800 rounded p-3";
-div.innerHTML = `
-<div class="text-sm mb-1">${name}</div>
-<div class="w-full bg-gray-700 rounded-full h-2">
-<div class="bg-green-400 h-2 rounded-full progress" style="width:0%"></div>
-</div>`;
-queueEl.appendChild(div);
-}
-
-/* ================= PROCESS ================= */
-async function processQueue() {
-const total = queue.length;
-
-for (let i = 0; i < total; i++) {
-  while (paused || uploadBlocked) await sleep(300);
-
-  await uploadFile(queue[i], i);
-  uploaded++;
-  updateOverall(total);
-}
-
-uploading = false;
-document.getElementById("overallText").innerText = "Upload completed";
-document.getElementById("clearBtn").classList.remove("hidden");
+  const div = document.createElement("div");
+  div.className = "bg-slate-800 rounded p-3";
+  div.innerHTML = `
+    <div class="text-sm mb-1">${name}</div>
+    <div class="w-full bg-gray-700 rounded-full h-2">
+      <div class="bg-green-400 h-2 rounded-full progress" style="width:0%"></div>
+    </div>
+  `;
+  queueEl.appendChild(div);
 }
 
 /* ================= UPLOAD ================= */
-function uploadFile(file, index) {
-return new Promise(async (resolve, reject) => {
-const path = userId + "/" + Date.now() + "_" + file.name;
-const xhr = new XMLHttpRequest();
+async function processQueue() {
+  const total = queue.length;
 
-xhr.open(
-  "POST",
-  SUPABASE_URL + "/storage/v1/object/gallery/" + encodeURIComponent(path)
-);
-xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_ANON_KEY);
-xhr.setRequestHeader("x-upsert", "false");
-
-const bar = document.querySelectorAll(".progress")[index];
-
-xhr.upload.onprogress = e => {
-if (e.lengthComputable)
-  bar.style.width = Math.round((e.loaded / e.total) * 100) + "%";
-};
-
-xhr.onload = async () => {
-if (xhr.status >= 200 && xhr.status < 300) {
-
-  const buf = await crypto.subtle.digest(
-    "SHA-256",
-    await file.arrayBuffer()
-  );
-  const hash = Array.from(new Uint8Array(buf))
-    .map(b => b.toString(16).padStart(2, "0"))
-    .join("");
-
-  const row = {
-    user_id: userId,
-    file_path: path,
-    hash: hash,
-    synced: false
-  };
-
-  if (uploadSession) row.upload_session = uploadSession;
-
-  const { error } = await sb
-    .from("file_hashes")
-    .upsert(row, { onConflict: "hash" });
-
-  if (error) {
-    console.error(error);
-    return reject();
+  for (let i = 0; i < total; i++) {
+    await uploadFile(queue[i], i);
+    uploaded++;
+    updateOverall(total);
   }
 
-  resolve();
-} else reject();
-};
-
-xhr.onerror = reject;
-xhr.send(file);
-});
+  document.getElementById("overallText").innerText = "Upload completed";
+  uploading = false;
 }
 
-/* ================= UI ================= */
 function updateOverall(total) {
-const percent = Math.min(
-  100,
-  Math.round((uploaded / Math.max(total, 1)) * 100)
-);
-document.getElementById("overallBar").style.width = percent + "%";
-document.getElementById("overallPercent").innerText = percent + "%";
-document.getElementById("overallText").innerText =
-  `Uploaded ${uploaded} / ${total}`;
+  const percent = Math.round((uploaded / total) * 100);
+  document.getElementById("overallBar").style.width = percent + "%";
+  document.getElementById("overallPercent").innerText = percent + "%";
+  document.getElementById("overallText").innerText =
+    "Uploaded " + uploaded + " / " + total;
 }
 
-document.getElementById("pauseBtn").onclick = () => paused = true;
-document.getElementById("resumeBtn").onclick = () => paused = false;
+function uploadFile(file, index) {
+  return new Promise(async (resolve, reject) => {
+    const path = userId + "/" + Date.now() + "_" + file.name;
+    const xhr = new XMLHttpRequest();
 
-document.getElementById("clearBtn").onclick = () => {
-queue = [];
-queueEl.innerHTML = "";
-uploaded = 0;
-updateOverall(1);
-document.getElementById("overallText").innerText = "Waiting";
-};
+    xhr.open(
+      "POST",
+      SUPABASE_URL + "/storage/v1/object/gallery/" + encodeURIComponent(path)
+    );
+    xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_ANON_KEY);
+    xhr.setRequestHeader("x-upsert", "false");
 
-/* ================= UTIL ================= */
-function sleep(ms) {
-return new Promise(r => setTimeout(r, ms));
+    const bar = document.querySelectorAll(".progress")[index];
+
+    xhr.upload.onprogress = e => {
+      if (e.lengthComputable) {
+        bar.style.width = Math.round((e.loaded / e.total) * 100) + "%";
+      }
+    };
+
+    xhr.onload = async () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const buf = await crypto.subtle.digest(
+          "SHA-256",
+          await file.arrayBuffer()
+        );
+        const hash = Array.from(new Uint8Array(buf))
+          .map(b => b.toString(16).padStart(2, "0"))
+          .join("");
+
+        await sb.from("file_hashes").upsert(
+          {
+            user_id: userId,
+            file_path: path,
+            hash: hash,
+            synced: false
+          },
+          { onConflict: "hash" }
+        );
+
+        resolve();
+      } else {
+        reject();
+      }
+    };
+
+    xhr.onerror = () => reject();
+    xhr.send(file);
+  });
 }
 </script>
 
