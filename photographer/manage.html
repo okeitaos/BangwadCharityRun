@@ -5,10 +5,7 @@
 <title>Admin – Photographer Manager</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-<!-- Tailwind -->
 <script src="https://cdn.tailwindcss.com"></script>
-
-<!-- Supabase JS v2 (CDN) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -38,8 +35,8 @@
 
   <!-- IMAGE MODAL -->
   <div id="imageModal"
-       class="fixed inset-0 bg-black/70 hidden items-center justify-center z-50">
-    <div class="bg-slate-800 p-4 rounded-xl w-full max-w-5xl max-h-[90vh] overflow-auto">
+       class="fixed inset-0 bg-black/70 hidden items-center justify-center z-40">
+    <div class="bg-slate-800 p-4 rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
       <div class="flex justify-between items-center mb-3">
         <h2 class="font-bold">📸 Photographer Images</h2>
         <button onclick="closeModal()" class="text-red-400 text-xl">✖</button>
@@ -53,7 +50,19 @@
       </div>
 
       <div id="imageGrid"
-           class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+        class="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-[70vh] overflow-auto">
+      </div>
+    </div>
+  </div>
+
+  <!-- PREVIEW MODAL -->
+  <div id="previewModal"
+       class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50">
+    <div class="relative max-w-5xl w-full p-4">
+      <button onclick="closePreview()"
+        class="absolute top-2 right-2 text-white text-2xl">✖</button>
+      <img id="previewImage"
+           class="w-full max-h-[90vh] object-contain rounded" />
     </div>
   </div>
 
@@ -66,7 +75,6 @@ const SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 const BUCKET = "gallery";
 /* ========================================= */
 
-/* ✅ FIXED: ใช้ global supabase จาก CDN */
 const adminSupabase = supabase.createClient(
   SUPABASE_URL,
   SERVICE_ROLE_KEY
@@ -76,23 +84,23 @@ const table = document.getElementById("photographerTable");
 const modal = document.getElementById("imageModal");
 const imageGrid = document.getElementById("imageGrid");
 
+/* ===== pagination / infinite ===== */
+let pageSize = 40;
+let currentOffset = 0;
+let hasMore = true;
+let loading = false;
 let currentUserId = null;
 
 /* ================= LOAD PHOTOGRAPHERS ================= */
 async function loadPhotographers() {
-  const { data: photographers, error } = await adminSupabase
+  const { data } = await adminSupabase
     .from("photographer_registration")
     .select("user_id, display_name, is_blocked, is_upload_blocked")
     .order("created_at", { ascending: false });
 
-  if (error) {
-    alert("Load photographer error");
-    return;
-  }
-
   table.innerHTML = "";
 
-  for (const p of photographers || []) {
+  for (const p of data || []) {
     const { count } = await adminSupabase
       .from("file_hashes")
       .select("*", { count: "exact", head: true })
@@ -115,7 +123,8 @@ async function loadPhotographers() {
           </button>
         </td>
         <td class="p-2 text-center space-x-2">
-          <button onclick="openImages('${p.user_id}')" class="text-blue-400">View</button>
+          <button onclick="openImages('${p.user_id}')"
+            class="text-blue-400">View</button>
           <button onclick="deletePhotographer('${p.user_id}')"
             class="text-red-500">Delete</button>
         </td>
@@ -130,7 +139,6 @@ async function toggleSearchBlock(userId, value) {
     .from("photographer_registration")
     .update({ is_blocked: value })
     .eq("user_id", userId);
-
   loadPhotographers();
 }
 
@@ -139,41 +147,69 @@ async function toggleUploadBlock(userId, value) {
     .from("photographer_registration")
     .update({ is_upload_blocked: value })
     .eq("user_id", userId);
-
   loadPhotographers();
 }
 
 /* ================= IMAGES ================= */
 async function openImages(userId) {
   currentUserId = userId;
+  currentOffset = 0;
+  hasMore = true;
+  imageGrid.innerHTML = "";
   modal.classList.remove("hidden");
-  imageGrid.innerHTML = "Loading...";
+  await loadNextPage();
+}
+
+async function loadNextPage() {
+  if (!hasMore || loading) return;
+  loading = true;
 
   const { data: images } = await adminSupabase
     .from("file_hashes")
     .select("id, file_path")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+    .eq("user_id", currentUserId)
+    .order("created_at", { ascending: false })
+    .range(currentOffset, currentOffset + pageSize - 1);
 
-  imageGrid.innerHTML = "";
+  if (!images || images.length < pageSize) hasMore = false;
 
-  for (const img of images || []) {
+  renderImages(images || []);
+  currentOffset += pageSize;
+  loading = false;
+}
+
+function renderImages(images) {
+  for (const img of images) {
     const url = adminSupabase
       .storage
       .from(BUCKET)
       .getPublicUrl(img.file_path).data.publicUrl;
 
-    imageGrid.innerHTML += `
-      <div class="relative group">
-        <img src="${url}" class="rounded" />
-        <button onclick="deleteSingleImage('${img.id}', '${img.file_path}')"
-          class="absolute top-1 right-1 bg-black/70 px-2 text-red-400 rounded opacity-0 group-hover:opacity-100">
-          ✖
-        </button>
-      </div>
+    const el = document.createElement("div");
+    el.className = "relative group";
+
+    el.innerHTML = `
+      <img src="${url}"
+        loading="lazy"
+        class="rounded w-full h-32 object-cover bg-slate-700 cursor-pointer"
+        onclick="openPreview('${url}')"/>
+      <button onclick="deleteSingleImage('${img.id}', '${img.file_path}')"
+        class="absolute top-1 right-1 bg-black/70 px-2 text-red-400 rounded opacity-0 group-hover:opacity-100">
+        ✖
+      </button>
     `;
+    imageGrid.appendChild(el);
   }
 }
+
+imageGrid.addEventListener("scroll", () => {
+  if (
+    imageGrid.scrollTop + imageGrid.clientHeight >=
+    imageGrid.scrollHeight - 200
+  ) {
+    loadNextPage();
+  }
+});
 
 function closeModal() {
   modal.classList.add("hidden");
@@ -187,7 +223,10 @@ async function deleteSingleImage(imageId, filePath) {
   await adminSupabase.from("file_hashes").delete().eq("id", imageId);
   await adminSupabase.storage.from(BUCKET).remove([filePath]);
 
-  openImages(currentUserId);
+  imageGrid.innerHTML = "";
+  currentOffset = 0;
+  hasMore = true;
+  loadNextPage();
 }
 
 async function deleteAllImagesOfPhotographer() {
@@ -199,16 +238,13 @@ async function deleteAllImagesOfPhotographer() {
     .eq("user_id", currentUserId);
 
   await adminSupabase.from("face_index")
-    .delete()
-    .eq("photographer_code", currentUserId);
+    .delete().eq("photographer_code", currentUserId);
 
   await adminSupabase.from("file_hashes")
-    .delete()
-    .eq("user_id", currentUserId);
+    .delete().eq("user_id", currentUserId);
 
   if (files?.length) {
-    await adminSupabase
-      .storage
+    await adminSupabase.storage
       .from(BUCKET)
       .remove(files.map(f => f.file_path));
   }
@@ -226,25 +262,31 @@ async function deletePhotographer(userId) {
     .eq("user_id", userId);
 
   await adminSupabase.from("face_index")
-    .delete()
-    .eq("photographer_code", userId);
+    .delete().eq("photographer_code", userId);
 
   await adminSupabase.from("file_hashes")
-    .delete()
-    .eq("user_id", userId);
+    .delete().eq("user_id", userId);
 
   await adminSupabase.from("photographer_registration")
-    .delete()
-    .eq("user_id", userId);
+    .delete().eq("user_id", userId);
 
   if (files?.length) {
-    await adminSupabase
-      .storage
+    await adminSupabase.storage
       .from(BUCKET)
       .remove(files.map(f => f.file_path));
   }
 
   loadPhotographers();
+}
+
+/* ================= PREVIEW ================= */
+function openPreview(url) {
+  document.getElementById("previewImage").src = url;
+  document.getElementById("previewModal").classList.remove("hidden");
+}
+
+function closePreview() {
+  document.getElementById("previewModal").classList.add("hidden");
 }
 
 /* ================= INIT ================= */
