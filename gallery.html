@@ -218,8 +218,10 @@ function closePreview() {
 async function downloadWithWatermark(imageUrl, filename) {
   const img = new Image();
   const logo = new Image();
+
   img.crossOrigin = "anonymous";
   logo.crossOrigin = "anonymous";
+
   img.src = imageUrl;
   logo.src = LOGO_URL;
 
@@ -233,34 +235,45 @@ async function downloadWithWatermark(imageUrl, filename) {
   canvas.height = img.height;
   const ctx = canvas.getContext("2d");
 
-  ctx.drawImage(img,0,0);
+  /* ===== draw original image ===== */
+  ctx.drawImage(img, 0, 0);
 
-  const pad = canvas.width*0.03;
-  const logoW = canvas.width*0.15;
-  const logoH = logoW*(logo.height/logo.width);
+  /* ===== common padding ===== */
+  const pad = canvas.width * 0.03;
 
-  ctx.globalAlpha = 0.85;
-  ctx.drawImage(
-    logo,
-    canvas.width-logoW-pad,
-    canvas.height-logoH-pad,
-    logoW,logoH
-  );
+  /* ===== TEXT WATERMARK (center bottom) ===== */
+  const text = "Banwad Charity Run 2025 | OFFICIAL PHOTOGRAPHER";
+  const fontSize = Math.round(canvas.width * 0.028);
 
-  ctx.globalAlpha = 0.9;
+  ctx.globalAlpha = 0.45;          // สีอ่อน อ่านได้ แต่ไม่รบกวนภาพ
   ctx.fillStyle = "white";
-  ctx.font = `bold ${Math.round(canvas.width*0.028)}px Arial`;
-  ctx.fillText(
-    "BANGWAD CHARITY RUN 2025 | OFFICIAL PHOTOGRAPHER",
-    pad,
-    canvas.height-pad
-  );
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.font = `bold ${fontSize}px Arial`;
 
-  const a=document.createElement("a");
-  a.href=canvas.toDataURL("image/jpeg",0.95);
-  a.download=filename;
+  const textY = canvas.height - pad;
+  ctx.fillText(text, canvas.width / 2, textY);
+
+  /* ===== LOGO (bottom-right, above text) ===== */
+  const logoW = canvas.width * 0.15;
+  const logoH = logoW * (logo.height / logo.width);
+
+  const logoX = canvas.width - logoW - pad;
+  const logoY = textY - logoH - pad * 0.6;
+
+  ctx.globalAlpha = 0.75;          // โลโก้ชัดกว่าข้อความ
+  ctx.drawImage(logo, logoX, logoY, logoW, logoH);
+
+  /* ===== reset alpha ===== */
+  ctx.globalAlpha = 1;
+
+  /* ===== download ===== */
+  const a = document.createElement("a");
+  a.href = canvas.toDataURL("image/jpeg", 0.95);
+  a.download = filename;
   a.click();
 }
+
 </script>
 
 </body>
