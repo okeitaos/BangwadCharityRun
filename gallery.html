@@ -60,7 +60,7 @@
 <!-- Secondary -->
 <div id="secondarySection" class="hidden mt-8">
 <h2 class="text-sm text-yellow-400 mb-2 text-center">
-⚠️ อาจเป็นภาพของคุณ
+📌 รูปเพิ่มเติม (อาจเป็นภาพของคุณ)
 </h2>
 <div id="secondaryBox"
   class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
@@ -165,29 +165,61 @@ fileInput.onchange = async () => {
   renderResults(allResults);
 };
 
-/* ================= SPLIT RESULTS (FINAL) ================= */
+/* ================= LAYER 4 ================= */
+function identityConsistencyFilter(results) {
+  if (results.length <= 2) return results;
+  const anchors = results.slice(0, 5);
+  return results.filter(r => {
+    let votes = 0;
+    for (const a of anchors) {
+      if (Math.abs(r.distance - a.distance) < 0.08) votes++;
+    }
+    return votes >= 2;
+  });
+}
+
+/* ================= LAYER 5 ================= */
+function contextBoost(results) {
+  if (results.length <= 1) return results;
+  const boosted = [];
+  for (let i = 0; i < results.length; i++) {
+    const prev = results[i - 1];
+    const curr = results[i];
+    const next = results[i + 1];
+    if (
+      (prev && prev.photographer_code === curr.photographer_code) ||
+      (next && next.photographer_code === curr.photographer_code)
+    ) {
+      boosted.push(curr);
+    }
+  }
+  return boosted;
+}
+
+/* ================= SPLIT RESULTS (FINAL UX + AI) ================= */
 function renderResults(rows) {
   const sorted = rows
     .filter(r => r.distance <= HARD_MAX_DISTANCE)
-    .sort((a,b)=>a.distance-b.distance);
+    .sort((a, b) => a.distance - b.distance);
 
   if (!sorted.length) return;
 
-  const primary = [sorted[0]];
-  const secondary = [];
-
+  // Primary (strict)
+  let primaryRaw = [sorted[0]];
   for (let i = 1; i < sorted.length; i++) {
-    const jump = sorted[i].distance - sorted[i-1].distance;
+    const jump = sorted[i].distance - sorted[i - 1].distance;
     if (sorted[i].distance <= PRIMARY_MAX && jump <= MAX_JUMP) {
-      primary.push(sorted[i]);
+      primaryRaw.push(sorted[i]);
     } else break;
   }
+  const primary = identityConsistencyFilter(primaryRaw);
 
-  for (let i = primary.length; i < sorted.length; i++) {
-    secondary.push(sorted[i]);
-  }
+  // Secondary (relaxed)
+  const secondaryRaw = sorted.slice(primaryRaw.length);
+  const secondary = contextBoost(secondaryRaw);
 
   renderBox(primary, primaryBox);
+
   if (secondary.length) {
     secondarySection.classList.remove("hidden");
     renderBox(secondary, secondaryBox);
@@ -196,35 +228,33 @@ function renderResults(rows) {
   resultInfo.classList.remove("hidden");
   resultInfo.innerText =
     `พบรูปของคุณ ${primary.length} ภาพ` +
-    (secondary.length ? ` • อาจใช่ ${secondary.length} ภาพ` : "");
+    (secondary.length ? ` • รูปเพิ่มเติม ${secondary.length} ภาพ` : "");
 }
 
 /* ================= RENDER ================= */
 function renderBox(rows, box) {
   box.innerHTML = "";
-  rows.forEach((r,i)=>{
+  rows.forEach((r, i) => {
     const url = sb.storage.from("gallery")
       .getPublicUrl(r.file_path).data.publicUrl;
 
     const card = document.createElement("div");
     card.className = "card bg-slate-800 rounded-2xl overflow-hidden";
-
     card.innerHTML = `
       <img src="${url}" class="w-full h-56 object-cover cursor-pointer"
         onclick="openPreview('${url}','photo_${i+1}.jpg')">
       <div class="p-3 text-xs text-gray-400">
-        Similarity ${(1-r.distance).toFixed(2)}
-      </div>
-    `;
+        Similarity ${(1 - r.distance).toFixed(2)}
+      </div>`;
     box.appendChild(card);
   });
 }
 
-/* ================= PREVIEW ================= */
-function openPreview(url, filename) {
+/* ================= PREVIEW + WATERMARK ================= */
+async function openPreview(url, filename) {
   currentFilename = filename;
   document.getElementById("previewModal").classList.remove("hidden");
-  drawPreviewWithWatermark(url);
+  await drawPreviewWithWatermark(url);
 
   document.getElementById("downloadBtn").onclick = () => {
     const canvas = document.getElementById("previewCanvas");
@@ -239,7 +269,6 @@ function closePreview() {
   document.getElementById("previewModal").classList.add("hidden");
 }
 
-/* ================= WATERMARK ================= */
 async function drawPreviewWithWatermark(imageUrl) {
   const img = new Image();
   const logo = new Image();
@@ -262,45 +291,41 @@ async function drawPreviewWithWatermark(imageUrl) {
 
   const pad = canvas.width * 0.03;
 
-  // text watermark (จาง)
+  // Text watermark
   ctx.save();
   ctx.globalAlpha = 0.45;
   ctx.fillStyle = "white";
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
   ctx.font = `bold ${Math.round(canvas.width * 0.020)}px Arial`;
-
-  const textY = canvas.height - pad * 0.4;
   ctx.fillText(
     "BANGWAD CHARITY RUN 2025 | OFFICIAL PHOTOGRAPHER",
     canvas.width / 2,
-    textY
+    canvas.height - pad * 0.4
   );
   ctx.restore();
 
-  // logo (สีปกติ)
+  // Logo
   const logoW = canvas.width * 0.15;
   const logoH = logoW * (logo.height / logo.width);
-  const logoX = canvas.width - logoW - pad;
-  const logoY = textY - logoH - pad * 0.6;
-
-  ctx.drawImage(logo, logoX, logoY, logoW, logoH);
+  ctx.drawImage(
+    logo,
+    canvas.width - logoW - pad,
+    canvas.height - logoH - pad * 1.6,
+    logoW,
+    logoH
+  );
 }
-</script>
-<script>
+
 /* ===== Disable Right Click & DevTools ===== */
 document.addEventListener("contextmenu", e => e.preventDefault());
-
 document.addEventListener("keydown", e => {
-  const key = e.key.toUpperCase();
-
+  const k = e.key.toUpperCase();
   if (
-    key === "F12" ||
-    (e.ctrlKey && e.shiftKey && ["I", "J", "C"].includes(key)) ||
-    (e.ctrlKey && key === "U")
-  ) {
-    e.preventDefault();
-  }
+    k === "F12" ||
+    (e.ctrlKey && e.shiftKey && ["I","J","C"].includes(k)) ||
+    (e.ctrlKey && k === "U")
+  ) e.preventDefault();
 });
 </script>
 
