@@ -2,10 +2,13 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
-<title>Admin Photographer Manager</title>
+<title>Admin – Photographer Manager</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+<!-- Tailwind -->
 <script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Supabase JS v2 (CDN) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -63,8 +66,8 @@ const SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 const BUCKET = "gallery";
 /* ========================================= */
 
-/* ✅ FIX: ใช้ adminSupabase ตัวเดียว */
-const adminSupabase = supabasejs.createClient(
+/* ✅ FIXED: ใช้ global supabase จาก CDN */
+const adminSupabase = supabase.createClient(
   SUPABASE_URL,
   SERVICE_ROLE_KEY
 );
@@ -77,10 +80,15 @@ let currentUserId = null;
 
 /* ================= LOAD PHOTOGRAPHERS ================= */
 async function loadPhotographers() {
-  const { data: photographers } = await adminSupabase
+  const { data: photographers, error } = await adminSupabase
     .from("photographer_registration")
     .select("user_id, display_name, is_blocked, is_upload_blocked")
     .order("created_at", { ascending: false });
+
+  if (error) {
+    alert("Load photographer error");
+    return;
+  }
 
   table.innerHTML = "";
 
@@ -122,6 +130,7 @@ async function toggleSearchBlock(userId, value) {
     .from("photographer_registration")
     .update({ is_blocked: value })
     .eq("user_id", userId);
+
   loadPhotographers();
 }
 
@@ -130,6 +139,7 @@ async function toggleUploadBlock(userId, value) {
     .from("photographer_registration")
     .update({ is_upload_blocked: value })
     .eq("user_id", userId);
+
   loadPhotographers();
 }
 
