@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
-<title>Face Sync Control</title>
+<title>Face Sync Control — Auto Recover</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -11,11 +11,19 @@
 
 <div class="max-w-xl mx-auto space-y-4">
 
-  <h1 class="text-2xl font-bold text-center text-yellow-400">
-    📱 Face Sync Control
-  </h1>
+  <!-- HEADER -->
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-yellow-400">
+      📱 Face Sync Control
+    </h1>
+    <!-- SERVER BADGE -->
+    <span id="serverBadge"
+      class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-600">
+      ● Unknown
+    </span>
+  </div>
 
-  <!-- STATUS -->
+  <!-- STATS -->
   <div class="bg-slate-800 rounded-xl p-4 grid grid-cols-3 text-center gap-2">
     <div>
       <div class="text-gray-400 text-sm">Total</div>
@@ -66,15 +74,25 @@
 <script>
 /* ================= CONFIG ================= */
 const API_BASE = "http://192.168.1.18:3000"; // 👈 IP MAC
-const SYNC_INTERVAL = 1200;
-const STATUS_INTERVAL = 700;
+const SYNC_INTERVAL = 1200;   // sync loop ปกติ
+const STATUS_INTERVAL = 700;  // status realtime
+
+// Exponential backoff (status)
+const BACKOFF_BASE = 800;     // ms
+const BACKOFF_MAX  = 10000;   // ms
 /* ========================================= */
 
+// STATE
 let syncing = false;
+let serverOnline = true;
 let syncTimer = null;
 let statusTimer = null;
 
-/* DOM */
+// backoff state
+let backoffDelay = BACKOFF_BASE;
+let backoffTimer = null;
+
+// DOM
 const totalEl = document.getElementById("total");
 const syncedEl = document.getElementById("synced");
 const remainingEl = document.getElementById("remaining");
@@ -82,8 +100,19 @@ const statusText = document.getElementById("statusText");
 const percentText = document.getElementById("percentText");
 const progressBar = document.getElementById("progressBar");
 const logBox = document.getElementById("logBox");
+const serverBadge = document.getElementById("serverBadge");
 
-/* LOG */
+/* ================= UI HELPERS ================= */
+function setBadgeOnline() {
+  serverBadge.textContent = "● Online";
+  serverBadge.className =
+    "px-3 py-1 rounded-full text-xs font-semibold bg-green-600";
+}
+function setBadgeOffline() {
+  serverBadge.textContent = "● Offline";
+  serverBadge.className =
+    "px-3 py-1 rounded-full text-xs font-semibold bg-red-600";
+}
 function log(msg) {
   const el = document.createElement("div");
   el.textContent = new Date().toLocaleTimeString() + " - " + msg;
@@ -91,78 +120,136 @@ function log(msg) {
   logBox.scrollTop = logBox.scrollHeight;
 }
 
-/* START */
+/* ================= CONTROL ================= */
 document.getElementById("startBtn").onclick = () => {
   if (syncing) return;
   syncing = true;
-  statusText.textContent = "Syncing...";
+  statusText.textContent = "Syncing…";
   log("🚀 Start sync");
 
   runSyncLoop();
   startStatusLoop();
 };
 
-/* STOP */
 document.getElementById("stopBtn").onclick = () => {
   syncing = false;
   clearTimeout(syncTimer);
   clearInterval(statusTimer);
+  clearTimeout(backoffTimer);
   statusText.textContent = "Stopped";
   log("⏹ Stop sync");
 };
 
-/* SYNC LOOP (POST) */
+/* ================= SYNC LOOP ================= */
 function runSyncLoop() {
   if (!syncing) return;
 
-  fetch(`${API_BASE}/sync`, {
-    method: "POST"
-  })
-  .then(res => res.json())
-  .then(d => {
-    if (d.status === "busy") {
-      log("⏳ Server busy");
-    }
-    if (d.status === "no_files") {
-      log("✅ No pending files");
-      syncing = false;
-    }
-  })
-  .catch(() => {
-    log("❌ Sync request failed");
-    syncing = false;
-  });
+  // ถ้า server offline → รอ (auto-recover)
+  if (!serverOnline) {
+    syncTimer = setTimeout(runSyncLoop, SYNC_INTERVAL);
+    return;
+  }
+
+  fetch(`${API_BASE}/sync`, { method: "POST" })
+    .then(res => res.json())
+    .then(d => {
+      if (d.status === "busy") {
+        log("⏳ Server busy");
+      }
+      if (d.status === "no_files") {
+        log("✅ No pending files");
+        syncing = false;
+        statusText.textContent = "Completed";
+      }
+    })
+    .catch(() => {
+      // server ล่มระหว่างยิง sync
+      if (serverOnline) {
+        log("⚠️ Sync failed, waiting for server restart…");
+      }
+      serverOnline = false;
+      setBadgeOffline();
+      statusText.textContent = "Server reconnecting…";
+      scheduleBackoffCheck();
+    });
 
   syncTimer = setTimeout(runSyncLoop, SYNC_INTERVAL);
 }
 
-/* STATUS LOOP */
+/* ================= STATUS LOOP ================= */
 function startStatusLoop() {
-  statusTimer = setInterval(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/sync/status`);
-      const d = await res.json();
+  clearInterval(statusTimer);
+  statusTimer = setInterval(fetchStatus, STATUS_INTERVAL);
+}
 
-      totalEl.textContent = d.total;
-      syncedEl.textContent = d.synced;
-      remainingEl.textContent = d.remaining;
+async function fetchStatus() {
+  try {
+    const res = await fetch(`${API_BASE}/sync/status`, { cache: "no-store" });
+    if (!res.ok) throw new Error("status not ok");
+    const d = await res.json();
 
-      const percent = d.total
-        ? Math.round((d.synced / d.total) * 100)
-        : 0;
-
-      progressBar.style.width = percent + "%";
-      percentText.textContent = percent + "%";
-
-      if (d.done && syncing) {
-        syncing = false;
-        log("🎉 Sync completed");
-        statusText.textContent = "Completed";
-      }
-    } catch {
-      log("⚠️ Status fetch error");
+    // server กลับมาแล้ว
+    if (!serverOnline) {
+      serverOnline = true;
+      setBadgeOnline();
+      backoffDelay = BACKOFF_BASE; // reset backoff
+      clearTimeout(backoffTimer);
+      log("✅ Server reconnected");
+      statusText.textContent = syncing ? "Syncing…" : "Idle";
     }
-  }, STATUS_INTERVAL);
+
+    totalEl.textContent = d.total;
+    syncedEl.textContent = d.synced;
+    remainingEl.textContent = d.remaining;
+
+    const percent = d.total
+      ? Math.round((d.synced / d.total) * 100)
+      : 0;
+
+    progressBar.style.width = percent + "%";
+    percentText.textContent = percent + "%";
+
+    if (d.done && syncing) {
+      syncing = false;
+      log("🎉 Sync completed");
+      statusText.textContent = "Completed";
+    }
+
+  } catch (e) {
+    // status ล้ม → ถือว่า server offline
+    if (serverOnline) {
+      log("⚠️ Server offline, auto-recovering…");
+    }
+    serverOnline = false;
+    setBadgeOffline();
+    statusText.textContent = "Server reconnecting…";
+    scheduleBackoffCheck();
+  }
+}
+
+/* ================= EXPONENTIAL BACKOFF ================= */
+function scheduleBackoffCheck() {
+  clearTimeout(backoffTimer);
+
+  backoffTimer = setTimeout(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/sync/status`, { cache: "no-store" });
+      if (!res.ok) throw new Error("still offline");
+
+      // online แล้ว
+      serverOnline = true;
+      setBadgeOnline();
+      backoffDelay = BACKOFF_BASE;
+      log("✅ Server reconnected (backoff)");
+      statusText.textContent = syncing ? "Syncing…" : "Idle";
+
+    } catch {
+      // ยัง offline → เพิ่ม backoff
+      backoffDelay = Math.min(backoffDelay * 1.8, BACKOFF_MAX);
+      log(`⏳ Retry in ${Math.round(backoffDelay)} ms`);
+      scheduleBackoffCheck();
+    }
+  }, backoffDelay);
 }
 </script>
 
