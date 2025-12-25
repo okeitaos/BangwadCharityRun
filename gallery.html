@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
-<title>ค้นหาภาพของคุณ | BANGWAD CHARITY RUN</title>
+<title>ค้นหาภาพของคุณ | Charity Run</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
 <script src="https://cdn.tailwindcss.com"></script>
@@ -60,7 +60,7 @@
 <!-- Secondary -->
 <div id="secondarySection" class="hidden mt-8">
 <h2 class="text-sm text-yellow-400 mb-2 text-center">
-⚠️ รูปเพิ่มเติม 
+⚠️ อาจเป็นภาพของคุณ
 </h2>
 <div id="secondaryBox"
   class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
@@ -68,7 +68,7 @@
 
 </div>
 
-<!-- ================= PREVIEW MODAL ================= -->
+<!-- PREVIEW MODAL -->
 <div id="previewModal"
   class="fixed inset-0 bg-black/80 hidden z-50 flex items-center justify-center">
   <div class="relative max-w-6xl w-full p-4">
@@ -92,8 +92,12 @@
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const LOGO_URL =
-  "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
+"https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
+
 const RESULT_LIMIT = 200;
+const HARD_MAX_DISTANCE = 0.45;
+const PRIMARY_MAX = 0.30;
+const MAX_JUMP = 0.12;
 /* ========================================= */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -135,46 +139,67 @@ fileInput.onchange = async () => {
   queryPreviewImg.src = img.src;
   queryPreviewBox.classList.remove("hidden");
 
-  const detection = await faceapi
-    .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 }))
+  const detections = await faceapi
+    .detectAllFaces(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 }))
     .withFaceLandmarks()
-    .withFaceDescriptor();
+    .withFaceDescriptors();
 
-  if (!detection) {
+  if (!detections.length) {
     statusEl.innerText = "❌ ไม่พบใบหน้าในภาพ";
     return;
   }
 
-  const vectorLiteral = "[" + Array.from(detection.descriptor).join(",") + "]";
   statusEl.innerText = "🔍 กำลังค้นหา...";
 
-  const { data, error } = await sb.rpc("search_face_ranked", {
-    query_vector: vectorLiteral,
-    result_limit: RESULT_LIMIT
-  });
+  const allResults = [];
 
-  if (error || !data) {
-    statusEl.innerText = "❌ ค้นหาไม่สำเร็จ";
-    return;
+  for (const det of detections) {
+    const vectorLiteral = "[" + Array.from(det.descriptor).join(",") + "]";
+    const { data } = await sb.rpc("search_face_ranked", {
+      query_vector: vectorLiteral,
+      result_limit: RESULT_LIMIT
+    });
+    if (data) allResults.push(...data);
   }
 
-  renderResults(data);
+  renderResults(allResults);
 };
 
-/* ================= RENDER ================= */
+/* ================= SPLIT RESULTS (FINAL) ================= */
 function renderResults(rows) {
-  const sorted = rows.sort((a,b)=>a.distance-b.distance);
+  const sorted = rows
+    .filter(r => r.distance <= HARD_MAX_DISTANCE)
+    .sort((a,b)=>a.distance-b.distance);
 
-  renderBox(sorted.slice(0,1), primaryBox);
-  if (sorted.length > 1) {
+  if (!sorted.length) return;
+
+  const primary = [sorted[0]];
+  const secondary = [];
+
+  for (let i = 1; i < sorted.length; i++) {
+    const jump = sorted[i].distance - sorted[i-1].distance;
+    if (sorted[i].distance <= PRIMARY_MAX && jump <= MAX_JUMP) {
+      primary.push(sorted[i]);
+    } else break;
+  }
+
+  for (let i = primary.length; i < sorted.length; i++) {
+    secondary.push(sorted[i]);
+  }
+
+  renderBox(primary, primaryBox);
+  if (secondary.length) {
     secondarySection.classList.remove("hidden");
-    renderBox(sorted.slice(1), secondaryBox);
+    renderBox(secondary, secondaryBox);
   }
 
   resultInfo.classList.remove("hidden");
-  resultInfo.innerText = `พบ ${sorted.length} ภาพ`;
+  resultInfo.innerText =
+    `พบรูปของคุณ ${primary.length} ภาพ` +
+    (secondary.length ? ` • อาจใช่ ${secondary.length} ภาพ` : "");
 }
 
+/* ================= RENDER ================= */
 function renderBox(rows, box) {
   box.innerHTML = "";
   rows.forEach((r,i)=>{
@@ -186,7 +211,7 @@ function renderBox(rows, box) {
 
     card.innerHTML = `
       <img src="${url}" class="w-full h-56 object-cover cursor-pointer"
-        onclick="openPreview('${url}','myphoto_${i+1}.jpg')">
+        onclick="openPreview('${url}','photo_${i+1}.jpg')">
       <div class="p-3 text-xs text-gray-400">
         Similarity ${(1-r.distance).toFixed(2)}
       </div>
@@ -237,29 +262,29 @@ async function drawPreviewWithWatermark(imageUrl) {
 
   const pad = canvas.width * 0.03;
 
-  // text watermark
+  // text watermark (จาง)
+  ctx.save();
   ctx.globalAlpha = 0.45;
   ctx.fillStyle = "white";
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
   ctx.font = `bold ${Math.round(canvas.width * 0.028)}px Arial`;
 
-  const textY = canvas.height - pad;
+  const textY = canvas.height - pad * 0.4;
   ctx.fillText(
     "BANGWAD CHARITY RUN 2025 | OFFICIAL PHOTOGRAPHER",
     canvas.width / 2,
     textY
   );
+  ctx.restore();
 
-  // logo
+  // logo (สีปกติ)
   const logoW = canvas.width * 0.15;
   const logoH = logoW * (logo.height / logo.width);
   const logoX = canvas.width - logoW - pad;
   const logoY = textY - logoH - pad * 0.6;
 
-  ctx.globalAlpha = 0.75;
   ctx.drawImage(logo, logoX, logoY, logoW, logoH);
-  ctx.globalAlpha = 1;
 }
 </script>
 
