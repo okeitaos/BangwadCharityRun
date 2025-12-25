@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
-<title>ค้นหาภาพของคุณ | Charity Run</title>
+<title>ค้นหาภาพของคุณ | BANGWAD CHARITY RUN</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
 <script src="https://cdn.tailwindcss.com"></script>
@@ -68,10 +68,31 @@
 
 </div>
 
+<!-- ================= PREVIEW MODAL ================= -->
+<div id="previewModal"
+  class="fixed inset-0 bg-black/80 hidden z-50 flex items-center justify-center">
+  <div class="relative max-w-6xl w-full p-4">
+    <button onclick="closePreview()"
+      class="absolute top-2 right-2 text-white text-2xl">✖</button>
+
+    <canvas id="previewCanvas"
+      class="w-full max-h-[85vh] object-contain rounded-xl mb-4"></canvas>
+
+    <div class="text-center">
+      <button id="downloadBtn"
+        class="bg-yellow-500 text-black px-6 py-2 rounded-lg font-semibold">
+        ⬇️ ดาวน์โหลดรูป (มีลายน้ำ)
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ================= CONFIG ================= */
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const LOGO_URL =
+  "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
 const RESULT_LIMIT = 200;
 /* ========================================= */
 
@@ -86,6 +107,8 @@ const secondarySection = document.getElementById("secondarySection");
 const queryPreviewBox = document.getElementById("queryPreviewBox");
 const queryPreviewImg = document.getElementById("queryPreviewImg");
 
+let currentFilename = "";
+
 /* ================= LOAD MODELS ================= */
 (async () => {
   const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
@@ -96,91 +119,7 @@ const queryPreviewImg = document.getElementById("queryPreviewImg");
   statusEl.innerText = "✅ พร้อมค้นหา";
 })();
 
-/* ================= GROUP FACE SUPPORT ================= */
-function pickMainFaces(detections, maxFaces = 1) {
-  return detections
-    .map(d => ({
-      descriptor: d.descriptor,
-      area: d.detection.box.width * d.detection.box.height
-    }))
-    .sort((a, b) => b.area - a.area)
-    .slice(0, maxFaces);
-}
-
-function mergeResults(resultSets) {
-  const map = new Map();
-  resultSets.flat().forEach(r => {
-    if (!map.has(r.image_id) || r.distance < map.get(r.image_id).distance) {
-      map.set(r.image_id, r);
-    }
-  });
-  return Array.from(map.values());
-}
-
-/* ================= SPLIT RESULTS (Layer 3) ================= */
-function splitResults(rows) {
-  if (!rows || rows.length === 0) return { primary: [], secondary: [] };
-
-  const HARD_CUTOFF = 0.45;
-  const STRONG_MAX  = 0.30;
-  const MAX_JUMP    = 0.10;
-  const MAX_PRIMARY = 40;
-
-  const sorted = rows
-    .filter(r => r.distance <= HARD_CUTOFF)
-    .sort((a, b) => a.distance - b.distance);
-
-  if (sorted.length === 0) return { primary: [], secondary: [] };
-
-  const primary = [sorted[0]];
-  const secondary = [];
-
-  for (let i = 1; i < sorted.length; i++) {
-    const jump = sorted[i].distance - sorted[i - 1].distance;
-    if (sorted[i].distance > STRONG_MAX) break;
-    if (jump > MAX_JUMP) break;
-    if (primary.length >= MAX_PRIMARY) break;
-    primary.push(sorted[i]);
-  }
-
-  const last = primary[primary.length - 1];
-  for (let i = primary.length; i < sorted.length; i++) {
-    if (sorted[i].distance - last.distance > MAX_JUMP) break;
-    secondary.push(sorted[i]);
-  }
-
-  return { primary, secondary };
-}
-
-/* ================= Layer 4: Identity Consistency ================= */
-function identityConsistencyFilter(results) {
-  if (results.length <= 2) return results;
-
-  const anchors = results.slice(0, 5);
-
-  return results.filter(r => {
-    let votes = 0;
-    for (const a of anchors) {
-      if (Math.abs(r.distance - a.distance) < 0.08) votes++;
-    }
-    return votes >= 2;
-  });
-}
-
-/* ================= Layer 5: Context Boost ================= */
-function contextBoost(results) {
-  const boosted = [];
-  for (let i = 0; i < results.length; i++) {
-    let score = 0;
-    if (i > 0 && results[i].photographer_code === results[i - 1].photographer_code) score++;
-    if (i < results.length - 1 &&
-        results[i].photographer_code === results[i + 1].photographer_code) score++;
-    if (score > 0) boosted.push(results[i]);
-  }
-  return boosted;
-}
-
-/* ================= SEARCH (ELITE PIPELINE) ================= */
+/* ================= SEARCH ================= */
 fileInput.onchange = async () => {
   const file = fileInput.files[0];
   if (!file) return;
@@ -196,52 +135,46 @@ fileInput.onchange = async () => {
   queryPreviewImg.src = img.src;
   queryPreviewBox.classList.remove("hidden");
 
-  const detections = await faceapi
-    .detectAllFaces(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 }))
+  const detection = await faceapi
+    .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 }))
     .withFaceLandmarks()
-    .withFaceDescriptors();
+    .withFaceDescriptor();
 
-  if (!detections || detections.length === 0) {
+  if (!detection) {
     statusEl.innerText = "❌ ไม่พบใบหน้าในภาพ";
     return;
   }
 
-  statusEl.innerText = `🔍 ตรวจพบ ${detections.length} ใบหน้า • กำลังค้นหา`;
+  const vectorLiteral = "[" + Array.from(detection.descriptor).join(",") + "]";
+  statusEl.innerText = "🔍 กำลังค้นหา...";
 
-  const mainFaces = pickMainFaces(detections, 1);
-  let allResults = [];
+  const { data, error } = await sb.rpc("search_face_ranked", {
+    query_vector: vectorLiteral,
+    result_limit: RESULT_LIMIT
+  });
 
-  for (const face of mainFaces) {
-    const vectorLiteral = "[" + Array.from(face.descriptor).join(",") + "]";
-    const { data } = await sb.rpc("search_face_ranked", {
-      query_vector: vectorLiteral,
-      result_limit: RESULT_LIMIT
-    });
-    if (data) allResults.push(data);
+  if (error || !data) {
+    statusEl.innerText = "❌ ค้นหาไม่สำเร็จ";
+    return;
   }
 
-  const merged = mergeResults(allResults);
-  const { primary, secondary } = splitResults(merged);
-
-  const primaryFinal = identityConsistencyFilter(primary);
-  const secondaryFinal = contextBoost(secondary);
-
-  statusEl.innerText = "🎉 ค้นหาสำเร็จ";
-
-  renderBox(primaryFinal, primaryBox);
-
-  if (secondaryFinal.length) {
-    secondarySection.classList.remove("hidden");
-    renderBox(secondaryFinal, secondaryBox);
-  }
-
-  resultInfo.classList.remove("hidden");
-  resultInfo.innerText =
-    `พบรูปของคุณ ${primaryFinal.length} ภาพ` +
-    (secondaryFinal.length ? ` • รูปเพิ่มเติม ${secondaryFinal.length} ภาพ` : "");
+  renderResults(data);
 };
 
 /* ================= RENDER ================= */
+function renderResults(rows) {
+  const sorted = rows.sort((a,b)=>a.distance-b.distance);
+
+  renderBox(sorted.slice(0,1), primaryBox);
+  if (sorted.length > 1) {
+    secondarySection.classList.remove("hidden");
+    renderBox(sorted.slice(1), secondaryBox);
+  }
+
+  resultInfo.classList.remove("hidden");
+  resultInfo.innerText = `พบ ${sorted.length} ภาพ`;
+}
+
 function renderBox(rows, box) {
   box.innerHTML = "";
   rows.forEach((r,i)=>{
@@ -252,13 +185,81 @@ function renderBox(rows, box) {
     card.className = "card bg-slate-800 rounded-2xl overflow-hidden";
 
     card.innerHTML = `
-      <img src="${url}" class="w-full h-56 object-cover">
+      <img src="${url}" class="w-full h-56 object-cover cursor-pointer"
+        onclick="openPreview('${url}','myphoto_${i+1}.jpg')">
       <div class="p-3 text-xs text-gray-400">
         Similarity ${(1-r.distance).toFixed(2)}
       </div>
     `;
     box.appendChild(card);
   });
+}
+
+/* ================= PREVIEW ================= */
+function openPreview(url, filename) {
+  currentFilename = filename;
+  document.getElementById("previewModal").classList.remove("hidden");
+  drawPreviewWithWatermark(url);
+
+  document.getElementById("downloadBtn").onclick = () => {
+    const canvas = document.getElementById("previewCanvas");
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/jpeg", 0.95);
+    a.download = filename;
+    a.click();
+  };
+}
+
+function closePreview() {
+  document.getElementById("previewModal").classList.add("hidden");
+}
+
+/* ================= WATERMARK ================= */
+async function drawPreviewWithWatermark(imageUrl) {
+  const img = new Image();
+  const logo = new Image();
+  img.crossOrigin = "anonymous";
+  logo.crossOrigin = "anonymous";
+  img.src = imageUrl;
+  logo.src = LOGO_URL;
+
+  await Promise.all([
+    new Promise(r => img.onload = r),
+    new Promise(r => logo.onload = r)
+  ]);
+
+  const canvas = document.getElementById("previewCanvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = img.width;
+  canvas.height = img.height;
+
+  ctx.drawImage(img, 0, 0);
+
+  const pad = canvas.width * 0.03;
+
+  // text watermark
+  ctx.globalAlpha = 0.45;
+  ctx.fillStyle = "white";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.font = `bold ${Math.round(canvas.width * 0.028)}px Arial`;
+
+  const textY = canvas.height - pad;
+  ctx.fillText(
+    "BANGWAD CHARITY RUN 2025 | OFFICIAL PHOTOGRAPHER",
+    canvas.width / 2,
+    textY
+  );
+
+  // logo
+  const logoW = canvas.width * 0.15;
+  const logoH = logoW * (logo.height / logo.width);
+  const logoX = canvas.width - logoW - pad;
+  const logoY = textY - logoH - pad * 0.6;
+
+  ctx.globalAlpha = 0.75;
+  ctx.drawImage(logo, logoX, logoY, logoW, logoH);
+  ctx.globalAlpha = 1;
 }
 </script>
 
