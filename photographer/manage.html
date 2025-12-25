@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <title>Admin Photographer Manager</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -21,11 +22,11 @@
     <table class="w-full text-sm">
       <thead class="bg-slate-700 text-gray-300">
         <tr>
-          <th class="p-2">Name</th>
-          <th class="p-2">Images</th>
-          <th class="p-2">Block</th>
-          <th class="p-2">Upload</th>
-          <th class="p-2">Manage</th>
+          <th class="p-2 text-left">Name</th>
+          <th class="p-2 text-center">Images</th>
+          <th class="p-2 text-center">Search</th>
+          <th class="p-2 text-center">Upload</th>
+          <th class="p-2 text-center">Manage</th>
         </tr>
       </thead>
       <tbody id="photographerTable"></tbody>
@@ -34,12 +35,20 @@
 
   <!-- IMAGE MODAL -->
   <div id="imageModal"
-       class="fixed inset-0 bg-black/70 hidden items-center justify-center">
-    <div class="bg-slate-800 p-4 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-auto">
-      <div class="flex justify-between mb-2">
+       class="fixed inset-0 bg-black/70 hidden items-center justify-center z-50">
+    <div class="bg-slate-800 p-4 rounded-xl w-full max-w-5xl max-h-[90vh] overflow-auto">
+      <div class="flex justify-between items-center mb-3">
         <h2 class="font-bold">📸 Photographer Images</h2>
-        <button onclick="closeModal()" class="text-red-400">✖</button>
+        <button onclick="closeModal()" class="text-red-400 text-xl">✖</button>
       </div>
+
+      <div class="mb-3">
+        <button onclick="deleteAllImagesOfPhotographer()"
+          class="bg-red-600 px-4 py-2 rounded text-sm">
+          🗑 Delete ALL Images
+        </button>
+      </div>
+
       <div id="imageGrid"
            class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
     </div>
@@ -54,7 +63,8 @@ const SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 const BUCKET = "gallery";
 /* ========================================= */
 
-const supabase = supabasejs.createClient(
+/* ✅ FIX: ใช้ adminSupabase ตัวเดียว */
+const adminSupabase = supabasejs.createClient(
   SUPABASE_URL,
   SERVICE_ROLE_KEY
 );
@@ -67,24 +77,25 @@ let currentUserId = null;
 
 /* ================= LOAD PHOTOGRAPHERS ================= */
 async function loadPhotographers() {
-  const { data } = await supabase
+  const { data: photographers } = await adminSupabase
     .from("photographer_registration")
-    .select("user_id, display_name, is_blocked, is_upload_blocked");
+    .select("user_id, display_name, is_blocked, is_upload_blocked")
+    .order("created_at", { ascending: false });
 
   table.innerHTML = "";
 
-  for (const p of data) {
-    const { count } = await supabase
+  for (const p of photographers || []) {
+    const { count } = await adminSupabase
       .from("file_hashes")
       .select("*", { count: "exact", head: true })
       .eq("user_id", p.user_id);
 
     table.innerHTML += `
       <tr class="border-b border-slate-700">
-        <td class="p-2">${p.display_name}</td>
+        <td class="p-2">${p.display_name || "-"}</td>
         <td class="p-2 text-center">${count ?? 0}</td>
         <td class="p-2 text-center">
-          <button onclick="toggleBlock('${p.user_id}', ${!p.is_blocked})"
+          <button onclick="toggleSearchBlock('${p.user_id}', ${!p.is_blocked})"
             class="${p.is_blocked ? 'text-red-400' : 'text-green-400'}">
             ${p.is_blocked ? 'Blocked' : 'Active'}
           </button>
@@ -97,7 +108,8 @@ async function loadPhotographers() {
         </td>
         <td class="p-2 text-center space-x-2">
           <button onclick="openImages('${p.user_id}')" class="text-blue-400">View</button>
-          <button onclick="deletePhotographer('${p.user_id}')" class="text-red-400">Delete</button>
+          <button onclick="deletePhotographer('${p.user_id}')"
+            class="text-red-500">Delete</button>
         </td>
       </tr>
     `;
@@ -105,8 +117,8 @@ async function loadPhotographers() {
 }
 
 /* ================= TOGGLES ================= */
-async function toggleBlock(userId, value) {
-  await supabase
+async function toggleSearchBlock(userId, value) {
+  await adminSupabase
     .from("photographer_registration")
     .update({ is_blocked: value })
     .eq("user_id", userId);
@@ -114,7 +126,7 @@ async function toggleBlock(userId, value) {
 }
 
 async function toggleUploadBlock(userId, value) {
-  await supabase
+  await adminSupabase
     .from("photographer_registration")
     .update({ is_upload_blocked: value })
     .eq("user_id", userId);
@@ -127,7 +139,7 @@ async function openImages(userId) {
   modal.classList.remove("hidden");
   imageGrid.innerHTML = "Loading...";
 
-  const { data } = await supabase
+  const { data: images } = await adminSupabase
     .from("file_hashes")
     .select("id, file_path")
     .eq("user_id", userId)
@@ -135,17 +147,17 @@ async function openImages(userId) {
 
   imageGrid.innerHTML = "";
 
-  for (const img of data) {
-    const url = supabase
+  for (const img of images || []) {
+    const url = adminSupabase
       .storage
       .from(BUCKET)
       .getPublicUrl(img.file_path).data.publicUrl;
 
     imageGrid.innerHTML += `
-      <div class="relative">
+      <div class="relative group">
         <img src="${url}" class="rounded" />
-        <button onclick="deleteImage('${img.id}', '${img.file_path}')"
-          class="absolute top-1 right-1 bg-black/60 text-red-400 px-2 rounded">
+        <button onclick="deleteSingleImage('${img.id}', '${img.file_path}')"
+          class="absolute top-1 right-1 bg-black/70 px-2 text-red-400 rounded opacity-0 group-hover:opacity-100">
           ✖
         </button>
       </div>
@@ -158,30 +170,65 @@ function closeModal() {
 }
 
 /* ================= DELETE ================= */
-async function deleteImage(imageId, path) {
+async function deleteSingleImage(imageId, filePath) {
   if (!confirm("Delete this image?")) return;
 
-  await supabase.from("face_index").delete().eq("image_id", imageId);
-  await supabase.from("file_hashes").delete().eq("id", imageId);
-  await supabase.storage.from(BUCKET).remove([path]);
+  await adminSupabase.from("face_index").delete().eq("image_id", imageId);
+  await adminSupabase.from("file_hashes").delete().eq("id", imageId);
+  await adminSupabase.storage.from(BUCKET).remove([filePath]);
 
   openImages(currentUserId);
+}
+
+async function deleteAllImagesOfPhotographer() {
+  if (!confirm("Delete ALL images of this photographer?")) return;
+
+  const { data: files } = await adminSupabase
+    .from("file_hashes")
+    .select("file_path")
+    .eq("user_id", currentUserId);
+
+  await adminSupabase.from("face_index")
+    .delete()
+    .eq("photographer_code", currentUserId);
+
+  await adminSupabase.from("file_hashes")
+    .delete()
+    .eq("user_id", currentUserId);
+
+  if (files?.length) {
+    await adminSupabase
+      .storage
+      .from(BUCKET)
+      .remove(files.map(f => f.file_path));
+  }
+
+  closeModal();
+  loadPhotographers();
 }
 
 async function deletePhotographer(userId) {
   if (!confirm("Delete photographer and ALL images?")) return;
 
-  const { data: files } = await supabase
+  const { data: files } = await adminSupabase
     .from("file_hashes")
     .select("file_path")
     .eq("user_id", userId);
 
-  await supabase.from("face_index").delete().eq("photographer_code", userId);
-  await supabase.from("file_hashes").delete().eq("user_id", userId);
-  await supabase.from("photographer_registration").delete().eq("user_id", userId);
+  await adminSupabase.from("face_index")
+    .delete()
+    .eq("photographer_code", userId);
+
+  await adminSupabase.from("file_hashes")
+    .delete()
+    .eq("user_id", userId);
+
+  await adminSupabase.from("photographer_registration")
+    .delete()
+    .eq("user_id", userId);
 
   if (files?.length) {
-    await supabase
+    await adminSupabase
       .storage
       .from(BUCKET)
       .remove(files.map(f => f.file_path));
