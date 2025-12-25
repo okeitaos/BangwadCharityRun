@@ -119,7 +119,7 @@ function stopSync() {
 
 async function loopSync() {
   if (!syncing) return;
-  if (!paused) await fetch(API + "/sync", { method: "POST" });
+  if (!paused) await fetch(`${API_BASE}/sync`, { method: "POST" })
   setTimeout(loopSync, 800);
 }
 
