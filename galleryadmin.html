@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
 <meta charset="UTF-8" />
-<title>Admin Face Sync</title>
+<title>Admin Face Sync – ThaiRun Style</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
 <script src="https://cdn.tailwindcss.com"></script>
@@ -13,33 +13,40 @@
 <div class="max-w-3xl mx-auto space-y-6">
 
   <h1 class="text-3xl font-bold text-yellow-400 text-center">
-    Admin Face Sync (ThaiRun Style)
+    🧠 Admin Face Sync (ThaiRun Style)
   </h1>
 
-  <!-- SUMMARY -->
-  <div class="bg-slate-800 rounded-xl p-4 space-y-2">
-    <div id="statusText">Idle</div>
+  <!-- STATUS -->
+  <div class="bg-slate-800 rounded-xl p-4 space-y-3">
+    <div id="statusText" class="font-semibold">Idle</div>
 
-    <div class="w-full bg-gray-700 rounded-full h-4">
-      <div id="progressBar"
-        class="bg-green-400 h-4 rounded-full"
+    <div id="counter" class="text-sm text-gray-300">
+      Synced: 0 / 0
+    </div>
+
+    <div class="w-full bg-gray-700 rounded-full h-4 overflow-hidden">
+      <div
+        id="progressBar"
+        class="bg-green-400 h-4 transition-all duration-300"
         style="width:0%">
       </div>
     </div>
 
-    <div id="progressText" class="text-sm">0%</div>
+    <div id="percentText" class="text-sm text-gray-400">
+      0%
+    </div>
   </div>
 
   <!-- CONTROLS -->
   <div class="flex gap-4 justify-center">
     <button id="startBtn"
-      class="bg-green-600 px-6 py-3 rounded-xl font-semibold">
-      Start Sync
+      class="bg-green-600 hover:bg-green-500 px-6 py-3 rounded-xl font-semibold">
+      ▶ Start Sync
     </button>
 
     <button id="stopBtn"
-      class="bg-red-600 px-6 py-3 rounded-xl font-semibold hidden">
-      Stop
+      class="bg-red-600 hover:bg-red-500 px-6 py-3 rounded-xl font-semibold hidden">
+      ⏹ Stop
     </button>
   </div>
 
@@ -53,17 +60,19 @@
 
 <script>
 /* ================= CONFIG ================= */
-const FACE_SYNC_URL = "http://localhost:3000/sync"; // 🔥 แก้ตรงนี้ถ้า deploy แล้ว
-const SYNC_KEY = ""; // ใส่ถ้ามี x-sync-key
-const LOOP_DELAY = 1200; // ms (เหมือนไทยรัน)
+const API_BASE = "http://localhost:3000";
+const SYNC_INTERVAL = 800;   // ยิง /sync
+const STATUS_INTERVAL = 1200; // poll สถานะ
 /* ========================================= */
 
-let running = false;
-let totalDone = 0;
+let syncing = false;
+let syncLoopTimer = null;
+let statusTimer = null;
 
 const statusText = document.getElementById("statusText");
+const counter = document.getElementById("counter");
 const progressBar = document.getElementById("progressBar");
-const progressText = document.getElementById("progressText");
+const percentText = document.getElementById("percentText");
 const logBox = document.getElementById("logBox");
 
 document.getElementById("startBtn").onclick = startSync;
@@ -78,108 +87,87 @@ function log(msg) {
 }
 
 /* ================= CONTROL ================= */
-async function startSync() {
-  if (running) return;
+function startSync() {
+  if (syncing) return;
 
-  running = true;
-  totalDone = 0;
-
-  statusText.innerText = "Running...";
-  progressBar.style.width = "0%";
-  progressText.innerText = "0%";
+  syncing = true;
+  statusText.innerText = "Syncing…";
+  log("🚀 Start face sync");
 
   document.getElementById("startBtn").classList.add("hidden");
   document.getElementById("stopBtn").classList.remove("hidden");
 
-  log("🚀 Start face sync");
-
-  await loopSync();
+  syncLoop();
+  pollStatus();
 }
 
 function stopSync() {
-  running = false;
+  syncing = false;
   statusText.innerText = "Stopped";
-  log("⛔ Sync stopped by admin");
+  log("⏹ Sync stopped");
+
+  clearTimeout(syncLoopTimer);
+  clearTimeout(statusTimer);
 
   document.getElementById("stopBtn").classList.add("hidden");
   document.getElementById("startBtn").classList.remove("hidden");
 }
 
 /* ================= SYNC LOOP ================= */
-async function loopSync() {
-  while (running) {
-    const result = await runBatch();
+async function syncLoop() {
+  if (!syncing) return;
 
-    if (!result) break;
-
-    if (result.status === "no_files") {
-      log("✅ No pending images");
-      finish();
-      break;
-    }
-
-    totalDone += result.synced;
-
-    log(
-      `Batch synced=${result.synced}, skipped=${result.skipped}`
-    );
-
-    // fake progress (thai-run style)
-    updateProgress(result.synced, result.skipped);
-
-    await sleep(LOOP_DELAY);
-  }
-}
-
-async function runBatch() {
   try {
-    const res = await fetch(FACE_SYNC_URL, {
-      method: "POST",
-      headers: SYNC_KEY
-        ? { "x-sync-key": SYNC_KEY }
-        : {}
-    });
+    await fetch(`${API_BASE}/sync`, { method: "POST" });
+  } catch (e) {
+    log("❌ Sync request failed");
+    stopSync();
+    return;
+  }
 
-    if (!res.ok) {
-      log("❌ Server error: " + res.status);
-      stopSync();
-      return null;
+  syncLoopTimer = setTimeout(syncLoop, SYNC_INTERVAL);
+}
+
+/* ================= STATUS POLLING ================= */
+async function pollStatus() {
+  if (!syncing) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/sync/status`);
+    const data = await res.json();
+
+    const total = data.total || 0;
+    const synced = data.synced || 0;
+    const remaining = data.remaining || 0;
+
+    const percent = total > 0
+      ? Math.round((synced / total) * 100)
+      : 0;
+
+    counter.innerText =
+      `Synced: ${synced} / ${total} (Remaining: ${remaining})`;
+
+    progressBar.style.width = percent + "%";
+    percentText.innerText = percent + "%";
+
+    if (data.done) {
+      syncing = false;
+      statusText.innerText = "Completed";
+      log("🎉 Face sync completed");
+
+      progressBar.style.width = "100%";
+      percentText.innerText = "100%";
+
+      document.getElementById("stopBtn").classList.add("hidden");
+      document.getElementById("startBtn").classList.remove("hidden");
+      return;
     }
 
-    return await res.json();
-  } catch (err) {
-    log("❌ Network error");
-    stopSync();
-    return null;
+  } catch (e) {
+    log("❌ Status check failed");
   }
-}
 
-/* ================= PROGRESS ================= */
-function updateProgress(synced, skipped) {
-  // progress แบบประมาณ (เพราะเราไม่รู้ total ล่วงหน้า)
-  const inc = synced > 0 ? 3 : 1;
-  const current = parseInt(progressBar.style.width) || 0;
-  const next = Math.min(100, current + inc);
-
-  progressBar.style.width = next + "%";
-  progressText.innerText = next + "%";
-}
-
-function finish() {
-  running = false;
-  progressBar.style.width = "100%";
-  progressText.innerText = "100%";
-  statusText.innerText = "Completed";
-
-  document.getElementById("stopBtn").classList.add("hidden");
-  document.getElementById("startBtn").classList.remove("hidden");
-
-  log("🎉 Face sync completed");
-}
-
-/* ================= UTIL ================= */
-function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms));
+  statusTimer = setTimeout(pollStatus, STATUS_INTERVAL);
 }
 </script>
 
