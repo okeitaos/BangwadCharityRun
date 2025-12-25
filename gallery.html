@@ -10,13 +10,13 @@
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 
 <style>
-  .card {
-    transition: transform .2s, box-shadow .2s;
-  }
-  .card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 25px rgba(0,0,0,.4);
-  }
+.card {
+  transition: transform .2s, box-shadow .2s;
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(0,0,0,.4);
+}
 </style>
 </head>
 
@@ -24,141 +24,102 @@
 
 <div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
-  <h1 class="text-2xl md:text-3xl font-bold text-center text-yellow-400">
-    🏃‍♂️ ค้นหาภาพของคุณ
-  </h1>
+<h1 class="text-2xl md:text-3xl font-bold text-center text-yellow-400">
+🏃‍♂️ ค้นหาภาพของคุณ
+</h1>
 
-  <!-- Upload -->
-  <div class="bg-slate-800 rounded-2xl p-5 space-y-3">
-    <input id="fileInput" type="file" accept="image/*"
-      class="block w-full text-sm
-      file:bg-yellow-500 file:text-black
-      file:px-5 file:py-2 file:rounded-xl" />
-    <div id="status" class="text-sm text-gray-300"></div>
-  </div>
+<!-- Upload -->
+<div class="bg-slate-800 rounded-2xl p-5 space-y-3">
+  <input id="fileInput" type="file" accept="image/*"
+    class="block w-full text-sm
+    file:bg-yellow-500 file:text-black
+    file:px-5 file:py-2 file:rounded-xl" />
+  <div id="status" class="text-sm text-gray-300"></div>
+</div>
 
-  <!-- Query Preview -->
-  <div id="queryPreviewBox"
-       class="hidden bg-slate-800 rounded-2xl p-4 text-center">
-    <p class="text-sm text-gray-400 mb-2">ภาพที่ใช้ค้นหา</p>
-    <img id="queryPreviewImg"
-         class="mx-auto rounded-xl max-h-64 border border-yellow-500/40">
-  </div>
+<!-- Query Preview -->
+<div id="queryPreviewBox"
+  class="hidden bg-slate-800 rounded-2xl p-4 text-center">
+  <p class="text-sm text-gray-400 mb-2">ภาพที่ใช้ค้นหา</p>
+  <img id="queryPreviewImg"
+    class="mx-auto rounded-xl max-h-64 border border-yellow-500/40">
+</div>
 
-  <!-- Result Info -->
-  <div id="resultInfo"
-       class="hidden text-sm text-center text-gray-300">
-  </div>
+<div id="resultInfo"
+  class="hidden text-sm text-center text-gray-300"></div>
 
-  <!-- Primary Results -->
-  <div>
-    <h2 class="text-sm text-green-400 mb-2 text-center">
-      ✅ รูปของคุณ (มั่นใจสูง)
-    </h2>
-    <div id="primaryBox"
-      class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+<!-- Primary -->
+<div>
+<h2 class="text-sm text-green-400 mb-2 text-center">
+✅ รูปของคุณ (มั่นใจสูง)
+</h2>
+<div id="primaryBox"
+  class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+</div>
+
+<!-- Secondary -->
+<div id="secondarySection" class="hidden mt-8">
+<h2 class="text-sm text-yellow-400 mb-2 text-center">
+⚠️ อาจเป็นภาพของคุณ
+</h2>
+<div id="secondaryBox"
+  class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+</div>
+
+</div>
+
+<!-- PREVIEW MODAL -->
+<div id="previewModal"
+  class="fixed inset-0 bg-black/80 hidden z-50 flex items-center justify-center">
+  <div class="relative max-w-6xl w-full p-4">
+    <button onclick="closePreview()"
+      class="absolute top-2 right-2 text-white text-2xl">✖</button>
+
+    <img id="previewImg"
+      class="w-full max-h-[85vh] object-contain rounded-xl mb-4" />
+
+    <div class="text-center">
+      <button id="downloadBtn"
+        class="bg-yellow-500 text-black px-6 py-2 rounded-lg font-semibold">
+        ⬇️ ดาวน์โหลดรูป (มีลายน้ำ)
+      </button>
     </div>
   </div>
-
-  <!-- Secondary Results -->
-  <div id="secondarySection" class="hidden mt-8">
-    <h2 class="text-sm text-yellow-400 mb-2 text-center">
-      ⚠️ อาจเป็นภาพของคุณ
-    </h2>
-    <div id="secondaryBox"
-      class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-    </div>
-  </div>
-
 </div>
 
 <script>
 /* ================= CONFIG ================= */
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // 🔑 ใส่ของจริง
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const LOGO_URL =
-  "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
+"https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
 const RESULT_LIMIT = 200;
-
-/*
-  Similarity = 1 - distance
-  ดังนั้น:
-  similarity >= 0.50  → distance <= 0.50
-*/
 const MAX_DISTANCE_SHOW = 0.50;
 /* ========================================= */
 
-const sb = supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
-);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const fileInput = document.getElementById("fileInput");
 const statusEl = document.getElementById("status");
 const resultInfo = document.getElementById("resultInfo");
-
 const primaryBox = document.getElementById("primaryBox");
 const secondaryBox = document.getElementById("secondaryBox");
 const secondarySection = document.getElementById("secondarySection");
-
 const queryPreviewBox = document.getElementById("queryPreviewBox");
 const queryPreviewImg = document.getElementById("queryPreviewImg");
 
+let currentPreviewUrl = "";
+let currentFilename = "";
+
 /* ================= LOAD MODELS ================= */
-async function loadModels() {
+(async () => {
   const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
   statusEl.innerText = "⏳ โหลดโมเดลใบหน้า...";
   await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
   await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
   await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
   statusEl.innerText = "✅ พร้อมค้นหา";
-}
-loadModels();
-
-/* ================= SPLIT RESULTS (UX + Confirmation) ================= */
-function splitResults(rows) {
-  if (!rows || rows.length === 0) {
-    return { primary: [], secondary: [] };
-  }
-
-  // เรียงจากใกล้ → ไกล
-  const sorted = [...rows]
-    .filter(r => r.distance <= MAX_DISTANCE_SHOW) // ❌ ตัด < similarity 0.50 ทิ้งตั้งแต่ต้น
-    .sort((a, b) => a.distance - b.distance);
-
-  if (sorted.length === 0) {
-    return { primary: [], secondary: [] };
-  }
-
-  const primary = [sorted[0]]; // anchor
-  const secondary = [];
-
-  const MAX_JUMP = 0.12;
-  const ABS_MAX_PRIMARY = 0.30; // similarity >= 0.70
-  const ABS_MAX_SECONDARY = 0.50; // similarity >= 0.50
-
-  let cutIndex = 1;
-
-  // primary (มั่นใจสูง)
-  for (let i = 1; i < sorted.length; i++) {
-    const jump = sorted[i].distance - sorted[i - 1].distance;
-
-    if (sorted[i].distance > ABS_MAX_PRIMARY) break;
-    if (jump > MAX_JUMP) break;
-
-    primary.push(sorted[i]);
-    cutIndex = i + 1;
-  }
-
-  // secondary (อาจใช่ แต่ similarity ≥ 0.50)
-  for (let i = cutIndex; i < sorted.length; i++) {
-    if (sorted[i].distance <= ABS_MAX_SECONDARY) {
-      secondary.push(sorted[i]);
-    }
-  }
-
-  return { primary, secondary };
-}
+})();
 
 /* ================= SEARCH ================= */
 fileInput.onchange = async () => {
@@ -173,15 +134,11 @@ fileInput.onchange = async () => {
   statusEl.innerText = "📸 ตรวจจับใบหน้า...";
 
   const img = await faceapi.bufferToImage(file);
-
   queryPreviewImg.src = img.src;
   queryPreviewBox.classList.remove("hidden");
 
   const detection = await faceapi
-    .detectSingleFace(
-      img,
-      new faceapi.TinyFaceDetectorOptions({ inputSize: 416 })
-    )
+    .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 }))
     .withFaceLandmarks()
     .withFaceDescriptor();
 
@@ -190,10 +147,8 @@ fileInput.onchange = async () => {
     return;
   }
 
-  const vectorLiteral =
-    "[" + Array.from(detection.descriptor).join(",") + "]";
-
-  statusEl.innerText = "🔍 กำลังค้นหาภาพของคุณ...";
+  const vectorLiteral = "[" + Array.from(detection.descriptor).join(",") + "]";
+  statusEl.innerText = "🔍 กำลังค้นหา...";
 
   const { data, error } = await sb.rpc("search_face_ranked", {
     query_vector: vectorLiteral,
@@ -201,30 +156,70 @@ fileInput.onchange = async () => {
   });
 
   if (error || !data) {
-    console.error(error);
     statusEl.innerText = "❌ ค้นหาไม่สำเร็จ";
     return;
   }
 
-  const { primary, secondary } = splitResults(data);
-
-  statusEl.innerText = "🎉 ค้นหาสำเร็จ";
-  resultInfo.classList.remove("hidden");
-  resultInfo.innerText =
-    `พบรูปของคุณ ${primary.length} ภาพ` +
-    (secondary.length ? ` • รูปที่อาจใช่ ${secondary.length} ภาพ` : "");
-
-  renderPrimary(primary);
-  renderSecondary(secondary);
+  renderResults(data);
 };
 
-/* ================= DOWNLOAD + WATERMARK ================= */
+/* ================= RENDER ================= */
+function renderResults(rows) {
+  const sorted = rows.filter(r => r.distance <= MAX_DISTANCE_SHOW)
+    .sort((a,b)=>a.distance-b.distance);
+
+  const primary = sorted.slice(0,1);
+  const secondary = sorted.slice(1);
+
+  renderBox(primary, primaryBox);
+  if (secondary.length) {
+    secondarySection.classList.remove("hidden");
+    renderBox(secondary, secondaryBox);
+  }
+
+  resultInfo.classList.remove("hidden");
+  resultInfo.innerText = `พบ ${sorted.length} ภาพ`;
+}
+
+function renderBox(rows, box) {
+  box.innerHTML = "";
+  rows.forEach((r,i)=>{
+    const url = sb.storage.from("gallery")
+      .getPublicUrl(r.file_path).data.publicUrl;
+
+    const card = document.createElement("div");
+    card.className = "card bg-slate-800 rounded-2xl overflow-hidden";
+
+    card.innerHTML = `
+      <img src="${url}" class="w-full h-56 object-cover cursor-pointer"
+        onclick="openPreview('${url}','myphoto_${i+1}.jpg')">
+      <div class="p-3 text-xs text-gray-400">
+        Similarity ${(1-r.distance).toFixed(2)}
+      </div>
+    `;
+    box.appendChild(card);
+  });
+}
+
+/* ================= PREVIEW ================= */
+function openPreview(url, filename) {
+  currentPreviewUrl = url;
+  currentFilename = filename;
+  document.getElementById("previewImg").src = url;
+  document.getElementById("previewModal").classList.remove("hidden");
+  document.getElementById("downloadBtn").onclick =
+    ()=>downloadWithWatermark(url, filename);
+}
+function closePreview() {
+  document.getElementById("previewModal").classList.add("hidden");
+}
+
+/* ================= DOWNLOAD ================= */
 async function downloadWithWatermark(imageUrl, filename) {
   const img = new Image();
   const logo = new Image();
   img.crossOrigin = "anonymous";
   logo.crossOrigin = "anonymous";
-
   img.src = imageUrl;
   logo.src = LOGO_URL;
 
@@ -238,69 +233,33 @@ async function downloadWithWatermark(imageUrl, filename) {
   canvas.height = img.height;
   const ctx = canvas.getContext("2d");
 
-  ctx.drawImage(img, 0, 0);
+  ctx.drawImage(img,0,0);
 
-  const logoW = canvas.width * 0.15;
-  const logoH = logoW * (logo.height / logo.width);
-  const pad = canvas.width * 0.02;
+  const pad = canvas.width*0.03;
+  const logoW = canvas.width*0.15;
+  const logoH = logoW*(logo.height/logo.width);
 
   ctx.globalAlpha = 0.85;
   ctx.drawImage(
     logo,
-    canvas.width - logoW - pad,
-    canvas.height - logoH - pad,
-    logoW,
-    logoH
+    canvas.width-logoW-pad,
+    canvas.height-logoH-pad,
+    logoW,logoH
   );
-  ctx.globalAlpha = 1;
 
-  const a = document.createElement("a");
-  a.href = canvas.toDataURL("image/jpeg", 0.95);
-  a.download = filename;
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = "white";
+  ctx.font = `bold ${Math.round(canvas.width*0.028)}px Arial`;
+  ctx.fillText(
+    "Banwad Charity Run 2025 | OFFICIAL PHOTOGRAPHER",
+    pad,
+    canvas.height-pad
+  );
+
+  const a=document.createElement("a");
+  a.href=canvas.toDataURL("image/jpeg",0.95);
+  a.download=filename;
   a.click();
-}
-
-/* ================= RENDER ================= */
-function renderPrimary(rows) {
-  primaryBox.innerHTML = "";
-  rows.forEach((r, i) => renderCard(r, i, primaryBox));
-}
-
-function renderSecondary(rows) {
-  if (rows.length === 0) return;
-
-  secondarySection.classList.remove("hidden");
-  secondaryBox.innerHTML = "";
-  rows.forEach((r, i) => renderCard(r, i, secondaryBox));
-}
-
-function renderCard(r, i, box) {
-  const url =
-    sb.storage.from("gallery")
-      .getPublicUrl(r.file_path).data.publicUrl;
-
-  const card = document.createElement("div");
-  card.className = "card bg-slate-800 rounded-2xl overflow-hidden";
-
-  card.innerHTML = `
-    <div class="relative">
-      <img src="${url}" class="w-full h-56 object-cover">
-      <img src="${LOGO_URL}"
-           class="absolute bottom-2 right-2 w-12 opacity-80 pointer-events-none">
-    </div>
-    <div class="p-3 space-y-2">
-      <div class="text-xs text-gray-400">
-        Similarity ${(1 - r.distance).toFixed(2)}
-      </div>
-      <button
-        class="w-full bg-yellow-500 text-black text-sm py-1.5 rounded-lg hover:bg-yellow-400"
-        onclick="downloadWithWatermark('${url}', 'myphoto_${i+1}.jpg')">
-        ⬇️ ดาวน์โหลด
-      </button>
-    </div>
-  `;
-
-  box.appendChild(card);
 }
 </script>
 
