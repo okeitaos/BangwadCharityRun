@@ -75,8 +75,8 @@
     <button onclick="closePreview()"
       class="absolute top-2 right-2 text-white text-2xl">✖</button>
 
-    <img id="previewImg"
-      class="w-full max-h-[85vh] object-contain rounded-xl mb-4" />
+    <canvas id="previewCanvas"
+      class="w-full max-h-[85vh] object-contain rounded-xl mb-4"></canvas>
 
     <div class="text-center">
       <button id="downloadBtn"
@@ -93,6 +93,7 @@ const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const LOGO_URL =
 "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
+
 const RESULT_LIMIT = 200;
 const MAX_DISTANCE_SHOW = 0.50;
 /* ========================================= */
@@ -205,23 +206,28 @@ function renderBox(rows, box) {
 function openPreview(url, filename) {
   currentPreviewUrl = url;
   currentFilename = filename;
-  document.getElementById("previewImg").src = url;
   document.getElementById("previewModal").classList.remove("hidden");
-  document.getElementById("downloadBtn").onclick =
-    ()=>downloadWithWatermark(url, filename);
+  drawPreviewWithWatermark(url);
+
+  document.getElementById("downloadBtn").onclick = () => {
+    const canvas = document.getElementById("previewCanvas");
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/jpeg", 0.95);
+    a.download = filename;
+    a.click();
+  };
 }
+
 function closePreview() {
   document.getElementById("previewModal").classList.add("hidden");
 }
 
-/* ================= DOWNLOAD ================= */
-async function downloadWithWatermark(imageUrl, filename) {
+/* ================= PREVIEW + WATERMARK ================= */
+async function drawPreviewWithWatermark(imageUrl) {
   const img = new Image();
   const logo = new Image();
-
   img.crossOrigin = "anonymous";
   logo.crossOrigin = "anonymous";
-
   img.src = imageUrl;
   logo.src = LOGO_URL;
 
@@ -230,50 +236,39 @@ async function downloadWithWatermark(imageUrl, filename) {
     new Promise(r => logo.onload = r)
   ]);
 
-  const canvas = document.createElement("canvas");
+  const canvas = document.getElementById("previewCanvas");
+  const ctx = canvas.getContext("2d");
   canvas.width = img.width;
   canvas.height = img.height;
-  const ctx = canvas.getContext("2d");
 
-  /* ===== draw original image ===== */
   ctx.drawImage(img, 0, 0);
 
-  /* ===== common padding ===== */
   const pad = canvas.width * 0.03;
 
-  /* ===== TEXT WATERMARK (center bottom) ===== */
-  const text = "Banwad Charity Run 2025 | OFFICIAL PHOTOGRAPHER";
-  const fontSize = Math.round(canvas.width * 0.028);
-
-  ctx.globalAlpha = 0.45;          // สีอ่อน อ่านได้ แต่ไม่รบกวนภาพ
+  // text watermark
+  ctx.globalAlpha = 0.45;
   ctx.fillStyle = "white";
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
-  ctx.font = `bold ${fontSize}px Arial`;
+  ctx.font = `bold ${Math.round(canvas.width * 0.028)}px Arial`;
 
   const textY = canvas.height - pad;
-  ctx.fillText(text, canvas.width / 2, textY);
+  ctx.fillText(
+    "BANGWAD CHARITY RUN 2025 | OFFICIAL PHOTOGRAPHER",
+    canvas.width / 2,
+    textY
+  );
 
-  /* ===== LOGO (bottom-right, above text) ===== */
+  // logo
   const logoW = canvas.width * 0.15;
   const logoH = logoW * (logo.height / logo.width);
-
   const logoX = canvas.width - logoW - pad;
   const logoY = textY - logoH - pad * 0.6;
 
-  ctx.globalAlpha = 0.75;          // โลโก้ชัดกว่าข้อความ
+  ctx.globalAlpha = 0.75;
   ctx.drawImage(logo, logoX, logoY, logoW, logoH);
-
-  /* ===== reset alpha ===== */
   ctx.globalAlpha = 1;
-
-  /* ===== download ===== */
-  const a = document.createElement("a");
-  a.href = canvas.toDataURL("image/jpeg", 0.95);
-  a.download = filename;
-  a.click();
 }
-
 </script>
 
 </body>
