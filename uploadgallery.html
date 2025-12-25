@@ -75,20 +75,17 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const MAX_FILES = 5000;
 const MAX_SIZE_MB = 5;
-const MAX_RETRY = 3;
 const BLOCK_CHECK_INTERVAL = 5000;
 /* ========================================= */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let userId;
-let uploadQueue = [];
+let queue = [];
 let uploaded = 0;
 let uploading = false;
 let paused = false;
-
 let uploadBlocked = false;
-let blockWatcher = null;
 let uploadSession = null;
 
 /* ================= LOGIN ================= */
@@ -105,7 +102,7 @@ try {
   document.getElementById("avatar").src = p.pictureUrl;
   document.getElementById("welcome").innerText = "Welcome " + p.displayName;
 
-  startBlockWatcher();
+  setInterval(checkUploadBlock, BLOCK_CHECK_INTERVAL);
 } catch {
   showError("LINE login failed");
 }
@@ -117,11 +114,7 @@ el.innerText = "❌ " + msg;
 el.classList.remove("hidden");
 }
 
-/* ================= BLOCK WATCHER ================= */
-function startBlockWatcher() {
-blockWatcher = setInterval(checkUploadBlock, BLOCK_CHECK_INTERVAL);
-}
-
+/* ================= BLOCK WATCH ================= */
 async function checkUploadBlock() {
 const { data } = await sb
   .from("photographer_registration")
@@ -154,34 +147,31 @@ fileInput.onchange = e => enqueueFiles(e.target.files);
 
 /* ================= ENQUEUE ================= */
 function enqueueFiles(files) {
-if (uploadBlocked) {
-  alert("⛔ Upload blocked by admin");
-  return;
-}
+if (uploadBlocked) return alert("⛔ Upload blocked");
 
-uploadQueue = [];
+queue = [];
 uploaded = 0;
 queueEl.innerHTML = "";
 updateOverall(1);
 
-uploadSession = crypto.randomUUID();
+uploadSession = crypto.randomUUID(); // session ต่อรอบ
 
 for (const file of files) {
-  if (uploadQueue.length >= MAX_FILES) break;
+  if (queue.length >= MAX_FILES) break;
   if (file.size > MAX_SIZE_MB * 1024 * 1024) continue;
 
-  uploadQueue.push({ file, retry: 0 });
+  queue.push(file);
   addQueueItem(file.name);
 }
 
-if (uploadQueue.length === 0) return;
+if (!queue.length) return;
 
 uploading = true;
 paused = false;
 processQueue();
 }
 
-/* ================= QUEUE ITEM ================= */
+/* ================= QUEUE UI ================= */
 function addQueueItem(name) {
 const div = document.createElement("div");
 div.className = "bg-slate-800 rounded p-3";
@@ -195,34 +185,24 @@ queueEl.appendChild(div);
 
 /* ================= PROCESS ================= */
 async function processQueue() {
-const total = uploadQueue.length;
+const total = queue.length;
 
 for (let i = 0; i < total; i++) {
   while (paused || uploadBlocked) await sleep(300);
 
-  const item = uploadQueue[i];
-  const bar = document.querySelectorAll(".progress")[i];
-
-  try {
-    await uploadFile(item.file, bar);
-    uploaded++;
-  } catch {
-    if (item.retry < MAX_RETRY) {
-      item.retry++;
-      i--;
-      continue;
-    }
-  }
-
+  await uploadFile(queue[i], i);
+  uploaded++;
   updateOverall(total);
 }
 
-finishUpload();
+uploading = false;
+document.getElementById("overallText").innerText = "Upload completed";
+document.getElementById("clearBtn").classList.remove("hidden");
 }
 
-/* ================= UPLOAD FILE ================= */
-function uploadFile(file, bar) {
-return new Promise((resolve, reject) => {
+/* ================= UPLOAD ================= */
+function uploadFile(file, index) {
+return new Promise(async (resolve, reject) => {
 const path = userId + "/" + Date.now() + "_" + file.name;
 const xhr = new XMLHttpRequest();
 
@@ -233,40 +213,44 @@ xhr.open(
 xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_ANON_KEY);
 xhr.setRequestHeader("x-upsert", "false");
 
+const bar = document.querySelectorAll(".progress")[index];
+
 xhr.upload.onprogress = e => {
-  if (e.lengthComputable)
-    bar.style.width = Math.round((e.loaded / e.total) * 100) + "%";
+if (e.lengthComputable)
+  bar.style.width = Math.round((e.loaded / e.total) * 100) + "%";
 };
 
 xhr.onload = async () => {
-  if (xhr.status >= 200 && xhr.status < 300) {
+if (xhr.status >= 200 && xhr.status < 300) {
 
-    const buf = await crypto.subtle.digest(
-      "SHA-256",
-      await file.arrayBuffer()
-    );
-    const hash = Array.from(new Uint8Array(buf))
-      .map(b => b.toString(16).padStart(2, "0"))
-      .join("");
+  const buf = await crypto.subtle.digest(
+    "SHA-256",
+    await file.arrayBuffer()
+  );
+  const hash = Array.from(new Uint8Array(buf))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
 
-    const { error } = await sb
-      .from("file_hashes")
-      .upsert(
-        {
-          user_id: userId,
-          file_path: path,
-          hash: hash,
-          upload_session: uploadSession,
-          synced: false
-        },
-        { onConflict: "hash" }
-      );
+  const row = {
+    user_id: userId,
+    file_path: path,
+    hash: hash,
+    synced: false
+  };
 
-    if (error) return reject();
-    resolve();
-  } else {
-    reject();
+  if (uploadSession) row.upload_session = uploadSession;
+
+  const { error } = await sb
+    .from("file_hashes")
+    .upsert(row, { onConflict: "hash" });
+
+  if (error) {
+    console.error(error);
+    return reject();
   }
+
+  resolve();
+} else reject();
 };
 
 xhr.onerror = reject;
@@ -280,39 +264,21 @@ const percent = Math.min(
   100,
   Math.round((uploaded / Math.max(total, 1)) * 100)
 );
-
 document.getElementById("overallBar").style.width = percent + "%";
 document.getElementById("overallPercent").innerText = percent + "%";
 document.getElementById("overallText").innerText =
   `Uploaded ${uploaded} / ${total}`;
 }
 
-function finishUpload() {
-uploading = false;
-document.getElementById("overallText").innerText = "Upload completed";
-document.getElementById("clearBtn").classList.remove("hidden");
-}
-
-/* ================= CONTROLS ================= */
-document.getElementById("pauseBtn").onclick = () => {
-paused = true;
-document.getElementById("pauseBtn").classList.add("hidden");
-document.getElementById("resumeBtn").classList.remove("hidden");
-};
-
-document.getElementById("resumeBtn").onclick = () => {
-paused = false;
-document.getElementById("resumeBtn").classList.add("hidden");
-document.getElementById("pauseBtn").classList.remove("hidden");
-};
+document.getElementById("pauseBtn").onclick = () => paused = true;
+document.getElementById("resumeBtn").onclick = () => paused = false;
 
 document.getElementById("clearBtn").onclick = () => {
-uploadQueue = [];
+queue = [];
 queueEl.innerHTML = "";
 uploaded = 0;
 updateOverall(1);
 document.getElementById("overallText").innerText = "Waiting";
-document.getElementById("clearBtn").classList.add("hidden");
 };
 
 /* ================= UTIL ================= */
