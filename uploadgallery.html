@@ -36,7 +36,7 @@
       <div id="welcome" class="text-sm"></div>
     </div>
 
-    <!-- Overall progress -->
+    <!-- Overall -->
     <div class="bg-slate-800 rounded-xl p-4">
       <div class="flex justify-between text-sm mb-1">
         <span id="overallText">Waiting</span>
@@ -47,6 +47,18 @@
           class="bg-yellow-400 h-3 rounded-full transition-all"
           style="width:0%"></div>
       </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="flex gap-2">
+      <button id="pauseBtn"
+        class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded-xl">
+        ⏸ Pause
+      </button>
+      <button id="clearBtn"
+        class="flex-1 bg-red-600 hover:bg-red-500 py-2 rounded-xl">
+        🧹 Clear
+      </button>
     </div>
 
     <!-- Dropzone -->
@@ -74,20 +86,19 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const MAX_FILES = 5000;
 const MAX_SIZE_MB = 5;
+const MAX_RETRY = 3;
 /* ========================================= */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let userId = null;
-let photographer = null;
 let queue = [];
 let uploaded = 0;
+let paused = false;
 let uploading = false;
 
 /* ================= LOGIN ================= */
-document.getElementById("loginBtn").onclick = loginLine;
-
-async function loginLine() {
+document.getElementById("loginBtn").onclick = async () => {
   try {
     await liff.init({ liffId: LIFF_ID });
     if (!liff.isLoggedIn()) return liff.login();
@@ -95,79 +106,19 @@ async function loginLine() {
     const profile = await liff.getProfile();
     userId = profile.userId;
 
-    await checkPermission();
-  } catch (e) {
+    document.getElementById("loginBox").classList.add("hidden");
+    document.getElementById("uploadBox").classList.remove("hidden");
+    document.getElementById("welcome").innerText = "Welcome " + profile.displayName;
+    document.getElementById("avatar").src = profile.pictureUrl;
+  } catch {
     showLoginError("LINE login failed");
   }
-}
-
-async function checkPermission() {
-  const { data, error } = await sb
-    .from("photographer_registration")
-    .select(`
-      user_id,
-      display_name,
-      picture_url,
-      status,
-      is_blocked,
-      is_deleted,
-      is_upload_blocked
-    `)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (error || !data) {
-    return showLoginError("ไม่พบรายชื่อช่างภาพในระบบ");
-  }
-
-  if (data.status !== "approved") {
-    return showLoginError("บัญชีนี้ยังไม่ได้รับการอนุมัติ");
-  }
-
-  if (data.is_blocked || data.is_deleted || data.is_upload_blocked) {
-    return showLoginError("บัญชีนี้ถูกระงับการอัปโหลด");
-  }
-
-  photographer = data;
-
-  document.getElementById("loginBox").classList.add("hidden");
-  document.getElementById("uploadBox").classList.remove("hidden");
-  document.getElementById("welcome").innerText =
-    "Welcome " + data.display_name;
-  document.getElementById("avatar").src = data.picture_url;
-}
+};
 
 function showLoginError(msg) {
   const el = document.getElementById("loginError");
   el.innerText = "❌ " + msg;
   el.classList.remove("hidden");
-}
-
-/* ================= FILE FILTER ================= */
-function filterFiles(files) {
-  const valid = [];
-  const skipped = [];
-
-  for (const file of files) {
-    if (valid.length >= MAX_FILES) {
-      skipped.push(file.name + " (over 5000 files)");
-      continue;
-    }
-    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-      skipped.push(file.name + " (over 5MB)");
-      continue;
-    }
-    valid.push(file);
-  }
-
-  if (skipped.length) {
-    alert(
-      "Skipped " + skipped.length + " files\n" +
-      skipped.slice(0, 10).join("\n")
-    );
-  }
-
-  return valid;
 }
 
 /* ================= DROPZONE ================= */
@@ -176,18 +127,36 @@ const fileInput = document.getElementById("fileInput");
 const queueEl = document.getElementById("queue");
 
 dropzone.onclick = () => fileInput.click();
-fileInput.onchange = e => enqueue(filterFiles(e.target.files));
+fileInput.onchange = e => enqueueFiles(e.target.files);
+
+/* ================= CONTROLS ================= */
+document.getElementById("pauseBtn").onclick = () => {
+  paused = !paused;
+  document.getElementById("pauseBtn").innerText =
+    paused ? "▶ Resume" : "⏸ Pause";
+  if (!paused && uploading) processQueue();
+};
+
+document.getElementById("clearBtn").onclick = () => {
+  queue = [];
+  uploaded = 0;
+  paused = false;
+  uploading = false;
+  queueEl.innerHTML = "";
+  updateOverall(0);
+};
 
 /* ================= QUEUE ================= */
-function enqueue(files) {
-  if (uploading) return;
-
+function enqueueFiles(files) {
   for (const file of files) {
-    queue.push(file);
+    if (queue.length >= MAX_FILES) break;
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) continue;
+
+    queue.push({ file, retry: 0 });
     addQueueItem(file.name);
   }
 
-  if (!uploading && queue.length > 0) {
+  if (!uploading) {
     uploading = true;
     processQueue();
   }
@@ -209,37 +178,49 @@ function addQueueItem(name) {
 async function processQueue() {
   const total = queue.length;
 
-  for (let i = 0; i < total; i++) {
-    await uploadFile(queue[i], i);
-    uploaded++;
-    updateOverall(total);
+  for (let i = uploaded; i < total; i++) {
+    if (paused) return;
+
+    try {
+      await uploadFile(queue[i], i);
+      uploaded++;
+      updateOverall(total);
+    } catch {
+      if (queue[i].retry++ < MAX_RETRY) {
+        i--; // retry same file
+      }
+    }
   }
 
-  document.getElementById("overallText").innerText = "Upload completed";
   uploading = false;
+  document.getElementById("overallText").innerText = "Upload completed";
 }
 
 function updateOverall(total) {
-  const percent = Math.round((uploaded / total) * 100);
+  const percent = total
+    ? Math.round((uploaded / total) * 100)
+    : 0;
+
   document.getElementById("overallBar").style.width = percent + "%";
   document.getElementById("overallPercent").innerText = percent + "%";
   document.getElementById("overallText").innerText =
-    "Uploaded " + uploaded + " / " + total;
+    `Uploaded ${uploaded} / ${total}`;
 }
 
-function uploadFile(file, index) {
-  return new Promise(async (resolve, reject) => {
-    const path = userId + "/" + Date.now() + "_" + file.name;
+function uploadFile(item, index) {
+  const file = item.file;
+  const path = userId + "/" + Date.now() + "_" + file.name;
+  const bar = document.querySelectorAll(".progress")[index];
+
+  return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
     xhr.open(
       "POST",
-      SUPABASE_URL + "/storage/v1/object/gallery/" + encodeURIComponent(path)
+      `${SUPABASE_URL}/storage/v1/object/gallery/${encodeURIComponent(path)}`
     );
     xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_ANON_KEY);
     xhr.setRequestHeader("x-upsert", "false");
-
-    const bar = document.querySelectorAll(".progress")[index];
 
     xhr.upload.onprogress = e => {
       if (e.lengthComputable) {
@@ -261,7 +242,7 @@ function uploadFile(file, index) {
           {
             user_id: userId,
             file_path: path,
-            hash: hash,
+            hash,
             synced: false
           },
           { onConflict: "hash" }
@@ -273,7 +254,7 @@ function uploadFile(file, index) {
       }
     };
 
-    xhr.onerror = () => reject();
+    xhr.onerror = reject;
     xhr.send(file);
   });
 }
