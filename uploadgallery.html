@@ -72,9 +72,11 @@ Click or Drop Images<br>
 const LIFF_ID = "2001781240-k2PJ3Ap2";
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+
 const MAX_FILES = 5000;
 const MAX_SIZE_MB = 5;
 const MAX_RETRY = 3;
+const BLOCK_CHECK_INTERVAL = 5000;
 /* ========================================= */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -85,19 +87,57 @@ let uploaded = 0;
 let uploading = false;
 let paused = false;
 
+let uploadBlocked = false;
+let blockWatcher = null;
+let uploadSession = null;
+
 /* ================= LOGIN ================= */
 document.getElementById("loginBtn").onclick = async () => {
-await liff.init({ liffId: LIFF_ID });
-if (!liff.isLoggedIn()) return liff.login();
+try {
+  await liff.init({ liffId: LIFF_ID });
+  if (!liff.isLoggedIn()) return liff.login();
 
-const p = await liff.getProfile();
-userId = p.userId;
+  const p = await liff.getProfile();
+  userId = p.userId;
 
-document.getElementById("loginBox").classList.add("hidden");
-document.getElementById("uploadBox").classList.remove("hidden");
-document.getElementById("avatar").src = p.pictureUrl;
-document.getElementById("welcome").innerText = "Welcome " + p.displayName;
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("uploadBox").classList.remove("hidden");
+  document.getElementById("avatar").src = p.pictureUrl;
+  document.getElementById("welcome").innerText = "Welcome " + p.displayName;
+
+  startBlockWatcher();
+} catch {
+  showError("LINE login failed");
+}
 };
+
+function showError(msg) {
+const el = document.getElementById("loginError");
+el.innerText = "❌ " + msg;
+el.classList.remove("hidden");
+}
+
+/* ================= BLOCK WATCHER ================= */
+function startBlockWatcher() {
+blockWatcher = setInterval(checkUploadBlock, BLOCK_CHECK_INTERVAL);
+}
+
+async function checkUploadBlock() {
+const { data } = await sb
+  .from("photographer_registration")
+  .select("is_upload_blocked")
+  .eq("user_id", userId)
+  .single();
+
+if (data?.is_upload_blocked) {
+  uploadBlocked = true;
+  paused = true;
+  document.getElementById("overallText").innerText =
+    "⛔ Upload blocked by admin";
+} else {
+  uploadBlocked = false;
+}
+}
 
 /* ================= DROPZONE ================= */
 const dropzone = document.getElementById("dropzone");
@@ -105,7 +145,8 @@ const fileInput = document.getElementById("fileInput");
 const queueEl = document.getElementById("queue");
 
 dropzone.onclick = () => {
-if (uploading) return alert("Uploading...");
+if (uploading) return alert("⏳ Uploading...");
+if (uploadBlocked) return alert("⛔ Upload blocked by admin");
 fileInput.click();
 };
 
@@ -113,17 +154,27 @@ fileInput.onchange = e => enqueueFiles(e.target.files);
 
 /* ================= ENQUEUE ================= */
 function enqueueFiles(files) {
+if (uploadBlocked) {
+  alert("⛔ Upload blocked by admin");
+  return;
+}
+
 uploadQueue = [];
 uploaded = 0;
 queueEl.innerHTML = "";
+updateOverall(1);
+
+uploadSession = crypto.randomUUID();
 
 for (const file of files) {
-if (uploadQueue.length >= MAX_FILES) break;
-if (file.size > MAX_SIZE_MB * 1024 * 1024) continue;
+  if (uploadQueue.length >= MAX_FILES) break;
+  if (file.size > MAX_SIZE_MB * 1024 * 1024) continue;
 
-uploadQueue.push({ file, retry: 0 });
-addQueueItem(file.name);
+  uploadQueue.push({ file, retry: 0 });
+  addQueueItem(file.name);
 }
+
+if (uploadQueue.length === 0) return;
 
 uploading = true;
 paused = false;
@@ -147,23 +198,23 @@ async function processQueue() {
 const total = uploadQueue.length;
 
 for (let i = 0; i < total; i++) {
-while (paused) await sleep(300);
+  while (paused || uploadBlocked) await sleep(300);
 
-const item = uploadQueue[i];
-const bar = document.querySelectorAll(".progress")[i];
+  const item = uploadQueue[i];
+  const bar = document.querySelectorAll(".progress")[i];
 
-try {
-await uploadFile(item.file, bar);
-uploaded++;
-} catch {
-if (item.retry < MAX_RETRY) {
-item.retry++;
-i--;
-continue;
-}
-}
+  try {
+    await uploadFile(item.file, bar);
+    uploaded++;
+  } catch {
+    if (item.retry < MAX_RETRY) {
+      item.retry++;
+      i--;
+      continue;
+    }
+  }
 
-updateOverall(total);
+  updateOverall(total);
 }
 
 finishUpload();
@@ -175,25 +226,47 @@ return new Promise((resolve, reject) => {
 const path = userId + "/" + Date.now() + "_" + file.name;
 const xhr = new XMLHttpRequest();
 
-xhr.open("POST",
-SUPABASE_URL + "/storage/v1/object/gallery/" + encodeURIComponent(path));
-
+xhr.open(
+  "POST",
+  SUPABASE_URL + "/storage/v1/object/gallery/" + encodeURIComponent(path)
+);
 xhr.setRequestHeader("Authorization", "Bearer " + SUPABASE_ANON_KEY);
+xhr.setRequestHeader("x-upsert", "false");
 
 xhr.upload.onprogress = e => {
-if (e.lengthComputable)
-bar.style.width = Math.round((e.loaded / e.total) * 100) + "%";
+  if (e.lengthComputable)
+    bar.style.width = Math.round((e.loaded / e.total) * 100) + "%";
 };
 
 xhr.onload = async () => {
-if (xhr.status >= 200 && xhr.status < 300) {
-await sb.from("file_hashes").insert({
-user_id: userId,
-file_path: path,
-synced: false
-});
-resolve();
-} else reject();
+  if (xhr.status >= 200 && xhr.status < 300) {
+
+    const buf = await crypto.subtle.digest(
+      "SHA-256",
+      await file.arrayBuffer()
+    );
+    const hash = Array.from(new Uint8Array(buf))
+      .map(b => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    const { error } = await sb
+      .from("file_hashes")
+      .upsert(
+        {
+          user_id: userId,
+          file_path: path,
+          hash: hash,
+          upload_session: uploadSession,
+          synced: false
+        },
+        { onConflict: "hash" }
+      );
+
+    if (error) return reject();
+    resolve();
+  } else {
+    reject();
+  }
 };
 
 xhr.onerror = reject;
@@ -203,16 +276,20 @@ xhr.send(file);
 
 /* ================= UI ================= */
 function updateOverall(total) {
-const percent = Math.min(100, Math.round((uploaded / total) * 100));
+const percent = Math.min(
+  100,
+  Math.round((uploaded / Math.max(total, 1)) * 100)
+);
+
 document.getElementById("overallBar").style.width = percent + "%";
 document.getElementById("overallPercent").innerText = percent + "%";
 document.getElementById("overallText").innerText =
-`Uploaded ${uploaded} / ${total}`;
+  `Uploaded ${uploaded} / ${total}`;
 }
 
 function finishUpload() {
 uploading = false;
-document.getElementById("overallText").innerText = "Completed";
+document.getElementById("overallText").innerText = "Upload completed";
 document.getElementById("clearBtn").classList.remove("hidden");
 }
 
@@ -233,8 +310,7 @@ document.getElementById("clearBtn").onclick = () => {
 uploadQueue = [];
 queueEl.innerHTML = "";
 uploaded = 0;
-document.getElementById("overallBar").style.width = "0%";
-document.getElementById("overallPercent").innerText = "0%";
+updateOverall(1);
 document.getElementById("overallText").innerText = "Waiting";
 document.getElementById("clearBtn").classList.add("hidden");
 };
