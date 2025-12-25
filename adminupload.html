@@ -1,236 +1,220 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🛠️ Admin Upload Manager</title>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<style>
-body {
-  font-family: Prompt, sans-serif;
-  background:#0f172a;
-  color:#fff;
-  padding:20px;
-  text-align:center;
-}
-h1 { color:#facc15; }
-table {
-  width:95%;
-  max-width:900px;
-  margin:auto;
-  border-collapse:collapse;
-  background:rgba(255,255,255,.05);
-}
-th,td {
-  padding:10px;
-  border-bottom:1px solid rgba(255,255,255,.1);
-}
-th { background:rgba(255,255,255,.1); }
-tr:hover { background:rgba(255,255,255,.08); }
-
-button {
-  padding:6px 12px;
-  border-radius:20px;
-  border:none;
-  font-weight:bold;
-  cursor:pointer;
-}
-.btn-view { background:#2563eb;color:#fff; }
-.btn-delete { background:#dc2626;color:#fff; }
-.btn-back { background:#475569;color:#fff;margin-top:20px; }
-
-#gallery { display:none; margin-top:20px; }
-.thumb {
-  width:150px;height:150px;
-  object-fit:cover;
-  margin:6px;
-  border-radius:10px;
-  cursor:pointer;
-}
-</style>
+<meta charset="UTF-8" />
+<title>ThaiRun Face Sync – PRO</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body>
-<h1>🛠️ Admin Upload Manager</h1>
+<body class="bg-slate-900 text-white min-h-screen p-6">
 
-<div id="userTableSection">
-<table>
-<thead>
-<tr>
-<th>โปรไฟล์</th>
-<th>ชื่อ</th>
-<th>จำนวนรูป</th>
-<th>จัดการ</th>
-</tr>
-</thead>
-<tbody id="userList">
-<tr><td colspan="4">⏳ กำลังโหลด...</td></tr>
-</tbody>
-</table>
-</div>
+<div id="app" class="max-w-6xl mx-auto space-y-6">
 
-<div id="gallery">
-<h2 id="userHeader"></h2>
-<div id="imageGrid"></div>
-<br>
-<button class="btn-delete" onclick="deleteAllFromUser()">ลบรูปทั้งหมด</button>
-<br><br>
-<button class="btn-back" onclick="backToUserList()">⬅ กลับ</button>
+  <!-- HEADER -->
+  <h1 class="text-4xl font-bold text-yellow-400 text-center">
+    🧠 ThaiRun Face Sync – PRO
+  </h1>
+
+  <!-- STATS -->
+  <div class="bg-slate-800 rounded-xl p-6 grid md:grid-cols-4 gap-4 text-center">
+    <div>
+      <div class="text-gray-400 text-sm">Total</div>
+      <div id="total" class="text-3xl font-bold">0</div>
+    </div>
+    <div>
+      <div class="text-gray-400 text-sm">Synced</div>
+      <div id="synced" class="text-3xl font-bold text-green-400">0</div>
+    </div>
+    <div>
+      <div class="text-gray-400 text-sm">Remaining</div>
+      <div id="remaining" class="text-3xl font-bold text-red-400">0</div>
+    </div>
+    <div>
+      <div class="text-gray-400 text-sm">Rate</div>
+      <div id="rate" class="text-3xl font-bold">0 / min</div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="bg-slate-800 rounded-xl p-4 space-y-2">
+    <div class="flex justify-between text-sm text-gray-300">
+      <div id="statusText">Idle</div>
+      <div id="percentText">0%</div>
+    </div>
+    <div class="w-full bg-gray-700 rounded-full h-4">
+      <div id="progressBar"
+        class="bg-green-400 h-4 rounded-full transition-all duration-300"
+        style="width:0%">
+      </div>
+    </div>
+    <div class="text-sm text-gray-400">
+      Elapsed: <span id="elapsed">0s</span>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="flex flex-wrap gap-3 justify-center">
+    <button id="startBtn" class="bg-green-600 px-5 py-2 rounded">▶ Start</button>
+    <button id="pauseBtn" class="bg-yellow-500 px-5 py-2 rounded">⏸ Pause</button>
+    <button id="resumeBtn" class="bg-green-500 px-5 py-2 rounded">▶ Resume</button>
+    <button id="stopBtn" class="bg-red-600 px-5 py-2 rounded">⏹ Stop</button>
+    <button id="refreshBtn" class="bg-blue-600 px-5 py-2 rounded">🔄 Refresh</button>
+    <button id="bigBtn" class="bg-purple-600 px-5 py-2 rounded">🖥 Big Screen</button>
+  </div>
+
+  <!-- LOG -->
+  <div class="bg-slate-800 rounded-xl p-4 h-64 overflow-auto text-sm" id="logBox"></div>
+
 </div>
 
 <script>
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics"; // ⚠️ admin only
-const BUCKET = "gallery";
+/* ================= CONFIG ================= */
+const API_BASE = "http://localhost:3000";
+const SYNC_INTERVAL = 800;
+const STATUS_INTERVAL = 1200;
+/* ========================================= */
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+// DOM refs (🔴 สำคัญมาก)
+const totalEl = document.getElementById("total");
+const syncedEl = document.getElementById("synced");
+const remainingEl = document.getElementById("remaining");
+const rateEl = document.getElementById("rate");
+const elapsedEl = document.getElementById("elapsed");
+const statusText = document.getElementById("statusText");
+const percentText = document.getElementById("percentText");
+const progressBar = document.getElementById("progressBar");
+const logBox = document.getElementById("logBox");
 
-let allUsers = [];
-let currentUserId = "";
-let currentUserName = "";
+// state
+let syncing = false;
+let paused = false;
+let startTime = null;
+let lastSynced = 0;
+let syncTimer = null;
+let statusTimer = null;
 
-/* =====================================
-   ✅ LOAD USERS (แก้ LIMIT 1000 แล้ว)
-   ===================================== */
-async function loadUsers() {
-  let page = 0;
-  let pageSize = 1000;
-  let rows = [];
-  let hasMore = true;
+// buttons
+document.getElementById("startBtn").onclick = startSync;
+document.getElementById("pauseBtn").onclick = pauseSync;
+document.getElementById("resumeBtn").onclick = resumeSync;
+document.getElementById("stopBtn").onclick = stopSync;
+document.getElementById("refreshBtn").onclick = refreshStatus;
+document.getElementById("bigBtn").onclick = toggleBig;
 
-  while (hasMore) {
-    const { data, error } = await sb
-      .from("file_hashes")
-      .select("user_id, profile_name, profile_pic")
-      .range(page * pageSize, (page + 1) * pageSize - 1);
+/* ================= LOG ================= */
+function log(msg) {
+  const el = document.createElement("div");
+  el.innerText = new Date().toLocaleTimeString() + " - " + msg;
+  logBox.appendChild(el);
+  logBox.scrollTop = logBox.scrollHeight;
+}
 
-    if (error) {
-      alert("โหลดข้อมูลล้มเหลว");
-      console.error(error);
+/* ================= CONTROL ================= */
+function startSync() {
+  if (syncing) return;
+  syncing = true;
+  paused = false;
+  startTime = Date.now();
+  lastSynced = 0;
+  statusText.innerText = "Syncing…";
+  log("🚀 Start Sync");
+  loopSync();
+  pollStatus();
+}
+
+function pauseSync() {
+  paused = true;
+  statusText.innerText = "Paused";
+  log("⏸ Paused");
+}
+
+function resumeSync() {
+  if (!syncing) return;
+  paused = false;
+  statusText.innerText = "Syncing…";
+  log("▶ Resume");
+}
+
+function stopSync() {
+  syncing = false;
+  paused = false;
+  clearTimeout(syncTimer);
+  clearTimeout(statusTimer);
+  statusText.innerText = "Stopped";
+  log("⏹ Stopped");
+}
+
+/* ================= LOOP ================= */
+async function loopSync() {
+  if (!syncing) return;
+
+  if (!paused) {
+    try {
+      await fetch(`${API_BASE}/sync`, { method: "POST" });
+    } catch {
+      log("❌ Sync request failed");
+      stopSync();
+      return;
+    }
+  }
+
+  syncTimer = setTimeout(loopSync, SYNC_INTERVAL);
+}
+
+/* ================= STATUS ================= */
+async function pollStatus() {
+  if (!syncing) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/sync/status`);
+    const d = await res.json();
+
+    totalEl.innerText = d.total;
+    syncedEl.innerText = d.synced;
+    remainingEl.innerText = d.remaining;
+
+    const percent = d.total
+      ? Math.round((d.synced / d.total) * 100)
+      : 0;
+
+    progressBar.style.width = percent + "%";
+    percentText.innerText = percent + "%";
+
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    elapsedEl.innerText = elapsed + "s";
+
+    const rate = d.synced - lastSynced;
+    rateEl.innerText = rate * 60 + " / min";
+    lastSynced = d.synced;
+
+    if (d.done) {
+      syncing = false;
+      statusText.innerText = "Completed";
+      progressBar.style.width = "100%";
+      percentText.innerText = "100%";
+      log("🎉 Completed");
       return;
     }
 
-    rows.push(...data);
-    hasMore = data.length === pageSize;
-    page++;
+  } catch {
+    log("❌ Status fetch failed");
   }
 
-  // รวม user ไม่ซ้ำ
-  const userMap = new Map();
-  rows.forEach(r => {
-    if (!userMap.has(r.user_id)) {
-      userMap.set(r.user_id, {
-        profile_name: r.profile_name || r.user_id,
-        profile_pic: r.profile_pic || "",
-        files_count: 0
-      });
-    }
-  });
-
-  // นับรูปจาก storage
-  await Promise.all(
-    [...userMap.keys()].map(async uid => {
-      const { data } = await sb.storage
-        .from(BUCKET)
-        .list(`${uid}/`, { limit: 10000 });
-
-      userMap.get(uid).files_count = data?.length || 0;
-    })
-  );
-
-  allUsers = [...userMap.entries()];
-  renderUserTable();
+  statusTimer = setTimeout(pollStatus, STATUS_INTERVAL);
 }
 
-/* =====================================
-   TABLE
-   ===================================== */
-function renderUserTable() {
-  const tbody = document.getElementById("userList");
-  tbody.innerHTML = "";
-
-  allUsers.forEach(([uid, info]) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>
-        <img src="${info.profile_pic}" width="40" height="40"
-             style="border-radius:50%" 
-             onerror="this.src='https://via.placeholder.com/40'">
-      </td>
-      <td>${info.profile_name}</td>
-      <td>${info.files_count}</td>
-      <td>
-        <button class="btn-view"
-          onclick="viewUser('${uid}','${info.profile_name}')">
-          ดูรูป
-        </button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
+/* ================= EXTRA ================= */
+function refreshStatus() {
+  log("🔄 Refresh Status");
+  pollStatus();
 }
 
-/* =====================================
-   VIEW USER
-   ===================================== */
-async function viewUser(uid, name) {
-  currentUserId = uid;
-  currentUserName = name;
-
-  document.getElementById("userTableSection").style.display = "none";
-  document.getElementById("gallery").style.display = "block";
-  document.getElementById("userHeader").innerText = `📸 ${name}`;
-
-  const { data } = await sb.storage
-    .from(BUCKET)
-    .list(`${uid}/`, { limit: 10000 });
-
-  const grid = document.getElementById("imageGrid");
-  grid.innerHTML = "";
-
-  if (!data || !data.length) {
-    grid.innerHTML = "<p>ไม่มีรูป</p>";
-    return;
-  }
-
-  data.forEach(f => {
-    const img = document.createElement("img");
-    img.src = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${uid}/${f.name}`;
-    img.className = "thumb";
-    img.onclick = () => deleteSingle(uid, f.name);
-    grid.appendChild(img);
-  });
+function toggleBig() {
+  document.body.classList.toggle("text-2xl");
+  log("🖥 Toggle Big Screen");
 }
-
-/* =====================================
-   DELETE
-   ===================================== */
-async function deleteSingle(uid, name) {
-  if (!confirm(`ลบ ${name}?`)) return;
-  const path = `${uid}/${name}`;
-  await sb.storage.from(BUCKET).remove([path]);
-  await sb.from("file_hashes").delete().eq("file_path", path);
-  viewUser(uid, currentUserName);
-}
-
-async function deleteAllFromUser() {
-  if (prompt("พิมพ์ CONFIRM") !== "CONFIRM") return;
-  const { data } = await sb.storage.from(BUCKET).list(`${currentUserId}/`);
-  await sb.storage.from(BUCKET)
-    .remove(data.map(f => `${currentUserId}/${f.name}`));
-  await sb.from("file_hashes").delete().eq("user_id", currentUserId);
-  backToUserList();
-}
-
-function backToUserList() {
-  document.getElementById("gallery").style.display = "none";
-  document.getElementById("userTableSection").style.display = "block";
-  loadUsers();
-}
-
-loadUsers();
 </script>
+
 </body>
 </html>
