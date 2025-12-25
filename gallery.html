@@ -287,6 +287,22 @@ async function drawPreviewWithWatermark(imageUrl) {
   ctx.drawImage(logo, logoX, logoY, logoW, logoH);
 }
 </script>
+<script>
+/* ===== Disable Right Click & DevTools ===== */
+document.addEventListener("contextmenu", e => e.preventDefault());
+
+document.addEventListener("keydown", e => {
+  const key = e.key.toUpperCase();
+
+  if (
+    key === "F12" ||
+    (e.ctrlKey && e.shiftKey && ["I", "J", "C"].includes(key)) ||
+    (e.ctrlKey && key === "U")
+  ) {
+    e.preventDefault();
+  }
+});
+</script>
 
 </body>
 </html>
