@@ -2,172 +2,163 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
-<title>Admin Face Sync – ThaiRun Style</title>
+<title>ThaiRun Face Sync – PRO</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
 <body class="bg-slate-900 text-white min-h-screen p-6">
 
-<div class="max-w-3xl mx-auto space-y-6">
+<div id="app" class="max-w-6xl mx-auto space-y-6">
 
-  <h1 class="text-3xl font-bold text-yellow-400 text-center">
-    🧠 Admin Face Sync (ThaiRun Style)
+  <!-- HEADER -->
+  <h1 class="text-4xl font-bold text-yellow-400 text-center">
+    🧠 ThaiRun Face Sync – PRO
   </h1>
 
   <!-- STATUS -->
-  <div class="bg-slate-800 rounded-xl p-4 space-y-3">
-    <div id="statusText" class="font-semibold">Idle</div>
-
-    <div id="counter" class="text-sm text-gray-300">
-      Synced: 0 / 0
+  <div class="bg-slate-800 rounded-xl p-6 grid md:grid-cols-4 gap-4 text-center">
+    <div>
+      <div class="text-gray-400 text-sm">Total</div>
+      <div id="total" class="text-3xl font-bold">0</div>
     </div>
-
-    <div class="w-full bg-gray-700 rounded-full h-4 overflow-hidden">
-      <div
-        id="progressBar"
-        class="bg-green-400 h-4 transition-all duration-300"
-        style="width:0%">
-      </div>
+    <div>
+      <div class="text-gray-400 text-sm">Synced</div>
+      <div id="synced" class="text-3xl font-bold text-green-400">0</div>
     </div>
+    <div>
+      <div class="text-gray-400 text-sm">Remaining</div>
+      <div id="remaining" class="text-3xl font-bold text-red-400">0</div>
+    </div>
+    <div>
+      <div class="text-gray-400 text-sm">Rate</div>
+      <div id="rate" class="text-3xl font-bold">0 / min</div>
+    </div>
+  </div>
 
-    <div id="percentText" class="text-sm text-gray-400">
-      0%
+  <!-- PROGRESS -->
+  <div class="bg-slate-800 rounded-xl p-4 space-y-2">
+    <div class="flex justify-between text-sm text-gray-300">
+      <div id="statusText">Idle</div>
+      <div id="percentText">0%</div>
+    </div>
+    <div class="w-full bg-gray-700 rounded-full h-4">
+      <div id="progressBar" class="bg-green-400 h-4 rounded-full transition-all"></div>
+    </div>
+    <div class="text-sm text-gray-400">
+      Elapsed: <span id="elapsed">0s</span>
     </div>
   </div>
 
   <!-- CONTROLS -->
-  <div class="flex gap-4 justify-center">
-    <button id="startBtn"
-      class="bg-green-600 hover:bg-green-500 px-6 py-3 rounded-xl font-semibold">
-      ▶ Start Sync
-    </button>
+  <div class="flex flex-wrap gap-3 justify-center">
+    <button onclick="startSync()" class="bg-green-600 px-5 py-2 rounded">▶ Start</button>
+    <button onclick="pauseSync()" class="bg-yellow-500 px-5 py-2 rounded">⏸ Pause</button>
+    <button onclick="resumeSync()" class="bg-green-500 px-5 py-2 rounded">▶ Resume</button>
+    <button onclick="stopSync()" class="bg-red-600 px-5 py-2 rounded">⏹ Stop</button>
+    <button onclick="refreshStatus()" class="bg-blue-600 px-5 py-2 rounded">🔄 Refresh</button>
+    <button onclick="toggleBig()" class="bg-purple-600 px-5 py-2 rounded">🖥 Big Screen</button>
+  </div>
 
-    <button id="stopBtn"
-      class="bg-red-600 hover:bg-red-500 px-6 py-3 rounded-xl font-semibold hidden">
-      ⏹ Stop
-    </button>
+  <!-- PER PHOTOGRAPHER -->
+  <div class="bg-slate-800 rounded-xl p-4">
+    <h2 class="font-bold mb-2">📷 Remaining per Photographer</h2>
+    <div id="photographerList" class="grid md:grid-cols-2 gap-2 text-sm"></div>
   </div>
 
   <!-- LOG -->
-  <div
-    id="logBox"
-    class="bg-slate-800 rounded-xl p-4 text-sm h-72 overflow-auto space-y-1">
-  </div>
+  <div class="bg-slate-800 rounded-xl p-4 h-64 overflow-auto text-sm" id="logBox"></div>
 
 </div>
 
 <script>
-/* ================= CONFIG ================= */
-const API_BASE = "http://localhost:3000";
-const SYNC_INTERVAL = 800;   // ยิง /sync
-const STATUS_INTERVAL = 1200; // poll สถานะ
-/* ========================================= */
-
+const API = "http://localhost:3000";
 let syncing = false;
-let syncLoopTimer = null;
-let statusTimer = null;
+let paused = false;
+let startTime = null;
+let lastSynced = 0;
 
-const statusText = document.getElementById("statusText");
-const counter = document.getElementById("counter");
-const progressBar = document.getElementById("progressBar");
-const percentText = document.getElementById("percentText");
-const logBox = document.getElementById("logBox");
-
-document.getElementById("startBtn").onclick = startSync;
-document.getElementById("stopBtn").onclick = stopSync;
-
-/* ================= LOG ================= */
 function log(msg) {
-  const el = document.createElement("div");
-  el.innerText = new Date().toLocaleTimeString() + " - " + msg;
-  logBox.appendChild(el);
-  logBox.scrollTop = logBox.scrollHeight;
+  const box = document.getElementById("logBox");
+  box.innerHTML += `<div>${new Date().toLocaleTimeString()} - ${msg}</div>`;
+  box.scrollTop = box.scrollHeight;
 }
 
-/* ================= CONTROL ================= */
-function startSync() {
-  if (syncing) return;
-
+async function startSync() {
   syncing = true;
+  paused = false;
+  startTime = Date.now();
+  lastSynced = 0;
+  log("🚀 Start Sync");
   statusText.innerText = "Syncing…";
-  log("🚀 Start face sync");
-
-  document.getElementById("startBtn").classList.add("hidden");
-  document.getElementById("stopBtn").classList.remove("hidden");
-
-  syncLoop();
+  loopSync();
   pollStatus();
+}
+
+function pauseSync() {
+  paused = true;
+  log("⏸ Paused");
+  statusText.innerText = "Paused";
+}
+
+function resumeSync() {
+  if (!syncing) return;
+  paused = false;
+  log("▶ Resume");
+  statusText.innerText = "Syncing…";
 }
 
 function stopSync() {
   syncing = false;
+  paused = false;
+  log("⏹ Stopped");
   statusText.innerText = "Stopped";
-  log("⏹ Sync stopped");
-
-  clearTimeout(syncLoopTimer);
-  clearTimeout(statusTimer);
-
-  document.getElementById("stopBtn").classList.add("hidden");
-  document.getElementById("startBtn").classList.remove("hidden");
 }
 
-/* ================= SYNC LOOP ================= */
-async function syncLoop() {
+async function loopSync() {
   if (!syncing) return;
-
-  try {
-    await fetch(`${API_BASE}/sync`, { method: "POST" });
-  } catch (e) {
-    log("❌ Sync request failed");
-    stopSync();
-    return;
-  }
-
-  syncLoopTimer = setTimeout(syncLoop, SYNC_INTERVAL);
+  if (!paused) await fetch(API + "/sync", { method: "POST" });
+  setTimeout(loopSync, 800);
 }
 
-/* ================= STATUS POLLING ================= */
 async function pollStatus() {
   if (!syncing) return;
 
-  try {
-    const res = await fetch(`${API_BASE}/sync/status`);
-    const data = await res.json();
+  const res = await fetch(API + "/sync/status");
+  const d = await res.json();
 
-    const total = data.total || 0;
-    const synced = data.synced || 0;
-    const remaining = data.remaining || 0;
+  total.innerText = d.total;
+  synced.innerText = d.synced;
+  remaining.innerText = d.remaining;
 
-    const percent = total > 0
-      ? Math.round((synced / total) * 100)
-      : 0;
+  const percent = d.total ? Math.round((d.synced / d.total) * 100) : 0;
+  progressBar.style.width = percent + "%";
+  percentText.innerText = percent + "%";
 
-    counter.innerText =
-      `Synced: ${synced} / ${total} (Remaining: ${remaining})`;
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  elapsedEl.innerText = elapsed + "s";
 
-    progressBar.style.width = percent + "%";
-    percentText.innerText = percent + "%";
+  const rate = d.synced - lastSynced;
+  rateEl.innerText = rate * 60 + " / min";
+  lastSynced = d.synced;
 
-    if (data.done) {
-      syncing = false;
-      statusText.innerText = "Completed";
-      log("🎉 Face sync completed");
-
-      progressBar.style.width = "100%";
-      percentText.innerText = "100%";
-
-      document.getElementById("stopBtn").classList.add("hidden");
-      document.getElementById("startBtn").classList.remove("hidden");
-      return;
-    }
-
-  } catch (e) {
-    log("❌ Status check failed");
+  if (d.done) {
+    syncing = false;
+    log("🎉 Completed");
+    statusText.innerText = "Completed";
+  } else {
+    setTimeout(pollStatus, 1200);
   }
+}
 
-  statusTimer = setTimeout(pollStatus, STATUS_INTERVAL);
+function refreshStatus() {
+  log("🔄 Refresh");
+  pollStatus();
+}
+
+function toggleBig() {
+  document.body.classList.toggle("text-2xl");
+  log("🖥 Toggle Big Screen");
 }
 </script>
 
