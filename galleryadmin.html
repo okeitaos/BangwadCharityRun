@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
-<title>Face Sync Control — Auto Recover</title>
+<title>Face Sync Control</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -16,10 +16,9 @@
     <h1 class="text-2xl font-bold text-yellow-400">
       📱 Face Sync Control
     </h1>
-    <!-- SERVER BADGE -->
     <span id="serverBadge"
-      class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-600">
-      ● Unknown
+      class="px-3 py-1 rounded-full text-xs font-semibold bg-red-600">
+      ● Offline
     </span>
   </div>
 
@@ -58,7 +57,6 @@
       class="bg-green-600 py-3 rounded-xl font-semibold active:scale-95">
       ▶ Start Sync
     </button>
-
     <button id="stopBtn"
       class="bg-red-600 py-3 rounded-xl font-semibold active:scale-95">
       ⏹ Stop
@@ -66,7 +64,7 @@
   </div>
 
   <!-- LOG -->
-  <div class="bg-slate-800 rounded-xl p-3 h-48 overflow-auto text-xs"
+  <div class="bg-slate-800 rounded-xl p-3 h-52 overflow-auto text-xs"
        id="logBox"></div>
 
 </div>
@@ -74,21 +72,19 @@
 <script>
 /* ================= CONFIG ================= */
 const API_BASE = "http://192.168.1.18:3000"; // 👈 IP MAC
-const SYNC_INTERVAL = 1200;   // sync loop ปกติ
-const STATUS_INTERVAL = 700;  // status realtime
+const SYNC_INTERVAL = 1200;
+const STATUS_INTERVAL = 800;
 
-// Exponential backoff (status)
-const BACKOFF_BASE = 800;     // ms
-const BACKOFF_MAX  = 10000;   // ms
+// exponential backoff
+const BACKOFF_BASE = 800;
+const BACKOFF_MAX  = 10000;
 /* ========================================= */
 
 // STATE
 let syncing = false;
-let serverOnline = true;
+let serverOnline = false;
 let syncTimer = null;
 let statusTimer = null;
-
-// backoff state
 let backoffDelay = BACKOFF_BASE;
 let backoffTimer = null;
 
@@ -102,7 +98,7 @@ const progressBar = document.getElementById("progressBar");
 const logBox = document.getElementById("logBox");
 const serverBadge = document.getElementById("serverBadge");
 
-/* ================= UI HELPERS ================= */
+/* ================= UI ================= */
 function setBadgeOnline() {
   serverBadge.textContent = "● Online";
   serverBadge.className =
@@ -120,7 +116,7 @@ function log(msg) {
   logBox.scrollTop = logBox.scrollHeight;
 }
 
-/* ================= CONTROL ================= */
+/* ================= BUTTONS ================= */
 document.getElementById("startBtn").onclick = () => {
   if (syncing) return;
   syncing = true;
@@ -128,14 +124,11 @@ document.getElementById("startBtn").onclick = () => {
   log("🚀 Start sync");
 
   runSyncLoop();
-  startStatusLoop();
 };
 
 document.getElementById("stopBtn").onclick = () => {
   syncing = false;
   clearTimeout(syncTimer);
-  clearInterval(statusTimer);
-  clearTimeout(backoffTimer);
   statusText.textContent = "Stopped";
   log("⏹ Stop sync");
 };
@@ -144,7 +137,6 @@ document.getElementById("stopBtn").onclick = () => {
 function runSyncLoop() {
   if (!syncing) return;
 
-  // ถ้า server offline → รอ (auto-recover)
   if (!serverOnline) {
     syncTimer = setTimeout(runSyncLoop, SYNC_INTERVAL);
     return;
@@ -153,49 +145,36 @@ function runSyncLoop() {
   fetch(`${API_BASE}/sync`, { method: "POST" })
     .then(res => res.json())
     .then(d => {
-      if (d.status === "busy") {
-        log("⏳ Server busy");
-      }
       if (d.status === "no_files") {
-        log("✅ No pending files");
         syncing = false;
         statusText.textContent = "Completed";
+        log("🎉 Sync completed");
       }
     })
     .catch(() => {
-      // server ล่มระหว่างยิง sync
-      if (serverOnline) {
-        log("⚠️ Sync failed, waiting for server restart…");
-      }
       serverOnline = false;
       setBadgeOffline();
       statusText.textContent = "Server reconnecting…";
-      scheduleBackoffCheck();
+      log("⚠️ Sync failed, waiting for server…");
+      scheduleBackoff();
     });
 
   syncTimer = setTimeout(runSyncLoop, SYNC_INTERVAL);
 }
 
-/* ================= STATUS LOOP ================= */
-function startStatusLoop() {
-  clearInterval(statusTimer);
-  statusTimer = setInterval(fetchStatus, STATUS_INTERVAL);
-}
-
+/* ================= STATUS ================= */
 async function fetchStatus() {
   try {
     const res = await fetch(`${API_BASE}/sync/status`, { cache: "no-store" });
-    if (!res.ok) throw new Error("status not ok");
+    if (!res.ok) throw new Error("offline");
     const d = await res.json();
 
-    // server กลับมาแล้ว
     if (!serverOnline) {
       serverOnline = true;
       setBadgeOnline();
-      backoffDelay = BACKOFF_BASE; // reset backoff
+      backoffDelay = BACKOFF_BASE;
       clearTimeout(backoffTimer);
-      log("✅ Server reconnected");
-      statusText.textContent = syncing ? "Syncing…" : "Idle";
+      log("✅ Server online");
     }
 
     totalEl.textContent = d.total;
@@ -211,46 +190,45 @@ async function fetchStatus() {
 
     if (d.done && syncing) {
       syncing = false;
-      log("🎉 Sync completed");
       statusText.textContent = "Completed";
+      log("🎉 Sync completed");
     }
 
-  } catch (e) {
-    // status ล้ม → ถือว่า server offline
+  } catch {
     if (serverOnline) {
-      log("⚠️ Server offline, auto-recovering…");
+      log("⚠️ Server offline, retrying…");
     }
     serverOnline = false;
     setBadgeOffline();
     statusText.textContent = "Server reconnecting…";
-    scheduleBackoffCheck();
+    scheduleBackoff();
   }
 }
 
-/* ================= EXPONENTIAL BACKOFF ================= */
-function scheduleBackoffCheck() {
+/* ================= BACKOFF ================= */
+function scheduleBackoff() {
   clearTimeout(backoffTimer);
-
   backoffTimer = setTimeout(async () => {
     try {
       const res = await fetch(`${API_BASE}/sync/status`, { cache: "no-store" });
-      if (!res.ok) throw new Error("still offline");
-
-      // online แล้ว
+      if (!res.ok) throw new Error();
       serverOnline = true;
       setBadgeOnline();
       backoffDelay = BACKOFF_BASE;
-      log("✅ Server reconnected (backoff)");
-      statusText.textContent = syncing ? "Syncing…" : "Idle";
-
+      log("✅ Server reconnected");
     } catch {
-      // ยัง offline → เพิ่ม backoff
       backoffDelay = Math.min(backoffDelay * 1.8, BACKOFF_MAX);
       log(`⏳ Retry in ${Math.round(backoffDelay)} ms`);
-      scheduleBackoffCheck();
+      scheduleBackoff();
     }
   }, backoffDelay);
 }
+
+/* ================= INIT ================= */
+window.addEventListener("load", () => {
+  fetchStatus(); // check immediately
+  statusTimer = setInterval(fetchStatus, STATUS_INTERVAL);
+});
 </script>
 
 </body>
