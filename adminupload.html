@@ -2,18 +2,18 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
-<title>ThaiRun Face Sync – PRO</title>
+<title>ThaiRun Face Sync – Realtime</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
 <body class="bg-slate-900 text-white min-h-screen p-6">
 
-<div id="app" class="max-w-6xl mx-auto space-y-6">
+<div class="max-w-6xl mx-auto space-y-6">
 
   <!-- HEADER -->
   <h1 class="text-4xl font-bold text-yellow-400 text-center">
-    🧠 ThaiRun Face Sync – PRO
+    🧠 ThaiRun Face Sync – Realtime
   </h1>
 
   <!-- STATS -->
@@ -71,11 +71,11 @@
 <script>
 /* ================= CONFIG ================= */
 const API_BASE = "http://localhost:3000";
-const SYNC_INTERVAL = 800;
-const STATUS_INTERVAL = 1200;
+const SYNC_INTERVAL = 1000;   // sync ช้าได้ แต่ชัวร์
+const STATUS_INTERVAL = 500;  // 🔥 realtime
 /* ========================================= */
 
-// DOM refs (🔴 สำคัญมาก)
+// DOM refs
 const totalEl = document.getElementById("total");
 const syncedEl = document.getElementById("synced");
 const remainingEl = document.getElementById("remaining");
@@ -99,7 +99,7 @@ document.getElementById("startBtn").onclick = startSync;
 document.getElementById("pauseBtn").onclick = pauseSync;
 document.getElementById("resumeBtn").onclick = resumeSync;
 document.getElementById("stopBtn").onclick = stopSync;
-document.getElementById("refreshBtn").onclick = refreshStatus;
+document.getElementById("refreshBtn").onclick = refreshOnce;
 document.getElementById("bigBtn").onclick = toggleBig;
 
 /* ================= LOG ================= */
@@ -119,8 +119,9 @@ function startSync() {
   lastSynced = 0;
   statusText.innerText = "Syncing…";
   log("🚀 Start Sync");
-  loopSync();
-  pollStatus();
+
+  runSyncLoop();
+  startStatusLoop();
 }
 
 function pauseSync() {
@@ -139,80 +140,87 @@ function resumeSync() {
 function stopSync() {
   syncing = false;
   paused = false;
-  clearTimeout(syncTimer);
-  clearTimeout(statusTimer);
+
+  if (syncTimer) clearTimeout(syncTimer);
+  stopStatusLoop();
+
   statusText.innerText = "Stopped";
   log("⏹ Stopped");
 }
 
-/* ================= LOOP ================= */
-async function loopSync() {
+/* ================= SYNC LOOP ================= */
+function runSyncLoop() {
   if (!syncing) return;
 
   if (!paused) {
-    try {
-      await fetch(`${API_BASE}/sync`, { method: "POST" });
-    } catch {
-      log("❌ Sync request failed");
-      stopSync();
-      return;
-    }
+    fetch(`${API_BASE}/sync`, { method: "POST" })
+      .catch(() => {
+        log("❌ Sync error");
+        stopSync();
+      });
   }
 
-  syncTimer = setTimeout(loopSync, SYNC_INTERVAL);
+  syncTimer = setTimeout(runSyncLoop, SYNC_INTERVAL);
 }
 
-/* ================= STATUS ================= */
-async function pollStatus() {
-  if (!syncing) return;
+/* ================= REALTIME STATUS LOOP ================= */
+function startStatusLoop() {
+  stopStatusLoop(); // กันซ้อน
 
-  try {
-    const res = await fetch(`${API_BASE}/sync/status`);
-    const d = await res.json();
+  statusTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/sync/status`);
+      const d = await res.json();
 
-    totalEl.innerText = d.total;
-    syncedEl.innerText = d.synced;
-    remainingEl.innerText = d.remaining;
+      totalEl.innerText = d.total;
+      syncedEl.innerText = d.synced;
+      remainingEl.innerText = d.remaining;
 
-    const percent = d.total
-      ? Math.round((d.synced / d.total) * 100)
-      : 0;
+      const percent = d.total
+        ? Math.round((d.synced / d.total) * 100)
+        : 0;
 
-    progressBar.style.width = percent + "%";
-    percentText.innerText = percent + "%";
+      progressBar.style.width = percent + "%";
+      percentText.innerText = percent + "%";
 
-    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-    elapsedEl.innerText = elapsed + "s";
+      if (startTime) {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        elapsedEl.innerText = elapsed + "s";
+      }
 
-    const rate = d.synced - lastSynced;
-    rateEl.innerText = rate * 60 + " / min";
-    lastSynced = d.synced;
+      const rate = d.synced - lastSynced;
+      rateEl.innerText = rate * 120 + " / min"; // 500ms → x120
+      lastSynced = d.synced;
 
-    if (d.done) {
-      syncing = false;
-      statusText.innerText = "Completed";
-      progressBar.style.width = "100%";
-      percentText.innerText = "100%";
-      log("🎉 Completed");
-      return;
+      if (d.done && syncing) {
+        log("🎉 Completed");
+        statusText.innerText = "Completed";
+        syncing = false;
+        stopStatusLoop();
+      }
+
+    } catch {
+      log("⚠️ Status fetch failed");
     }
+  }, STATUS_INTERVAL);
+}
 
-  } catch {
-    log("❌ Status fetch failed");
+function stopStatusLoop() {
+  if (statusTimer) {
+    clearInterval(statusTimer);
+    statusTimer = null;
   }
-
-  statusTimer = setTimeout(pollStatus, STATUS_INTERVAL);
 }
 
 /* ================= EXTRA ================= */
-function refreshStatus() {
-  log("🔄 Refresh Status");
-  pollStatus();
+function refreshOnce() {
+  log("🔄 Manual refresh");
+  startStatusLoop();
 }
 
 function toggleBig() {
   document.body.classList.toggle("text-2xl");
-  log("🖥 Toggle Big Screen");
+  log("🖥 Big Screen toggle");
 }
 </script>
 
