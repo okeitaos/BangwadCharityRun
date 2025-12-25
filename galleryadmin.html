@@ -2,165 +2,167 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
-<title>ThaiRun Face Sync – PRO</title>
+<title>Face Sync Control</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="bg-slate-900 text-white min-h-screen p-6">
+<body class="bg-slate-900 text-white min-h-screen p-4">
 
-<div id="app" class="max-w-6xl mx-auto space-y-6">
+<div class="max-w-xl mx-auto space-y-4">
 
-  <!-- HEADER -->
-  <h1 class="text-4xl font-bold text-yellow-400 text-center">
-    🧠 ThaiRun Face Sync – PRO
+  <h1 class="text-2xl font-bold text-center text-yellow-400">
+    📱 Face Sync Control
   </h1>
 
   <!-- STATUS -->
-  <div class="bg-slate-800 rounded-xl p-6 grid md:grid-cols-4 gap-4 text-center">
+  <div class="bg-slate-800 rounded-xl p-4 grid grid-cols-3 text-center gap-2">
     <div>
       <div class="text-gray-400 text-sm">Total</div>
-      <div id="total" class="text-3xl font-bold">0</div>
+      <div id="total" class="text-xl font-bold">0</div>
     </div>
     <div>
       <div class="text-gray-400 text-sm">Synced</div>
-      <div id="synced" class="text-3xl font-bold text-green-400">0</div>
+      <div id="synced" class="text-xl font-bold text-green-400">0</div>
     </div>
     <div>
-      <div class="text-gray-400 text-sm">Remaining</div>
-      <div id="remaining" class="text-3xl font-bold text-red-400">0</div>
-    </div>
-    <div>
-      <div class="text-gray-400 text-sm">Rate</div>
-      <div id="rate" class="text-3xl font-bold">0 / min</div>
+      <div class="text-gray-400 text-sm">Remain</div>
+      <div id="remaining" class="text-xl font-bold text-red-400">0</div>
     </div>
   </div>
 
   <!-- PROGRESS -->
   <div class="bg-slate-800 rounded-xl p-4 space-y-2">
-    <div class="flex justify-between text-sm text-gray-300">
-      <div id="statusText">Idle</div>
-      <div id="percentText">0%</div>
+    <div class="flex justify-between text-sm">
+      <span id="statusText">Idle</span>
+      <span id="percentText">0%</span>
     </div>
-    <div class="w-full bg-gray-700 rounded-full h-4">
-      <div id="progressBar" class="bg-green-400 h-4 rounded-full transition-all"></div>
-    </div>
-    <div class="text-sm text-gray-400">
-      Elapsed: <span id="elapsed">0s</span>
+    <div class="w-full bg-gray-700 rounded-full h-3">
+      <div id="progressBar"
+           class="bg-green-400 h-3 rounded-full transition-all duration-300"
+           style="width:0%"></div>
     </div>
   </div>
 
-  <!-- CONTROLS -->
-  <div class="flex flex-wrap gap-3 justify-center">
-    <button onclick="startSync()" class="bg-green-600 px-5 py-2 rounded">▶ Start</button>
-    <button onclick="pauseSync()" class="bg-yellow-500 px-5 py-2 rounded">⏸ Pause</button>
-    <button onclick="resumeSync()" class="bg-green-500 px-5 py-2 rounded">▶ Resume</button>
-    <button onclick="stopSync()" class="bg-red-600 px-5 py-2 rounded">⏹ Stop</button>
-    <button onclick="refreshStatus()" class="bg-blue-600 px-5 py-2 rounded">🔄 Refresh</button>
-    <button onclick="toggleBig()" class="bg-purple-600 px-5 py-2 rounded">🖥 Big Screen</button>
-  </div>
+  <!-- BUTTONS -->
+  <div class="grid grid-cols-2 gap-3">
+    <button id="startBtn"
+      class="bg-green-600 py-3 rounded-xl font-semibold active:scale-95">
+      ▶ Start Sync
+    </button>
 
-  <!-- PER PHOTOGRAPHER -->
-  <div class="bg-slate-800 rounded-xl p-4">
-    <h2 class="font-bold mb-2">📷 Remaining per Photographer</h2>
-    <div id="photographerList" class="grid md:grid-cols-2 gap-2 text-sm"></div>
+    <button id="stopBtn"
+      class="bg-red-600 py-3 rounded-xl font-semibold active:scale-95">
+      ⏹ Stop
+    </button>
   </div>
 
   <!-- LOG -->
-  <div class="bg-slate-800 rounded-xl p-4 h-64 overflow-auto text-sm" id="logBox"></div>
+  <div class="bg-slate-800 rounded-xl p-3 h-48 overflow-auto text-xs"
+       id="logBox"></div>
 
 </div>
 
 <script>
-// const API = "http://localhost:3000";
-  const API_BASE = "http://192.168.1.18:3000";
+/* ================= CONFIG ================= */
+const API_BASE = "http://192.168.1.18:3000"; // 👈 IP MAC
+const SYNC_INTERVAL = 1200;
+const STATUS_INTERVAL = 700;
+/* ========================================= */
 
 let syncing = false;
-let paused = false;
-let startTime = null;
-let lastSynced = 0;
+let syncTimer = null;
+let statusTimer = null;
 
+/* DOM */
+const totalEl = document.getElementById("total");
+const syncedEl = document.getElementById("synced");
+const remainingEl = document.getElementById("remaining");
+const statusText = document.getElementById("statusText");
+const percentText = document.getElementById("percentText");
+const progressBar = document.getElementById("progressBar");
+const logBox = document.getElementById("logBox");
+
+/* LOG */
 function log(msg) {
-  const box = document.getElementById("logBox");
-  box.innerHTML += `<div>${new Date().toLocaleTimeString()} - ${msg}</div>`;
-  box.scrollTop = box.scrollHeight;
+  const el = document.createElement("div");
+  el.textContent = new Date().toLocaleTimeString() + " - " + msg;
+  logBox.appendChild(el);
+  logBox.scrollTop = logBox.scrollHeight;
 }
 
-async function startSync() {
+/* START */
+document.getElementById("startBtn").onclick = () => {
+  if (syncing) return;
   syncing = true;
-  paused = false;
-  startTime = Date.now();
-  lastSynced = 0;
-  log("🚀 Start Sync");
-  statusText.innerText = "Syncing…";
-  loopSync();
-  pollStatus();
-}
+  statusText.textContent = "Syncing...";
+  log("🚀 Start sync");
 
-function pauseSync() {
-  paused = true;
-  log("⏸ Paused");
-  statusText.innerText = "Paused";
-}
+  runSyncLoop();
+  startStatusLoop();
+};
 
-function resumeSync() {
-  if (!syncing) return;
-  paused = false;
-  log("▶ Resume");
-  statusText.innerText = "Syncing…";
-}
-
-function stopSync() {
+/* STOP */
+document.getElementById("stopBtn").onclick = () => {
   syncing = false;
-  paused = false;
-  log("⏹ Stopped");
-  statusText.innerText = "Stopped";
-}
+  clearTimeout(syncTimer);
+  clearInterval(statusTimer);
+  statusText.textContent = "Stopped";
+  log("⏹ Stop sync");
+};
 
-async function loopSync() {
-  if (!syncing) return;
-  if (!paused) await fetch(`${API_BASE}/sync`, { method: "POST" })
-  setTimeout(loopSync, 800);
-}
-
-async function pollStatus() {
+/* SYNC LOOP (POST) */
+function runSyncLoop() {
   if (!syncing) return;
 
-  const res = await fetch(API + "/sync/status");
-  const d = await res.json();
-
-  total.innerText = d.total;
-  synced.innerText = d.synced;
-  remaining.innerText = d.remaining;
-
-  const percent = d.total ? Math.round((d.synced / d.total) * 100) : 0;
-  progressBar.style.width = percent + "%";
-  percentText.innerText = percent + "%";
-
-  const elapsed = Math.floor((Date.now() - startTime) / 1000);
-  elapsedEl.innerText = elapsed + "s";
-
-  const rate = d.synced - lastSynced;
-  rateEl.innerText = rate * 60 + " / min";
-  lastSynced = d.synced;
-
-  if (d.done) {
+  fetch(`${API_BASE}/sync`, {
+    method: "POST"
+  })
+  .then(res => res.json())
+  .then(d => {
+    if (d.status === "busy") {
+      log("⏳ Server busy");
+    }
+    if (d.status === "no_files") {
+      log("✅ No pending files");
+      syncing = false;
+    }
+  })
+  .catch(() => {
+    log("❌ Sync request failed");
     syncing = false;
-    log("🎉 Completed");
-    statusText.innerText = "Completed";
-  } else {
-    setTimeout(pollStatus, 1200);
-  }
+  });
+
+  syncTimer = setTimeout(runSyncLoop, SYNC_INTERVAL);
 }
 
-function refreshStatus() {
-  log("🔄 Refresh");
-  pollStatus();
-}
+/* STATUS LOOP */
+function startStatusLoop() {
+  statusTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/sync/status`);
+      const d = await res.json();
 
-function toggleBig() {
-  document.body.classList.toggle("text-2xl");
-  log("🖥 Toggle Big Screen");
+      totalEl.textContent = d.total;
+      syncedEl.textContent = d.synced;
+      remainingEl.textContent = d.remaining;
+
+      const percent = d.total
+        ? Math.round((d.synced / d.total) * 100)
+        : 0;
+
+      progressBar.style.width = percent + "%";
+      percentText.textContent = percent + "%";
+
+      if (d.done && syncing) {
+        syncing = false;
+        log("🎉 Sync completed");
+        statusText.textContent = "Completed";
+      }
+    } catch {
+      log("⚠️ Status fetch error");
+    }
+  }, STATUS_INTERVAL);
 }
 </script>
 
