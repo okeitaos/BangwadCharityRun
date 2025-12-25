@@ -95,7 +95,6 @@ const LOGO_URL =
 "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
 
 const RESULT_LIMIT = 200;
-const MAX_DISTANCE_SHOW = 0.50;
 /* ========================================= */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -109,9 +108,6 @@ const secondarySection = document.getElementById("secondarySection");
 const queryPreviewBox = document.getElementById("queryPreviewBox");
 const queryPreviewImg = document.getElementById("queryPreviewImg");
 
-let currentPreviewUrl = "";
-let currentFilename = "";
-
 /* ================= LOAD MODELS ================= */
 (async () => {
   const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
@@ -121,6 +117,45 @@ let currentFilename = "";
   await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
   statusEl.innerText = "✅ พร้อมค้นหา";
 })();
+
+/* ================= 🔥 SPLIT RESULTS FINAL ================= */
+function splitResults(rows) {
+  if (!rows || rows.length === 0) {
+    return { primary: [], secondary: [] };
+  }
+
+  const HARD_CUTOFF = 0.45;
+  const STRONG_MAX  = 0.30;
+  const MAX_JUMP    = 0.10;
+  const MAX_PRIMARY = 40;
+
+  const sorted = [...rows]
+    .filter(r => r.distance <= HARD_CUTOFF)
+    .sort((a, b) => a.distance - b.distance);
+
+  if (sorted.length === 0) {
+    return { primary: [], secondary: [] };
+  }
+
+  const primary = [sorted[0]];
+  const secondary = [];
+
+  for (let i = 1; i < sorted.length; i++) {
+    const jump = sorted[i].distance - sorted[i - 1].distance;
+    if (sorted[i].distance > STRONG_MAX) break;
+    if (jump > MAX_JUMP) break;
+    if (primary.length >= MAX_PRIMARY) break;
+    primary.push(sorted[i]);
+  }
+
+  const last = primary[primary.length - 1];
+  for (let i = primary.length; i < sorted.length; i++) {
+    if (sorted[i].distance - last.distance > MAX_JUMP) break;
+    secondary.push(sorted[i]);
+  }
+
+  return { primary, secondary };
+}
 
 /* ================= SEARCH ================= */
 fileInput.onchange = async () => {
@@ -161,16 +196,7 @@ fileInput.onchange = async () => {
     return;
   }
 
-  renderResults(data);
-};
-
-/* ================= RENDER ================= */
-function renderResults(rows) {
-  const sorted = rows.filter(r => r.distance <= MAX_DISTANCE_SHOW)
-    .sort((a,b)=>a.distance-b.distance);
-
-  const primary = sorted.slice(0,1);
-  const secondary = sorted.slice(1);
+  const { primary, secondary } = splitResults(data);
 
   renderBox(primary, primaryBox);
   if (secondary.length) {
@@ -179,9 +205,12 @@ function renderResults(rows) {
   }
 
   resultInfo.classList.remove("hidden");
-  resultInfo.innerText = `พบ ${sorted.length} ภาพ`;
-}
+  resultInfo.innerText =
+    `พบรูปของคุณ ${primary.length} ภาพ` +
+    (secondary.length ? ` • รูปที่อาจใช่ ${secondary.length} ภาพ` : "");
+};
 
+/* ================= RENDER ================= */
 function renderBox(rows, box) {
   box.innerHTML = "";
   rows.forEach((r,i)=>{
@@ -202,15 +231,54 @@ function renderBox(rows, box) {
   });
 }
 
-/* ================= PREVIEW ================= */
-function openPreview(url, filename) {
-  currentPreviewUrl = url;
-  currentFilename = filename;
+/* ================= PREVIEW + WATERMARK ================= */
+async function openPreview(url, filename) {
   document.getElementById("previewModal").classList.remove("hidden");
-  drawPreviewWithWatermark(url);
+
+  const canvas = document.getElementById("previewCanvas");
+  const ctx = canvas.getContext("2d");
+  const img = new Image();
+  const logo = new Image();
+  img.crossOrigin = "anonymous";
+  logo.crossOrigin = "anonymous";
+  img.src = url;
+  logo.src = LOGO_URL;
+
+  await Promise.all([
+    new Promise(r => img.onload = r),
+    new Promise(r => logo.onload = r)
+  ]);
+
+  canvas.width = img.width;
+  canvas.height = img.height;
+  ctx.drawImage(img, 0, 0);
+
+  const pad = canvas.width * 0.03;
+  ctx.globalAlpha = 0.45;
+  ctx.fillStyle = "white";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.font = `bold ${Math.round(canvas.width * 0.028)}px Arial`;
+
+  ctx.fillText(
+    "BANGWAD CHARITY RUN 2025 | OFFICIAL PHOTOGRAPHER",
+    canvas.width / 2,
+    canvas.height - pad
+  );
+
+  const logoW = canvas.width * 0.15;
+  const logoH = logoW * (logo.height / logo.width);
+  ctx.globalAlpha = 0.75;
+  ctx.drawImage(
+    logo,
+    canvas.width - logoW - pad,
+    canvas.height - logoH - pad * 1.5,
+    logoW,
+    logoH
+  );
+  ctx.globalAlpha = 1;
 
   document.getElementById("downloadBtn").onclick = () => {
-    const canvas = document.getElementById("previewCanvas");
     const a = document.createElement("a");
     a.href = canvas.toDataURL("image/jpeg", 0.95);
     a.download = filename;
@@ -220,54 +288,6 @@ function openPreview(url, filename) {
 
 function closePreview() {
   document.getElementById("previewModal").classList.add("hidden");
-}
-
-/* ================= PREVIEW + WATERMARK ================= */
-async function drawPreviewWithWatermark(imageUrl) {
-  const img = new Image();
-  const logo = new Image();
-  img.crossOrigin = "anonymous";
-  logo.crossOrigin = "anonymous";
-  img.src = imageUrl;
-  logo.src = LOGO_URL;
-
-  await Promise.all([
-    new Promise(r => img.onload = r),
-    new Promise(r => logo.onload = r)
-  ]);
-
-  const canvas = document.getElementById("previewCanvas");
-  const ctx = canvas.getContext("2d");
-  canvas.width = img.width;
-  canvas.height = img.height;
-
-  ctx.drawImage(img, 0, 0);
-
-  const pad = canvas.width * 0.03;
-
-  // text watermark
-  ctx.globalAlpha = 0.45;
-  ctx.fillStyle = "white";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "bottom";
-  ctx.font = `bold ${Math.round(canvas.width * 0.028)}px Arial`;
-
-  const textY = canvas.height - pad;
-  ctx.fillText(
-    "BANGWAD CHARITY RUN 2025 | OFFICIAL PHOTOGRAPHER",
-    canvas.width / 2,
-    textY
-  );
-
-  // logo
-  const logoW = canvas.width * 0.15;
-  const logoH = logoW * (logo.height / logo.width);
-  const logoX = canvas.width - logoW - pad;
-  const logoY = textY - logoH - pad * 0.6;
-
-  ctx.globalAlpha = 0.75;
-  ctx.drawImage(logo, logoX, logoY, logoW, logoH);
-  ctx.globalAlpha = 1;
 }
 </script>
 
