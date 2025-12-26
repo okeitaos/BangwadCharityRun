@@ -220,10 +220,18 @@ function splitResultsUltra(rows) {
 function render(primary, secondary) {
   renderBox(primary, primaryBox);
 
-  if (secondary.length) {
-    secondarySection.classList.remove("hidden");
-    renderBox(secondary, secondaryBox);
-  }
+  if (secondary.length > 0 || primary.length > 1) {
+  secondarySection.classList.remove("hidden");
+
+  // fallback: เอารูป primary ที่เหลือมาใส่ secondary
+  const fallbackSecondary =
+    secondary.length > 0
+      ? secondary
+      : primary.slice(1);
+
+  renderBox(fallbackSecondary, secondaryBox);
+}
+
 
   resultInfo.classList.remove("hidden");
   resultInfo.innerText =
