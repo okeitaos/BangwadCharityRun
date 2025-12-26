@@ -92,15 +92,9 @@
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const LOGO_URL =
-"https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
+  "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
 
 const RESULT_LIMIT = 200;
-
-/* GOD MODE+++ */
-const HARD_MAX = 0.45;
-const CORE_MAX = 0.28;
-const MEAN_TOL = 0.10;
-const MEDIAN_TOL = 0.08;
 /* ========================================= */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -165,72 +159,69 @@ fileInput.onchange = async () => {
     if (data) allResults.push(...data);
   }
 
-  renderResultsGodModeUltra(allResults);
+  renderResults(allResults);
 };
 
-/* ================= GOD MODE+++ ================= */
-function renderResultsGodModeUltra(rawRows) {
+/* ================= GOD MODE FILTER ================= */
+function godModeFilter(rows) {
+  if (!rows || !rows.length) return { primary: [], secondary: [] };
 
-  /* STEP 1: Deduplicate */
-  const map = new Map();
-  for (const r of rawRows) {
-    if (!map.has(r.file_path) || r.distance < map.get(r.file_path).distance) {
-      map.set(r.file_path, r);
-    }
-  }
-  let rows = Array.from(map.values());
+  const ABSOLUTE_KILL_MAX = 0.38;
+  const RELATIVE_MARGIN = 0.055;
+  const CLUSTER_EPS = 0.045;
+  const MIN_CLUSTER_SIZE = 3;
+  const MAX_SECONDARY = 0.45;
 
-  /* STEP 2: Hard gate */
-  rows = rows.filter(r => r.distance <= HARD_MAX);
-  if (!rows.length) return;
-  rows.sort((a,b)=>a.distance-b.distance);
+  const sorted = [...rows].sort((a,b)=>a.distance-b.distance);
+  const anchor = sorted[0];
+  const anchorDistance = anchor.distance;
 
-  /* STEP 3: Identity core */
-  const core = rows.filter(r => r.distance <= CORE_MAX).slice(0,5);
-  if (!core.length) core.push(rows[0]);
+  const hard = sorted.filter(r =>
+    r.distance <= ABSOLUTE_KILL_MAX &&
+    r.distance <= anchorDistance + RELATIVE_MARGIN
+  );
 
-  const mean =
-    core.reduce((s,r)=>s+r.distance,0) / core.length;
+  const cluster = hard.filter(r =>
+    Math.abs(r.distance - anchorDistance) <= CLUSTER_EPS
+  );
 
-  const median = (() => {
-    const d = core.map(r=>r.distance).sort((a,b)=>a-b);
-    const m = Math.floor(d.length/2);
-    return d.length%2 ? d[m] : (d[m-1]+d[m])/2;
-  })();
-
-  /* STEP 4: Voting */
-  const primary = [];
-  const secondary = [];
-
-  for (const r of rows) {
-    let votes = 0;
-    if (Math.abs(r.distance - mean) <= MEAN_TOL) votes++;
-    if (Math.abs(r.distance - median) <= MEDIAN_TOL) votes++;
-    if (r.distance <= 0.30) votes++;
-
-    if (votes >= 3) primary.push(r);
-    else if (votes === 2) secondary.push(r);
+  if (cluster.length < MIN_CLUSTER_SIZE) {
+    return { primary: [], secondary: [] };
   }
 
-  /* STEP 5: UX safety */
-  let secondaryFinal = secondary;
-  if (!secondaryFinal.length && primary.length > 1) {
-    secondaryFinal = primary.slice(1);
+  const primary = cluster;
+
+  const secondary = sorted.filter(r =>
+    !primary.includes(r) &&
+    r.distance <= MAX_SECONDARY
+  );
+
+  return { primary, secondary };
+}
+
+/* ================= RENDER ================= */
+function renderResults(rows) {
+  const { primary, secondary } = godModeFilter(rows);
+
+  if (!primary.length) {
+    resultInfo.classList.remove("hidden");
+    resultInfo.innerText = "❌ ไม่พบภาพที่มั่นใจว่าเป็นคุณ";
+    return;
   }
 
   renderBox(primary, primaryBox);
-  secondarySection.classList.remove("hidden");
-  renderBox(secondaryFinal, secondaryBox);
+
+  if (secondary.length) {
+    secondarySection.classList.remove("hidden");
+    renderBox(secondary, secondaryBox);
+  }
 
   resultInfo.classList.remove("hidden");
   resultInfo.innerText =
     `พบรูปของคุณ ${primary.length} ภาพ` +
-    (secondaryFinal.length
-      ? ` • รูปเพิ่มเติม ${secondaryFinal.length} ภาพ`
-      : "");
+    (secondary.length ? ` • รูปเพิ่มเติม ${secondary.length} ภาพ` : "");
 }
 
-/* ================= RENDER ================= */
 function renderBox(rows, box) {
   box.innerHTML = "";
   rows.forEach((r,i)=>{
@@ -277,8 +268,8 @@ async function drawPreviewWithWatermark(imageUrl) {
   logo.src = LOGO_URL;
 
   await Promise.all([
-    new Promise(r=>img.onload=r),
-    new Promise(r=>logo.onload=r)
+    new Promise(r => img.onload = r),
+    new Promise(r => logo.onload = r)
   ]);
 
   const canvas = document.getElementById("previewCanvas");
@@ -286,42 +277,42 @@ async function drawPreviewWithWatermark(imageUrl) {
   canvas.width = img.width;
   canvas.height = img.height;
 
-  ctx.drawImage(img,0,0);
+  ctx.drawImage(img, 0, 0);
 
-  const pad = canvas.width*0.03;
+  const pad = canvas.width * 0.03;
 
   ctx.save();
   ctx.globalAlpha = 0.45;
   ctx.fillStyle = "white";
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
-  ctx.font = `bold ${Math.round(canvas.width*0.02)}px Arial`;
+  ctx.font = `bold ${Math.round(canvas.width * 0.020)}px Arial`;
   ctx.fillText(
     "BANGWAD CHARITY RUN 2025 | OFFICIAL PHOTOGRAPHER",
-    canvas.width/2,
-    canvas.height - pad*0.4
+    canvas.width / 2,
+    canvas.height - pad * 0.4
   );
   ctx.restore();
 
-  const logoW = canvas.width*0.15;
-  const logoH = logoW*(logo.height/logo.width);
+  const logoW = canvas.width * 0.15;
+  const logoH = logoW * (logo.height / logo.width);
   ctx.drawImage(
     logo,
-    canvas.width-logoW-pad,
-    canvas.height-logoH-pad*1.6,
+    canvas.width - logoW - pad,
+    canvas.height - logoH - pad * 1.6,
     logoW,
     logoH
   );
 }
 
-/* Disable Right Click & DevTools */
-document.addEventListener("contextmenu", e=>e.preventDefault());
-document.addEventListener("keydown", e=>{
-  const k=e.key.toUpperCase();
-  if(
-    k==="F12"||
-    (e.ctrlKey&&e.shiftKey&&["I","J","C"].includes(k))||
-    (e.ctrlKey&&k==="U")
+/* ===== Disable Right Click & DevTools ===== */
+document.addEventListener("contextmenu", e => e.preventDefault());
+document.addEventListener("keydown", e => {
+  const k = e.key.toUpperCase();
+  if (
+    k === "F12" ||
+    (e.ctrlKey && e.shiftKey && ["I","J","C"].includes(k)) ||
+    (e.ctrlKey && k === "U")
   ) e.preventDefault();
 });
 </script>
