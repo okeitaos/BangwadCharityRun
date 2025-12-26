@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
-<title>ค้นหาภาพของคุณ | Charity Run</title>
+<title>ค้นหาภาพของคุณ | Bangwad Charity Run</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
 <script src="https://cdn.tailwindcss.com"></script>
@@ -11,76 +11,78 @@
 
 <style>
 .card {
-  transition: transform .2s, box-shadow .2s;
+  transition: transform .25s ease, box-shadow .25s ease;
 }
 .card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 25px rgba(0,0,0,.4);
+  transform: translateY(-6px);
+  box-shadow: 0 18px 40px rgba(0,0,0,.45);
 }
 </style>
 </head>
 
-<body class="bg-slate-900 text-white min-h-screen">
+<body class="bg-slate-950 text-white min-h-screen select-none">
 
-<div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+<div class="max-w-7xl mx-auto px-4 py-8 space-y-8">
 
-<h1 class="text-2xl md:text-3xl font-bold text-center text-yellow-400">
+<!-- HEADER -->
+<h1 class="text-3xl md:text-4xl font-extrabold text-center text-yellow-400">
 🏃‍♂️ ค้นหาภาพของคุณ
 </h1>
+<p class="text-center text-gray-400 text-sm">
+ระบบค้นหาภาพอัจฉริยะ • เจอเฉพาะ “คุณ” เท่านั้น
+</p>
 
-<!-- Upload -->
-<div class="bg-slate-800 rounded-2xl p-5 space-y-3">
+<!-- UPLOAD -->
+<div class="bg-slate-800 rounded-2xl p-6 space-y-3">
   <input id="fileInput" type="file" accept="image/*"
     class="block w-full text-sm
     file:bg-yellow-500 file:text-black
-    file:px-5 file:py-2 file:rounded-xl" />
+    file:px-6 file:py-2 file:rounded-xl" />
   <div id="status" class="text-sm text-gray-300"></div>
 </div>
 
-<!-- Query Preview -->
-<div id="queryPreviewBox"
-  class="hidden bg-slate-800 rounded-2xl p-4 text-center">
-  <p class="text-sm text-gray-400 mb-2">ภาพที่ใช้ค้นหา</p>
-  <img id="queryPreviewImg"
-    class="mx-auto rounded-xl max-h-64 border border-yellow-500/40">
+<!-- QUERY PREVIEW -->
+<div id="queryBox" class="hidden bg-slate-800 rounded-2xl p-4 text-center">
+  <p class="text-xs text-gray-400 mb-2">ภาพที่ใช้ค้นหา</p>
+  <img id="queryImg" class="mx-auto max-h-64 rounded-xl border border-yellow-400/30">
 </div>
 
-<div id="resultInfo"
-  class="hidden text-sm text-center text-gray-300"></div>
+<!-- INFO -->
+<div id="info" class="hidden text-center text-sm text-gray-300"></div>
 
-<!-- Primary -->
-<div>
-<h2 class="text-sm text-green-400 mb-2 text-center">
+<!-- PRIMARY -->
+<section>
+<h2 class="text-sm text-green-400 text-center mb-3">
 ✅ รูปของคุณ (มั่นใจสูง)
 </h2>
 <div id="primaryBox"
-  class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
-</div>
+  class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5"></div>
+</section>
 
-<!-- Secondary -->
-<div id="secondarySection" class="hidden mt-8">
-<h2 class="text-sm text-yellow-400 mb-2 text-center">
+<!-- SECONDARY -->
+<section id="secondarySection" class="hidden">
+<h2 class="text-sm text-yellow-400 text-center mb-3">
 📌 รูปเพิ่มเติม (อาจเป็นภาพของคุณ)
 </h2>
 <div id="secondaryBox"
-  class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
-</div>
+  class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5"></div>
+</section>
 
 </div>
 
 <!-- PREVIEW MODAL -->
-<div id="previewModal"
-  class="fixed inset-0 bg-black/80 hidden z-50 flex items-center justify-center">
+<div id="modal"
+  class="fixed inset-0 bg-black/90 hidden z-50 flex items-center justify-center">
   <div class="relative max-w-6xl w-full p-4">
-    <button onclick="closePreview()"
-      class="absolute top-2 right-2 text-white text-2xl">✖</button>
+    <button onclick="closeModal()"
+      class="absolute top-2 right-2 text-white text-3xl">✖</button>
 
-    <canvas id="previewCanvas"
-      class="w-full max-h-[85vh] object-contain rounded-xl mb-4"></canvas>
+    <canvas id="canvas"
+      class="w-full max-h-[85vh] rounded-xl mb-4"></canvas>
 
     <div class="text-center">
       <button id="downloadBtn"
-        class="bg-yellow-500 text-black px-6 py-2 rounded-lg font-semibold">
+        class="bg-yellow-500 text-black px-8 py-3 rounded-xl font-bold">
         ⬇️ ดาวน์โหลดรูป (มีลายน้ำ)
       </button>
     </div>
@@ -92,172 +94,184 @@
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const LOGO_URL =
-  "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
+"https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
 
 const RESULT_LIMIT = 200;
-
-// 🔥 ULTRA PARAMS
-const HARD_MAX = 0.48;        // กันคนอื่น 100%
-const PRIMARY_SOFT = 0.33;    // ตัวเองชัวร์
-const PRIMARY_HARD = 0.38;    // ตัวเองยาก
-const MAX_JUMP = 0.09;        // continuity
-const MIN_CLUSTER = 2;
+const HARD_MAX = 0.45;
+const PRIMARY_MAX = 0.30;
+const MAX_JUMP = 0.12;
 /* ========================================= */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const fileInput = document.getElementById("fileInput");
-const statusEl = document.getElementById("status");
-const resultInfo = document.getElementById("resultInfo");
-const primaryBox = document.getElementById("primaryBox");
-const secondaryBox = document.getElementById("secondaryBox");
-const secondarySection = document.getElementById("secondarySection");
-const queryPreviewBox = document.getElementById("queryPreviewBox");
-const queryPreviewImg = document.getElementById("queryPreviewImg");
-
-let currentFilename = "";
+const el = id => document.getElementById(id);
 
 /* ================= LOAD MODELS ================= */
 (async () => {
-  const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
-  statusEl.innerText = "⏳ โหลดโมเดลใบหน้า...";
-  await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-  await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-  await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-  statusEl.innerText = "✅ พร้อมค้นหา";
+  const URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
+  el("status").innerText = "⏳ โหลดระบบ AI...";
+  await faceapi.nets.tinyFaceDetector.loadFromUri(URL);
+  await faceapi.nets.faceLandmark68Net.loadFromUri(URL);
+  await faceapi.nets.faceRecognitionNet.loadFromUri(URL);
+  el("status").innerText = "✅ พร้อมใช้งาน";
 })();
 
 /* ================= SEARCH ================= */
-fileInput.onchange = async () => {
-  const file = fileInput.files[0];
+el("fileInput").onchange = async () => {
+  const file = el("fileInput").files[0];
   if (!file) return;
 
-  primaryBox.innerHTML = "";
-  secondaryBox.innerHTML = "";
-  secondarySection.classList.add("hidden");
-  resultInfo.classList.add("hidden");
+  el("primaryBox").innerHTML = "";
+  el("secondaryBox").innerHTML = "";
+  el("secondarySection").classList.add("hidden");
+  el("info").classList.add("hidden");
 
-  statusEl.innerText = "📸 ตรวจจับใบหน้า...";
-
+  el("status").innerText = "📸 วิเคราะห์ใบหน้า...";
   const img = await faceapi.bufferToImage(file);
-  queryPreviewImg.src = img.src;
-  queryPreviewBox.classList.remove("hidden");
+  el("queryImg").src = img.src;
+  el("queryBox").classList.remove("hidden");
 
-  const detections = await faceapi
+  const faces = await faceapi
     .detectAllFaces(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 }))
     .withFaceLandmarks()
     .withFaceDescriptors();
 
-  if (!detections.length) {
-    statusEl.innerText = "❌ ไม่พบใบหน้าในภาพ";
+  if (!faces.length) {
+    el("status").innerText = "❌ ไม่พบใบหน้า";
     return;
   }
 
-  statusEl.innerText = "🔍 กำลังค้นหา...";
+  el("status").innerText = `🔍 ค้นหาใบหน้า ${faces.length} คน...`;
 
-  const rawResults = [];
-
-  for (const det of detections) {
-    const vector = "[" + Array.from(det.descriptor).join(",") + "]";
+  let results = [];
+  for (const f of faces) {
+    const vector = "[" + Array.from(f.descriptor).join(",") + "]";
     const { data } = await sb.rpc("search_face_ranked", {
       query_vector: vector,
       result_limit: RESULT_LIMIT
     });
-    if (data) rawResults.push(...data);
+    if (data) results.push(...data);
   }
 
-  const { primary, secondary } = splitResultsUltra(rawResults);
-  render(primary, secondary);
+  renderGOD(results);
 };
 
-/* ================= ULTRA SPLIT ================= */
-function splitResultsUltra(rows) {
-  // 1) dedupe per image (keep best distance)
-  const map = new Map();
-  for (const r of rows) {
-    if (!map.has(r.file_path) || r.distance < map.get(r.file_path).distance) {
-      map.set(r.file_path, r);
-    }
+/* ================= GOD MODE LOGIC ================= */
+function renderGOD(rows) {
+  let list = rows
+    .filter(r => r.distance <= HARD_MAX)
+    .sort((a,b)=>a.distance-b.distance);
+
+  if (!list.length) return;
+
+  // Primary cluster
+  let primaryRaw = [list[0]];
+  for (let i=1;i<list.length;i++){
+    const jump = list[i].distance - list[i-1].distance;
+    if (list[i].distance <= PRIMARY_MAX && jump <= MAX_JUMP)
+      primaryRaw.push(list[i]);
+    else break;
   }
 
-  let list = Array.from(map.values());
+  // Identity consistency
+  const anchors = primaryRaw.slice(0,3);
+  const primary = primaryRaw.filter(r=>{
+    let v=0;
+    for (const a of anchors)
+      if (Math.abs(r.distance-a.distance)<0.08) v++;
+    return v>=2 || anchors.length===1;
+  });
 
-  // 2) hard gate
-  list = list.filter(r => r.distance <= HARD_MAX);
-  list.sort((a, b) => a.distance - b.distance);
-  if (!list.length) return { primary: [], secondary: [] };
+  // Secondary = everything else
+  let secondary = list.slice(primaryRaw.length);
 
-  // 3) build primary cluster
-  const primary = [list[0]];
-  for (let i = 1; i < list.length; i++) {
-    const prev = list[i - 1];
-    const cur = list[i];
-    const jump = cur.distance - prev.distance;
+  // UX GUARANTEE
+  if (secondary.length===0 && primary.length>1)
+    secondary = primary.slice(1);
 
-    if (
-      cur.distance <= PRIMARY_SOFT ||
-      (cur.distance <= PRIMARY_HARD && jump <= MAX_JUMP)
-    ) {
-      primary.push(cur);
-    } else {
-      break;
-    }
+  draw(primary, "primaryBox");
+  if (secondary.length){
+    el("secondarySection").classList.remove("hidden");
+    draw(secondary, "secondaryBox");
   }
 
-  // 4) density rule
-  if (primary.length < MIN_CLUSTER) {
-    // ถ้าไม่เป็นกลุ่มจริง → ลดความมั่นใจ
-    return { primary: primary.slice(0, 1), secondary: list.slice(1) };
-  }
-
-  // 5) secondary = ที่เหลือ
-  const secondary = list.slice(primary.length);
-
-  return { primary, secondary };
-}
-
-/* ================= RENDER ================= */
-function render(primary, secondary) {
-  renderBox(primary, primaryBox);
-
-  if (secondary.length > 0 || primary.length > 1) {
-  secondarySection.classList.remove("hidden");
-
-  // fallback: เอารูป primary ที่เหลือมาใส่ secondary
-  const fallbackSecondary =
-    secondary.length > 0
-      ? secondary
-      : primary.slice(1);
-
-  renderBox(fallbackSecondary, secondaryBox);
-}
-
-
-  resultInfo.classList.remove("hidden");
-  resultInfo.innerText =
+  el("info").classList.remove("hidden");
+  el("info").innerText =
     `พบรูปของคุณ ${primary.length} ภาพ` +
     (secondary.length ? ` • รูปเพิ่มเติม ${secondary.length} ภาพ` : "");
 }
 
-function renderBox(rows, box) {
-  box.innerHTML = "";
-  rows.forEach((r, i) => {
+/* ================= RENDER ================= */
+function draw(rows, boxId){
+  const box = el(boxId);
+  rows.forEach((r,i)=>{
     const url = sb.storage.from("gallery")
       .getPublicUrl(r.file_path).data.publicUrl;
 
-    const card = document.createElement("div");
-    card.className = "card bg-slate-800 rounded-2xl overflow-hidden";
-    card.innerHTML = `
+    const d = document.createElement("div");
+    d.className = "card bg-slate-800 rounded-2xl overflow-hidden";
+    d.innerHTML = `
       <img src="${url}" class="w-full h-56 object-cover cursor-pointer"
-        onclick="openPreview('${url}','photo_${i+1}.jpg')">
+        onclick="openModal('${url}','photo_${i+1}.jpg')">
       <div class="p-3 text-xs text-gray-400">
-        Similarity ${(1 - r.distance).toFixed(2)}
+        Similarity ${(1-r.distance).toFixed(2)}
       </div>`;
-    box.appendChild(card);
+    box.appendChild(d);
   });
 }
-</script>
 
+/* ================= PREVIEW + WATERMARK ================= */
+async function openModal(url, name){
+  el("modal").classList.remove("hidden");
+  const img = new Image(), logo = new Image();
+  img.crossOrigin = logo.crossOrigin = "anonymous";
+  img.src = url; logo.src = LOGO_URL;
+
+  await Promise.all([img.onload, logo.onload]);
+
+  const c = el("canvas"), ctx = c.getContext("2d");
+  c.width = img.width; c.height = img.height;
+  ctx.drawImage(img,0,0);
+
+  const pad = c.width*0.03;
+  ctx.globalAlpha = 0.45;
+  ctx.fillStyle = "white";
+  ctx.font = `bold ${c.width*0.02}px Arial`;
+  ctx.textAlign = "center";
+  ctx.fillText(
+    "BANGWAD CHARITY RUN 2025 | OFFICIAL PHOTOGRAPHER",
+    c.width/2, c.height-pad*0.4
+  );
+  ctx.globalAlpha = 1;
+
+  const w = c.width*0.15;
+  ctx.drawImage(
+    logo,
+    c.width-w-pad,
+    c.height-(w*(logo.height/logo.width))-pad*1.6,
+    w, w*(logo.height/logo.width)
+  );
+
+  el("downloadBtn").onclick = ()=>{
+    const a = document.createElement("a");
+    a.href = c.toDataURL("image/jpeg",0.95);
+    a.download = name;
+    a.click();
+  };
+}
+
+function closeModal(){
+  el("modal").classList.add("hidden");
+}
+
+/* ===== Block Right Click & DevTools ===== */
+document.addEventListener("contextmenu",e=>e.preventDefault());
+document.addEventListener("keydown",e=>{
+  const k=e.key.toUpperCase();
+  if(k==="F12"||(e.ctrlKey&&e.shiftKey&&["I","J","C"].includes(k))||(e.ctrlKey&&k==="U"))
+    e.preventDefault();
+});
+</script>
 
 </body>
 </html>
