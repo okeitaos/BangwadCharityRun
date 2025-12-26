@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
-<title>ค้นหาภาพของคุณ | Bangwad Charity Run</title>
+<title>ค้นหาภาพของคุณ | Charity Run</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
 <script src="https://cdn.tailwindcss.com"></script>
@@ -11,78 +11,76 @@
 
 <style>
 .card {
-  transition: transform .25s ease, box-shadow .25s ease;
+  transition: transform .2s, box-shadow .2s;
 }
 .card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 18px 40px rgba(0,0,0,.45);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(0,0,0,.4);
 }
 </style>
 </head>
 
-<body class="bg-slate-950 text-white min-h-screen select-none">
+<body class="bg-slate-900 text-white min-h-screen">
 
-<div class="max-w-7xl mx-auto px-4 py-8 space-y-8">
+<div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
-<!-- HEADER -->
-<h1 class="text-3xl md:text-4xl font-extrabold text-center text-yellow-400">
+<h1 class="text-2xl md:text-3xl font-bold text-center text-yellow-400">
 🏃‍♂️ ค้นหาภาพของคุณ
 </h1>
-<p class="text-center text-gray-400 text-sm">
-ระบบค้นหาภาพอัจฉริยะ • เจอเฉพาะ “คุณ” เท่านั้น
-</p>
 
-<!-- UPLOAD -->
-<div class="bg-slate-800 rounded-2xl p-6 space-y-3">
+<!-- Upload -->
+<div class="bg-slate-800 rounded-2xl p-5 space-y-3">
   <input id="fileInput" type="file" accept="image/*"
     class="block w-full text-sm
     file:bg-yellow-500 file:text-black
-    file:px-6 file:py-2 file:rounded-xl" />
+    file:px-5 file:py-2 file:rounded-xl" />
   <div id="status" class="text-sm text-gray-300"></div>
 </div>
 
-<!-- QUERY PREVIEW -->
-<div id="queryBox" class="hidden bg-slate-800 rounded-2xl p-4 text-center">
-  <p class="text-xs text-gray-400 mb-2">ภาพที่ใช้ค้นหา</p>
-  <img id="queryImg" class="mx-auto max-h-64 rounded-xl border border-yellow-400/30">
+<!-- Query Preview -->
+<div id="queryPreviewBox"
+  class="hidden bg-slate-800 rounded-2xl p-4 text-center">
+  <p class="text-sm text-gray-400 mb-2">ภาพที่ใช้ค้นหา</p>
+  <img id="queryPreviewImg"
+    class="mx-auto rounded-xl max-h-64 border border-yellow-500/40">
 </div>
 
-<!-- INFO -->
-<div id="info" class="hidden text-center text-sm text-gray-300"></div>
+<div id="resultInfo"
+  class="hidden text-sm text-center text-gray-300"></div>
 
-<!-- PRIMARY -->
-<section>
-<h2 class="text-sm text-green-400 text-center mb-3">
+<!-- Primary -->
+<div>
+<h2 class="text-sm text-green-400 mb-2 text-center">
 ✅ รูปของคุณ (มั่นใจสูง)
 </h2>
 <div id="primaryBox"
-  class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5"></div>
-</section>
+  class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+</div>
 
-<!-- SECONDARY -->
-<section id="secondarySection" class="hidden">
-<h2 class="text-sm text-yellow-400 text-center mb-3">
+<!-- Secondary -->
+<div id="secondarySection" class="hidden mt-8">
+<h2 class="text-sm text-yellow-400 mb-2 text-center">
 📌 รูปเพิ่มเติม (อาจเป็นภาพของคุณ)
 </h2>
 <div id="secondaryBox"
-  class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5"></div>
-</section>
+  class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+</div>
 
 </div>
 
 <!-- PREVIEW MODAL -->
-<div id="modal"
-  class="fixed inset-0 bg-black/90 hidden z-50 flex items-center justify-center">
+<div id="previewModal"
+  class="fixed inset-0 bg-black/80 hidden z-50 flex items-center justify-center">
   <div class="relative max-w-6xl w-full p-4">
-    <button onclick="closeModal()"
-      class="absolute top-2 right-2 text-white text-3xl">✖</button>
+    <button onclick="closePreview()"
+      class="absolute top-2 right-2 text-white text-2xl">✖</button>
 
-    <canvas id="canvas"
-      class="w-full max-h-[85vh] rounded-xl mb-4"></canvas>
+    <canvas id="previewCanvas"
+      class="w-full max-h-[85vh] object-contain rounded-xl mb-4"></canvas>
 
     <div class="text-center">
       <button id="downloadBtn"
-        class="bg-yellow-500 text-black px-8 py-3 rounded-xl font-bold">
+        class="bg-yellow-500 text-black px-6 py-2 rounded-lg font-semibold">
         ⬇️ ดาวน์โหลดรูป (มีลายน้ำ)
       </button>
     </div>
@@ -97,179 +95,230 @@ const LOGO_URL =
 "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
 
 const RESULT_LIMIT = 200;
+
+/* GOD MODE++ THRESHOLDS */
 const HARD_MAX = 0.45;
-const PRIMARY_MAX = 0.30;
-const MAX_JUMP = 0.12;
+const CORE_MAX = 0.30;
+const CENTROID_PRIMARY = 0.12;
+const CENTROID_SECONDARY = 0.18;
 /* ========================================= */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const el = id => document.getElementById(id);
+const fileInput = document.getElementById("fileInput");
+const statusEl = document.getElementById("status");
+const resultInfo = document.getElementById("resultInfo");
+const primaryBox = document.getElementById("primaryBox");
+const secondaryBox = document.getElementById("secondaryBox");
+const secondarySection = document.getElementById("secondarySection");
+const queryPreviewBox = document.getElementById("queryPreviewBox");
+const queryPreviewImg = document.getElementById("queryPreviewImg");
+
+let currentFilename = "";
 
 /* ================= LOAD MODELS ================= */
 (async () => {
-  const URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
-  el("status").innerText = "⏳ โหลดระบบ AI...";
-  await faceapi.nets.tinyFaceDetector.loadFromUri(URL);
-  await faceapi.nets.faceLandmark68Net.loadFromUri(URL);
-  await faceapi.nets.faceRecognitionNet.loadFromUri(URL);
-  el("status").innerText = "✅ พร้อมใช้งาน";
+  const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
+  statusEl.innerText = "⏳ โหลดโมเดลใบหน้า...";
+  await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+  statusEl.innerText = "✅ พร้อมค้นหา";
 })();
 
 /* ================= SEARCH ================= */
-el("fileInput").onchange = async () => {
-  const file = el("fileInput").files[0];
+fileInput.onchange = async () => {
+  const file = fileInput.files[0];
   if (!file) return;
 
-  el("primaryBox").innerHTML = "";
-  el("secondaryBox").innerHTML = "";
-  el("secondarySection").classList.add("hidden");
-  el("info").classList.add("hidden");
+  primaryBox.innerHTML = "";
+  secondaryBox.innerHTML = "";
+  secondarySection.classList.add("hidden");
+  resultInfo.classList.add("hidden");
 
-  el("status").innerText = "📸 วิเคราะห์ใบหน้า...";
+  statusEl.innerText = "📸 ตรวจจับใบหน้า...";
+
   const img = await faceapi.bufferToImage(file);
-  el("queryImg").src = img.src;
-  el("queryBox").classList.remove("hidden");
+  queryPreviewImg.src = img.src;
+  queryPreviewBox.classList.remove("hidden");
 
-  const faces = await faceapi
+  const detections = await faceapi
     .detectAllFaces(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 }))
     .withFaceLandmarks()
     .withFaceDescriptors();
 
-  if (!faces.length) {
-    el("status").innerText = "❌ ไม่พบใบหน้า";
+  if (!detections.length) {
+    statusEl.innerText = "❌ ไม่พบใบหน้าในภาพ";
     return;
   }
 
-  el("status").innerText = `🔍 ค้นหาใบหน้า ${faces.length} คน...`;
+  statusEl.innerText = "🔍 กำลังค้นหา...";
 
-  let results = [];
-  for (const f of faces) {
-    const vector = "[" + Array.from(f.descriptor).join(",") + "]";
+  const allResults = [];
+
+  for (const det of detections) {
+    const vectorLiteral = "[" + Array.from(det.descriptor).join(",") + "]";
     const { data } = await sb.rpc("search_face_ranked", {
-      query_vector: vector,
+      query_vector: vectorLiteral,
       result_limit: RESULT_LIMIT
     });
-    if (data) results.push(...data);
+    if (data) allResults.push(...data);
   }
 
-  renderGOD(results);
+  renderResultsGodModePlus(allResults);
 };
 
-/* ================= GOD MODE LOGIC ================= */
-function renderGOD(rows) {
-  let list = rows
-    .filter(r => r.distance <= HARD_MAX)
-    .sort((a,b)=>a.distance-b.distance);
+/* ================= GOD MODE++ ================= */
+function renderResultsGodModePlus(rows) {
+  // Deduplicate by file_path (keep best)
+  const map = new Map();
+  for (const r of rows) {
+    if (!map.has(r.file_path) || r.distance < map.get(r.file_path).distance) {
+      map.set(r.file_path, r);
+    }
+  }
+  let list = Array.from(map.values());
 
+  // Hard gate
+  list = list.filter(r => r.distance <= HARD_MAX);
   if (!list.length) return;
 
-  // Primary cluster
-  let primaryRaw = [list[0]];
-  for (let i=1;i<list.length;i++){
-    const jump = list[i].distance - list[i-1].distance;
-    if (list[i].distance <= PRIMARY_MAX && jump <= MAX_JUMP)
-      primaryRaw.push(list[i]);
-    else break;
+  // Sort
+  list.sort((a,b)=>a.distance-b.distance);
+
+  // Build identity core
+  const core = list.filter(r => r.distance <= CORE_MAX).slice(0,5);
+  if (!core.length) core.push(list[0]);
+
+  const centroid =
+    core.reduce((s,r)=>s+r.distance,0) / core.length;
+
+  const primary = [];
+  const secondary = [];
+
+  for (const r of list) {
+    const dCentroid = Math.abs(r.distance - centroid);
+
+    if (dCentroid <= CENTROID_PRIMARY && r.distance <= CORE_MAX) {
+      primary.push(r);
+    } else if (dCentroid <= CENTROID_SECONDARY) {
+      secondary.push(r);
+    }
   }
 
-  // Identity consistency
-  const anchors = primaryRaw.slice(0,3);
-  const primary = primaryRaw.filter(r=>{
-    let v=0;
-    for (const a of anchors)
-      if (Math.abs(r.distance-a.distance)<0.08) v++;
-    return v>=2 || anchors.length===1;
-  });
-
-  // Secondary = everything else
-  let secondary = list.slice(primaryRaw.length);
-
-  // UX GUARANTEE
-  if (secondary.length===0 && primary.length>1)
-    secondary = primary.slice(1);
-
-  draw(primary, "primaryBox");
-  if (secondary.length){
-    el("secondarySection").classList.remove("hidden");
-    draw(secondary, "secondaryBox");
+  // UX guarantee
+  let secondaryFinal = secondary;
+  if (!secondaryFinal.length && primary.length > 1) {
+    secondaryFinal = primary.slice(1);
   }
 
-  el("info").classList.remove("hidden");
-  el("info").innerText =
+  renderBox(primary, primaryBox);
+
+  secondarySection.classList.remove("hidden");
+  renderBox(secondaryFinal, secondaryBox);
+
+  resultInfo.classList.remove("hidden");
+  resultInfo.innerText =
     `พบรูปของคุณ ${primary.length} ภาพ` +
-    (secondary.length ? ` • รูปเพิ่มเติม ${secondary.length} ภาพ` : "");
+    (secondaryFinal.length
+      ? ` • รูปเพิ่มเติม ${secondaryFinal.length} ภาพ`
+      : "");
 }
 
 /* ================= RENDER ================= */
-function draw(rows, boxId){
-  const box = el(boxId);
+function renderBox(rows, box) {
+  box.innerHTML = "";
   rows.forEach((r,i)=>{
     const url = sb.storage.from("gallery")
       .getPublicUrl(r.file_path).data.publicUrl;
 
-    const d = document.createElement("div");
-    d.className = "card bg-slate-800 rounded-2xl overflow-hidden";
-    d.innerHTML = `
+    const card = document.createElement("div");
+    card.className = "card bg-slate-800 rounded-2xl overflow-hidden";
+
+    card.innerHTML = `
       <img src="${url}" class="w-full h-56 object-cover cursor-pointer"
-        onclick="openModal('${url}','photo_${i+1}.jpg')">
+        onclick="openPreview('${url}','photo_${i+1}.jpg')">
       <div class="p-3 text-xs text-gray-400">
         Similarity ${(1-r.distance).toFixed(2)}
       </div>`;
-    box.appendChild(d);
+    box.appendChild(card);
   });
 }
 
 /* ================= PREVIEW + WATERMARK ================= */
-async function openModal(url, name){
-  el("modal").classList.remove("hidden");
-  const img = new Image(), logo = new Image();
-  img.crossOrigin = logo.crossOrigin = "anonymous";
-  img.src = url; logo.src = LOGO_URL;
+async function openPreview(url, filename) {
+  currentFilename = filename;
+  document.getElementById("previewModal").classList.remove("hidden");
+  await drawPreviewWithWatermark(url);
 
-  await Promise.all([img.onload, logo.onload]);
-
-  const c = el("canvas"), ctx = c.getContext("2d");
-  c.width = img.width; c.height = img.height;
-  ctx.drawImage(img,0,0);
-
-  const pad = c.width*0.03;
-  ctx.globalAlpha = 0.45;
-  ctx.fillStyle = "white";
-  ctx.font = `bold ${c.width*0.02}px Arial`;
-  ctx.textAlign = "center";
-  ctx.fillText(
-    "BANGWAD CHARITY RUN 2025 | OFFICIAL PHOTOGRAPHER",
-    c.width/2, c.height-pad*0.4
-  );
-  ctx.globalAlpha = 1;
-
-  const w = c.width*0.15;
-  ctx.drawImage(
-    logo,
-    c.width-w-pad,
-    c.height-(w*(logo.height/logo.width))-pad*1.6,
-    w, w*(logo.height/logo.width)
-  );
-
-  el("downloadBtn").onclick = ()=>{
+  document.getElementById("downloadBtn").onclick = () => {
+    const canvas = document.getElementById("previewCanvas");
     const a = document.createElement("a");
-    a.href = c.toDataURL("image/jpeg",0.95);
-    a.download = name;
+    a.href = canvas.toDataURL("image/jpeg", 0.95);
+    a.download = filename;
     a.click();
   };
 }
 
-function closeModal(){
-  el("modal").classList.add("hidden");
+function closePreview() {
+  document.getElementById("previewModal").classList.add("hidden");
 }
 
-/* ===== Block Right Click & DevTools ===== */
-document.addEventListener("contextmenu",e=>e.preventDefault());
-document.addEventListener("keydown",e=>{
-  const k=e.key.toUpperCase();
-  if(k==="F12"||(e.ctrlKey&&e.shiftKey&&["I","J","C"].includes(k))||(e.ctrlKey&&k==="U"))
-    e.preventDefault();
+async function drawPreviewWithWatermark(imageUrl) {
+  const img = new Image();
+  const logo = new Image();
+  img.crossOrigin = "anonymous";
+  logo.crossOrigin = "anonymous";
+  img.src = imageUrl;
+  logo.src = LOGO_URL;
+
+  await Promise.all([
+    new Promise(r => img.onload = r),
+    new Promise(r => logo.onload = r)
+  ]);
+
+  const canvas = document.getElementById("previewCanvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = img.width;
+  canvas.height = img.height;
+
+  ctx.drawImage(img, 0, 0);
+
+  const pad = canvas.width * 0.03;
+
+  ctx.save();
+  ctx.globalAlpha = 0.45;
+  ctx.fillStyle = "white";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.font = `bold ${Math.round(canvas.width * 0.020)}px Arial`;
+  ctx.fillText(
+    "BANGWAD CHARITY RUN 2025 | OFFICIAL PHOTOGRAPHER",
+    canvas.width / 2,
+    canvas.height - pad * 0.4
+  );
+  ctx.restore();
+
+  const logoW = canvas.width * 0.15;
+  const logoH = logoW * (logo.height / logo.width);
+  ctx.drawImage(
+    logo,
+    canvas.width - logoW - pad,
+    canvas.height - logoH - pad * 1.6,
+    logoW,
+    logoH
+  );
+}
+
+/* ===== Disable Right Click & DevTools ===== */
+document.addEventListener("contextmenu", e => e.preventDefault());
+document.addEventListener("keydown", e => {
+  const k = e.key.toUpperCase();
+  if (
+    k === "F12" ||
+    (e.ctrlKey && e.shiftKey && ["I","J","C"].includes(k)) ||
+    (e.ctrlKey && k === "U")
+  ) e.preventDefault();
 });
 </script>
 
