@@ -2,20 +2,21 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
-<title>ค้นหาภาพของคุณ | Charity Run</title>
+<title>ค้นหาภาพของคุณ | Bangwad Charity Run</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 
 <style>
-.card {
-  transition: transform .2s, box-shadow .2s;
-}
+.card { transition:.2s }
 .card:hover {
   transform: translateY(-4px);
   box-shadow: 0 10px 25px rgba(0,0,0,.4);
+}
+.debug {
+  font-size: 10px;
+  opacity: .75;
 }
 </style>
 </head>
@@ -39,7 +40,7 @@
 
 <!-- Query Preview -->
 <div id="queryPreviewBox"
-  class="hidden bg-slate-800 rounded-2xl p-4 text-center">
+  class="hidden bg-slate-800 rounded-xl p-4 text-center">
   <p class="text-sm text-gray-400 mb-2">ภาพที่ใช้ค้นหา</p>
   <img id="queryPreviewImg"
     class="mx-auto rounded-xl max-h-64 border border-yellow-500/40">
@@ -48,7 +49,7 @@
 <div id="resultInfo"
   class="hidden text-sm text-center text-gray-300"></div>
 
-<!-- Primary -->
+<!-- PRIMARY -->
 <div>
 <h2 class="text-sm text-green-400 mb-2 text-center">
 ✅ รูปของคุณ (มั่นใจสูง)
@@ -57,7 +58,7 @@
   class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
 </div>
 
-<!-- Secondary -->
+<!-- SECONDARY -->
 <div id="secondarySection" class="hidden mt-8">
 <h2 class="text-sm text-yellow-400 mb-2 text-center">
 📌 รูปเพิ่มเติม (อาจเป็นภาพของคุณ)
@@ -89,50 +90,44 @@
 
 <script>
 /* ================= CONFIG ================= */
-const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
+const SERVER_API =
+  "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/face-search"; // 🔥 เปลี่ยน
 const LOGO_URL =
   "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
-
-const RESULT_LIMIT = 200;
 /* ========================================= */
-
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const fileInput = document.getElementById("fileInput");
 const statusEl = document.getElementById("status");
+const queryPreviewBox = document.getElementById("queryPreviewBox");
+const queryPreviewImg = document.getElementById("queryPreviewImg");
 const resultInfo = document.getElementById("resultInfo");
+
 const primaryBox = document.getElementById("primaryBox");
 const secondaryBox = document.getElementById("secondaryBox");
 const secondarySection = document.getElementById("secondarySection");
-const queryPreviewBox = document.getElementById("queryPreviewBox");
-const queryPreviewImg = document.getElementById("queryPreviewImg");
 
 let currentFilename = "";
 
 /* ================= LOAD MODELS ================= */
-(async () => {
-  const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
+(async()=>{
+  const URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
   statusEl.innerText = "⏳ โหลดโมเดลใบหน้า...";
-  await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-  await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-  await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+  await faceapi.nets.tinyFaceDetector.loadFromUri(URL);
+  await faceapi.nets.faceLandmark68Net.loadFromUri(URL);
+  await faceapi.nets.faceRecognitionNet.loadFromUri(URL);
   statusEl.innerText = "✅ พร้อมค้นหา";
 })();
 
 /* ================= SEARCH ================= */
-fileInput.onchange = async () => {
+fileInput.onchange = async ()=>{
   const file = fileInput.files[0];
-  if (!file) return;
+  if(!file) return;
 
-  primaryBox.innerHTML = "";
-  secondaryBox.innerHTML = "";
-  secondarySection.classList.add("hidden");
-  resultInfo.classList.add("hidden");
+  resetUI();
 
   statusEl.innerText = "📸 ตรวจจับใบหน้า...";
-
   const img = await faceapi.bufferToImage(file);
+
   queryPreviewImg.src = img.src;
   queryPreviewBox.classList.remove("hidden");
 
@@ -141,77 +136,30 @@ fileInput.onchange = async () => {
     .withFaceLandmarks()
     .withFaceDescriptors();
 
-  if (!detections.length) {
+  if(!detections.length){
     statusEl.innerText = "❌ ไม่พบใบหน้าในภาพ";
     return;
   }
 
-  statusEl.innerText = "🔍 กำลังค้นหา...";
+  statusEl.innerText = "🧠 วิเคราะห์อัตลักษณ์ (AI)...";
 
-  const allResults = [];
+  const descriptors = detections.map(d => Array.from(d.descriptor));
 
-  for (const det of detections) {
-    const vectorLiteral = "[" + Array.from(det.descriptor).join(",") + "]";
-    const { data } = await sb.rpc("search_face_ranked", {
-      query_vector: vectorLiteral,
-      result_limit: RESULT_LIMIT
-    });
-    if (data) allResults.push(...data);
-  }
+  const res = await fetch(SERVER_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ descriptors })
+  });
 
-  renderResults(allResults);
+  const json = await res.json();
+  renderResults(json);
 };
 
-/* ================= GOD MODE FILTER ================= */
-function godModeFilter(rows) {
-  if (!rows || !rows.length) return { primary: [], secondary: [] };
-
-  const ABSOLUTE_KILL_MAX = 0.38;
-  const RELATIVE_MARGIN = 0.055;
-  const CLUSTER_EPS = 0.045;
-  const MIN_CLUSTER_SIZE = 3;
-  const MAX_SECONDARY = 0.45;
-
-  const sorted = [...rows].sort((a,b)=>a.distance-b.distance);
-  const anchor = sorted[0];
-  const anchorDistance = anchor.distance;
-
-  const hard = sorted.filter(r =>
-    r.distance <= ABSOLUTE_KILL_MAX &&
-    r.distance <= anchorDistance + RELATIVE_MARGIN
-  );
-
-  const cluster = hard.filter(r =>
-    Math.abs(r.distance - anchorDistance) <= CLUSTER_EPS
-  );
-
-  if (cluster.length < MIN_CLUSTER_SIZE) {
-    return { primary: [], secondary: [] };
-  }
-
-  const primary = cluster;
-
-  const secondary = sorted.filter(r =>
-    !primary.includes(r) &&
-    r.distance <= MAX_SECONDARY
-  );
-
-  return { primary, secondary };
-}
-
 /* ================= RENDER ================= */
-function renderResults(rows) {
-  const { primary, secondary } = godModeFilter(rows);
-
-  if (!primary.length) {
-    resultInfo.classList.remove("hidden");
-    resultInfo.innerText = "❌ ไม่พบภาพที่มั่นใจว่าเป็นคุณ";
-    return;
-  }
-
+function renderResults({ primary=[], secondary=[] }) {
   renderBox(primary, primaryBox);
 
-  if (secondary.length) {
+  if(secondary.length){
     secondarySection.classList.remove("hidden");
     renderBox(secondary, secondaryBox);
   }
@@ -220,51 +168,54 @@ function renderResults(rows) {
   resultInfo.innerText =
     `พบรูปของคุณ ${primary.length} ภาพ` +
     (secondary.length ? ` • รูปเพิ่มเติม ${secondary.length} ภาพ` : "");
+
+  statusEl.innerText = "🎉 ค้นหาสำเร็จ";
 }
 
-function renderBox(rows, box) {
+function renderBox(rows, box){
   box.innerHTML = "";
   rows.forEach((r,i)=>{
-    const url = sb.storage.from("gallery")
-      .getPublicUrl(r.file_path).data.publicUrl;
-
     const card = document.createElement("div");
     card.className = "card bg-slate-800 rounded-2xl overflow-hidden";
+
     card.innerHTML = `
-      <img src="${url}" class="w-full h-56 object-cover cursor-pointer"
-        onclick="openPreview('${url}','photo_${i+1}.jpg')">
-      <div class="p-3 text-xs text-gray-400">
-        Similarity ${(1-r.distance).toFixed(2)}
-      </div>`;
+      <img src="${r.url}"
+        class="w-full h-56 object-cover cursor-pointer"
+        onclick="openPreview('${r.url}','photo_${i+1}.jpg')">
+      <div class="p-3 text-xs text-gray-400 flex justify-between">
+        <span>Similarity ${r.similarity}</span>
+        ${r.debug ? `<span class="debug text-red-400">${r.debug}</span>` : ``}
+      </div>
+    `;
     box.appendChild(card);
   });
 }
 
 /* ================= PREVIEW + WATERMARK ================= */
-async function openPreview(url, filename) {
+async function openPreview(url, filename){
   currentFilename = filename;
   document.getElementById("previewModal").classList.remove("hidden");
-  await drawPreviewWithWatermark(url);
+  await drawPreview(url);
 
-  document.getElementById("downloadBtn").onclick = () => {
-    const canvas = document.getElementById("previewCanvas");
+  document.getElementById("downloadBtn").onclick = ()=>{
+    const c = document.getElementById("previewCanvas");
     const a = document.createElement("a");
-    a.href = canvas.toDataURL("image/jpeg", 0.95);
+    a.href = c.toDataURL("image/jpeg", 0.95);
     a.download = filename;
     a.click();
   };
 }
 
-function closePreview() {
+function closePreview(){
   document.getElementById("previewModal").classList.add("hidden");
 }
 
-async function drawPreviewWithWatermark(imageUrl) {
+async function drawPreview(url){
   const img = new Image();
   const logo = new Image();
   img.crossOrigin = "anonymous";
   logo.crossOrigin = "anonymous";
-  img.src = imageUrl;
+  img.src = url;
   logo.src = LOGO_URL;
 
   await Promise.all([
@@ -272,49 +223,46 @@ async function drawPreviewWithWatermark(imageUrl) {
     new Promise(r => logo.onload = r)
   ]);
 
-  const canvas = document.getElementById("previewCanvas");
-  const ctx = canvas.getContext("2d");
-  canvas.width = img.width;
-  canvas.height = img.height;
+  const c = document.getElementById("previewCanvas");
+  const ctx = c.getContext("2d");
+  c.width = img.width;
+  c.height = img.height;
 
-  ctx.drawImage(img, 0, 0);
+  ctx.drawImage(img,0,0);
 
-  const pad = canvas.width * 0.03;
+  const pad = c.width * 0.03;
 
+  // watermark text
   ctx.save();
   ctx.globalAlpha = 0.45;
   ctx.fillStyle = "white";
   ctx.textAlign = "center";
-  ctx.textBaseline = "bottom";
-  ctx.font = `bold ${Math.round(canvas.width * 0.020)}px Arial`;
+  ctx.font = `bold ${Math.round(c.width*0.02)}px Arial`;
   ctx.fillText(
     "BANGWAD CHARITY RUN 2025 | OFFICIAL PHOTOGRAPHER",
-    canvas.width / 2,
-    canvas.height - pad * 0.4
+    c.width/2,
+    c.height - pad*0.4
   );
   ctx.restore();
 
-  const logoW = canvas.width * 0.15;
-  const logoH = logoW * (logo.height / logo.width);
+  // logo
+  const lw = c.width * 0.15;
   ctx.drawImage(
     logo,
-    canvas.width - logoW - pad,
-    canvas.height - logoH - pad * 1.6,
-    logoW,
-    logoH
+    c.width - lw - pad,
+    c.height - lw - pad*1.4,
+    lw,
+    lw * (logo.height/logo.width)
   );
 }
 
-/* ===== Disable Right Click & DevTools ===== */
-document.addEventListener("contextmenu", e => e.preventDefault());
-document.addEventListener("keydown", e => {
-  const k = e.key.toUpperCase();
-  if (
-    k === "F12" ||
-    (e.ctrlKey && e.shiftKey && ["I","J","C"].includes(k)) ||
-    (e.ctrlKey && k === "U")
-  ) e.preventDefault();
-});
+/* ================= HELPERS ================= */
+function resetUI(){
+  primaryBox.innerHTML="";
+  secondaryBox.innerHTML="";
+  secondarySection.classList.add("hidden");
+  resultInfo.classList.add("hidden");
+}
 </script>
 
 </body>
