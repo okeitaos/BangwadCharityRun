@@ -92,12 +92,16 @@
 const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";
 const LOGO_URL =
-"https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
+  "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
 
 const RESULT_LIMIT = 200;
-const HARD_MAX_DISTANCE = 0.45;
-const PRIMARY_MAX = 0.30;
-const MAX_JUMP = 0.12;
+
+// 🔥 ULTRA PARAMS
+const HARD_MAX = 0.48;        // กันคนอื่น 100%
+const PRIMARY_SOFT = 0.33;    // ตัวเองชัวร์
+const PRIMARY_HARD = 0.38;    // ตัวเองยาก
+const MAX_JUMP = 0.09;        // continuity
+const MIN_CLUSTER = 2;
 /* ========================================= */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -151,73 +155,69 @@ fileInput.onchange = async () => {
 
   statusEl.innerText = "🔍 กำลังค้นหา...";
 
-  const allResults = [];
+  const rawResults = [];
 
   for (const det of detections) {
-    const vectorLiteral = "[" + Array.from(det.descriptor).join(",") + "]";
+    const vector = "[" + Array.from(det.descriptor).join(",") + "]";
     const { data } = await sb.rpc("search_face_ranked", {
-      query_vector: vectorLiteral,
+      query_vector: vector,
       result_limit: RESULT_LIMIT
     });
-    if (data) allResults.push(...data);
+    if (data) rawResults.push(...data);
   }
 
-  renderResults(allResults);
+  const { primary, secondary } = splitResultsUltra(rawResults);
+  render(primary, secondary);
 };
 
-/* ================= LAYER 4 ================= */
-function identityConsistencyFilter(results) {
-  if (results.length <= 2) return results;
-  const anchors = results.slice(0, 5);
-  return results.filter(r => {
-    let votes = 0;
-    for (const a of anchors) {
-      if (Math.abs(r.distance - a.distance) < 0.08) votes++;
+/* ================= ULTRA SPLIT ================= */
+function splitResultsUltra(rows) {
+  // 1) dedupe per image (keep best distance)
+  const map = new Map();
+  for (const r of rows) {
+    if (!map.has(r.file_path) || r.distance < map.get(r.file_path).distance) {
+      map.set(r.file_path, r);
     }
-    return votes >= 2;
-  });
-}
+  }
 
-/* ================= LAYER 5 ================= */
-function contextBoost(results) {
-  if (results.length <= 1) return results;
-  const boosted = [];
-  for (let i = 0; i < results.length; i++) {
-    const prev = results[i - 1];
-    const curr = results[i];
-    const next = results[i + 1];
+  let list = Array.from(map.values());
+
+  // 2) hard gate
+  list = list.filter(r => r.distance <= HARD_MAX);
+  list.sort((a, b) => a.distance - b.distance);
+  if (!list.length) return { primary: [], secondary: [] };
+
+  // 3) build primary cluster
+  const primary = [list[0]];
+  for (let i = 1; i < list.length; i++) {
+    const prev = list[i - 1];
+    const cur = list[i];
+    const jump = cur.distance - prev.distance;
+
     if (
-      (prev && prev.photographer_code === curr.photographer_code) ||
-      (next && next.photographer_code === curr.photographer_code)
+      cur.distance <= PRIMARY_SOFT ||
+      (cur.distance <= PRIMARY_HARD && jump <= MAX_JUMP)
     ) {
-      boosted.push(curr);
+      primary.push(cur);
+    } else {
+      break;
     }
   }
-  return boosted;
+
+  // 4) density rule
+  if (primary.length < MIN_CLUSTER) {
+    // ถ้าไม่เป็นกลุ่มจริง → ลดความมั่นใจ
+    return { primary: primary.slice(0, 1), secondary: list.slice(1) };
+  }
+
+  // 5) secondary = ที่เหลือ
+  const secondary = list.slice(primary.length);
+
+  return { primary, secondary };
 }
 
-/* ================= SPLIT RESULTS (FINAL UX + AI) ================= */
-function renderResults(rows) {
-  const sorted = rows
-    .filter(r => r.distance <= HARD_MAX_DISTANCE)
-    .sort((a, b) => a.distance - b.distance);
-
-  if (!sorted.length) return;
-
-  // Primary (strict)
-  let primaryRaw = [sorted[0]];
-  for (let i = 1; i < sorted.length; i++) {
-    const jump = sorted[i].distance - sorted[i - 1].distance;
-    if (sorted[i].distance <= PRIMARY_MAX && jump <= MAX_JUMP) {
-      primaryRaw.push(sorted[i]);
-    } else break;
-  }
-  const primary = identityConsistencyFilter(primaryRaw);
-
-  // Secondary (relaxed)
-  const secondaryRaw = sorted.slice(primaryRaw.length);
-  const secondary = contextBoost(secondaryRaw);
-
+/* ================= RENDER ================= */
+function render(primary, secondary) {
   renderBox(primary, primaryBox);
 
   if (secondary.length) {
@@ -231,7 +231,6 @@ function renderResults(rows) {
     (secondary.length ? ` • รูปเพิ่มเติม ${secondary.length} ภาพ` : "");
 }
 
-/* ================= RENDER ================= */
 function renderBox(rows, box) {
   box.innerHTML = "";
   rows.forEach((r, i) => {
@@ -249,85 +248,8 @@ function renderBox(rows, box) {
     box.appendChild(card);
   });
 }
-
-/* ================= PREVIEW + WATERMARK ================= */
-async function openPreview(url, filename) {
-  currentFilename = filename;
-  document.getElementById("previewModal").classList.remove("hidden");
-  await drawPreviewWithWatermark(url);
-
-  document.getElementById("downloadBtn").onclick = () => {
-    const canvas = document.getElementById("previewCanvas");
-    const a = document.createElement("a");
-    a.href = canvas.toDataURL("image/jpeg", 0.95);
-    a.download = filename;
-    a.click();
-  };
-}
-
-function closePreview() {
-  document.getElementById("previewModal").classList.add("hidden");
-}
-
-async function drawPreviewWithWatermark(imageUrl) {
-  const img = new Image();
-  const logo = new Image();
-  img.crossOrigin = "anonymous";
-  logo.crossOrigin = "anonymous";
-  img.src = imageUrl;
-  logo.src = LOGO_URL;
-
-  await Promise.all([
-    new Promise(r => img.onload = r),
-    new Promise(r => logo.onload = r)
-  ]);
-
-  const canvas = document.getElementById("previewCanvas");
-  const ctx = canvas.getContext("2d");
-  canvas.width = img.width;
-  canvas.height = img.height;
-
-  ctx.drawImage(img, 0, 0);
-
-  const pad = canvas.width * 0.03;
-
-  // Text watermark
-  ctx.save();
-  ctx.globalAlpha = 0.45;
-  ctx.fillStyle = "white";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "bottom";
-  ctx.font = `bold ${Math.round(canvas.width * 0.020)}px Arial`;
-  ctx.fillText(
-    "BANGWAD CHARITY RUN 2025 | OFFICIAL PHOTOGRAPHER",
-    canvas.width / 2,
-    canvas.height - pad * 0.4
-  );
-  ctx.restore();
-
-  // Logo
-  const logoW = canvas.width * 0.15;
-  const logoH = logoW * (logo.height / logo.width);
-  ctx.drawImage(
-    logo,
-    canvas.width - logoW - pad,
-    canvas.height - logoH - pad * 1.6,
-    logoW,
-    logoH
-  );
-}
-
-/* ===== Disable Right Click & DevTools ===== */
-document.addEventListener("contextmenu", e => e.preventDefault());
-document.addEventListener("keydown", e => {
-  const k = e.key.toUpperCase();
-  if (
-    k === "F12" ||
-    (e.ctrlKey && e.shiftKey && ["I","J","C"].includes(k)) ||
-    (e.ctrlKey && k === "U")
-  ) e.preventDefault();
-});
 </script>
+
 
 </body>
 </html>
