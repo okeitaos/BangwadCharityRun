@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script> <!-- 🔥 ADD -->
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.4/dist/face-api.min.js"></script>
 
 <style>
@@ -28,6 +29,14 @@
 <h1 class="text-2xl md:text-3xl font-bold text-center text-yellow-400">
 🏃‍♂️ ค้นหาภาพของคุณ
 </h1>
+
+<!-- 🔥 EVENT SELECT -->
+<div class="bg-slate-800 rounded-xl p-4 text-center">
+  <label class="text-sm text-gray-400">เลือกงานวิ่ง</label>
+  <select id="eventSelect"
+    class="mt-2 w-full bg-slate-700 text-white p-2 rounded-lg">
+  </select>
+</div>
 
 <!-- Upload -->
 <div class="bg-slate-800 rounded-2xl p-5 space-y-3">
@@ -90,12 +99,19 @@
 
 <script>
 /* ================= CONFIG ================= */
+const SUPABASE_URL = "https://xjdjurdflowiwdxgkvfr.supabase.co"; // 🔥 ADD
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqZGp1cmRmbG93aXdkeGdrdmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMDk5OTEsImV4cCI6MjA2OTg4NTk5MX0.QtWt1IrY1UYKmj0spL3T8CkaQh9wq2P-_4b6eWB3ics";                     // 🔥 ADD
+
 const SERVER_API =
-  "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/face-search"; // 🔥 เปลี่ยน
+  "https://xjdjurdflowiwdxgkvfr.supabase.co/functions/v1/face-search";
+
 const LOGO_URL =
   "https://xjdjurdflowiwdxgkvfr.supabase.co/storage/v1/object/public/user-images/Logo-CharityRun3D.png";
 /* ========================================= */
 
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); // 🔥 ADD
+
+const eventSelect = document.getElementById("eventSelect"); // 🔥 ADD
 const fileInput = document.getElementById("fileInput");
 const statusEl = document.getElementById("status");
 const queryPreviewBox = document.getElementById("queryPreviewBox");
@@ -107,6 +123,23 @@ const secondaryBox = document.getElementById("secondaryBox");
 const secondarySection = document.getElementById("secondarySection");
 
 let currentFilename = "";
+
+/* ================= LOAD EVENTS 🔥 ================= */
+async function loadEvents(){
+  const { data } = await sb
+    .from("events")
+    .select("name, slug")
+    .eq("is_active", true)
+    .order("start_date");
+
+  data.forEach(e=>{
+    const opt = document.createElement("option");
+    opt.value = e.slug;
+    opt.textContent = e.name;
+    eventSelect.appendChild(opt);
+  });
+}
+loadEvents();
 
 /* ================= LOAD MODELS ================= */
 (async()=>{
@@ -144,11 +177,12 @@ fileInput.onchange = async ()=>{
   statusEl.innerText = "🧠 วิเคราะห์อัตลักษณ์ (AI)...";
 
   const descriptors = detections.map(d => Array.from(d.descriptor));
+  const event_slug = eventSelect.value; // 🔥 ADD
 
   const res = await fetch(SERVER_API, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ descriptors })
+    body: JSON.stringify({ descriptors, event_slug }) // 🔥 ADD
   });
 
   const json = await res.json();
@@ -189,71 +223,6 @@ function renderBox(rows, box){
     `;
     box.appendChild(card);
   });
-}
-
-/* ================= PREVIEW + WATERMARK ================= */
-async function openPreview(url, filename){
-  currentFilename = filename;
-  document.getElementById("previewModal").classList.remove("hidden");
-  await drawPreview(url);
-
-  document.getElementById("downloadBtn").onclick = ()=>{
-    const c = document.getElementById("previewCanvas");
-    const a = document.createElement("a");
-    a.href = c.toDataURL("image/jpeg", 0.95);
-    a.download = filename;
-    a.click();
-  };
-}
-
-function closePreview(){
-  document.getElementById("previewModal").classList.add("hidden");
-}
-
-async function drawPreview(url){
-  const img = new Image();
-  const logo = new Image();
-  img.crossOrigin = "anonymous";
-  logo.crossOrigin = "anonymous";
-  img.src = url;
-  logo.src = LOGO_URL;
-
-  await Promise.all([
-    new Promise(r => img.onload = r),
-    new Promise(r => logo.onload = r)
-  ]);
-
-  const c = document.getElementById("previewCanvas");
-  const ctx = c.getContext("2d");
-  c.width = img.width;
-  c.height = img.height;
-
-  ctx.drawImage(img,0,0);
-
-  const pad = c.width * 0.03;
-
-  // watermark text
-  ctx.save();
-  ctx.globalAlpha = 0.45;
-  ctx.fillStyle = "white";
-  ctx.textAlign = "center";
-  ctx.font = `bold ${Math.round(c.width*0.02)}px Arial`;
-  ctx.fillText(
-    "BANGWAD CHARITY RUN 2025 | OFFICIAL PHOTOGRAPHER",
-    c.width/2,
-    c.height - pad*0.4
-  );
-  ctx.restore();
-
-  // logo
-  const lw = c.width * 0.15;
-  ctx.drawImage(
-    logo,
-    c.width - lw - pad,
-    c.height - lw - pad*1.4,
-    lw,
-    lw * (logo.height/logo.width)
-  );
 }
 
 /* ================= HELPERS ================= */
